@@ -20,14 +20,23 @@ This document covers Session Manager and Observability as a unified design acros
 1. [Crate Structure](#1-crate-structure)
 2. [Session Manager Core](#2-session-manager-core)
 3. [Channel Ownership](#3-channel-ownership)
-4. [Connection Lifecycle & Reconnection](#4-connection-lifecycle--reconnection)
-5. [Bandwidth Arbiter](#5-bandwidth-arbiter)
-6. [Connection Profiles](#6-connection-profiles)
-7. [Recv Loop & Dispatch](#7-recv-loop--dispatch)
-8. [Observability: prism-metrics](#8-observability-prism-metrics)
-9. [Observability: Frame Tracing](#9-observability-frame-tracing)
-10. [Observability: Client Feedback](#10-observability-client-feedback)
-11. [Observability: Collection & Export](#11-observability-collection--export)
+4. [Capability Negotiation](#4-capability-negotiation)
+5. [Control Channel Protocol](#5-control-channel-protocol)
+6. [Connection Lifecycle & Reconnection](#6-connection-lifecycle--reconnection)
+7. [Channel Dispatch](#7-channel-dispatch)
+8. [Bandwidth Arbiter](#8-bandwidth-arbiter)
+9. [Connection Profiles](#9-connection-profiles)
+10. [Recv Loop](#10-recv-loop)
+11. [Client-Side Session](#11-client-side-session)
+12. [Graceful Shutdown](#12-graceful-shutdown)
+13. [Observability: prism-metrics](#13-observability-prism-metrics)
+14. [Observability: Frame Tracing](#14-observability-frame-tracing)
+15. [Observability: Client Feedback](#15-observability-client-feedback)
+16. [Observability: Collection & Export](#16-observability-collection--export)
+17. [Phase Mapping](#17-phase-mapping)
+18. [File Layout](#18-file-layout)
+19. [Testing Strategy](#19-testing-strategy)
+20. [Optimizations Index](#20-optimizations-index)
 12. [Phase Mapping](#12-phase-mapping)
 13. [File Layout](#13-file-layout)
 14. [Testing Strategy](#14-testing-strategy)
@@ -134,6 +143,41 @@ impl RoutingTable {
     pub fn update(&self, new_snapshot: RoutingSnapshot) {
         self.inner.store(Arc::new(new_snapshot));
     }
+
+    /// Incremental: batch multiple route changes into a single atomic swap.
+    /// Most operations use this (6 AddRoutes on client connect = 1 swap).
+    pub fn batch_update(&self, mutations: Vec<RoutingMutation>) {
+        let current = self.inner.load_full();
+        let mut new_snapshot = (*current).clone();
+        for mutation in mutations {
+            match mutation {
+                RoutingMutation::AddRoute { channel_id, entry } => {
+                    new_snapshot.channel_routes
+                        .entry(channel_id).or_default().push(entry);
+                }
+                RoutingMutation::RemoveClient(client_id) => {
+                    for routes in new_snapshot.channel_routes.values_mut() {
+                        routes.retain(|r| r.client_id != client_id);
+                    }
+                    new_snapshot.client_connections.remove(&client_id);
+                }
+                RoutingMutation::TransferChannel { channel_id, from, to_entry } => {
+                    if let Some(routes) = new_snapshot.channel_routes.get_mut(&channel_id) {
+                        routes.retain(|r| r.client_id != from);
+                        routes.push(to_entry);
+                    }
+                }
+            }
+        }
+        new_snapshot.generation += 1;
+        self.inner.store(Arc::new(new_snapshot));
+    }
+}
+
+pub enum RoutingMutation {
+    AddRoute { channel_id: u16, entry: RouteEntry },
+    RemoveClient(ClientId),
+    TransferChannel { channel_id: u16, from: ClientId, to_entry: RouteEntry },
 }
 ```
 
@@ -261,7 +305,161 @@ impl ChannelRegistry {
 
 ---
 
-## 4. Connection Lifecycle & Reconnection
+## 4. Capability Negotiation
+
+### 4.1 Negotiation Algorithm
+
+When a client connects, it sends `ClientCapabilities` (all channels it supports). The server intersects with its own capabilities and returns only mutually supported channels. Clients silently ignore missing channels — a Phase 3 client connecting to a Phase 1 server simply doesn't get Clipboard or FileShare.
+
+```rust
+pub struct CapabilityNegotiator {
+    server_channels: HashMap<u16, ChannelCap>,
+}
+
+impl CapabilityNegotiator {
+    pub fn negotiate(&self, client_caps: &ClientCapabilities) -> NegotiationResult {
+        let mut granted = Vec::new();
+        let mut rejected = Vec::new();
+
+        for client_ch in &client_caps.channels {
+            match self.server_channels.get(&client_ch.channel_id) {
+                Some(server_ch) => {
+                    let version = client_ch.channel_version.min(server_ch.channel_version);
+                    granted.push(NegotiatedChannel {
+                        channel_id: client_ch.channel_id,
+                        version,
+                        client_config: client_ch.config.clone(),
+                        server_config: server_ch.config.clone(),
+                    });
+                }
+                None => {
+                    rejected.push(client_ch.channel_id);
+                }
+            }
+        }
+
+        let display_codec = self.negotiate_codec(client_caps);
+
+        NegotiationResult {
+            protocol_version: client_caps.protocol_version.min(1),
+            channels: granted,
+            rejected_channels: rejected,
+            display_codec,
+        }
+    }
+
+    fn negotiate_codec(&self, client: &ClientCapabilities) -> String {
+        let client_codecs: HashSet<_> = client.performance.supported_codecs.iter().collect();
+        let server_codecs = self.server_channels.get(&CHANNEL_DISPLAY)
+            .and_then(|c| match &c.config {
+                ChannelConfig::Display(d) => Some(&d.supported_codecs),
+                _ => None,
+            });
+
+        // Priority: H.265 -> H.264 -> AV1 -> software
+        for codec in ["h265", "h264", "av1"] {
+            if client_codecs.contains(&codec.to_string()) {
+                if let Some(server) = server_codecs {
+                    if server.iter().any(|c| c == codec) {
+                        return codec.to_string();
+                    }
+                }
+            }
+        }
+        "h264".to_string()
+    }
+}
+
+pub struct NegotiatedChannel {
+    pub channel_id: u16,
+    pub version: u16,
+    pub client_config: ChannelConfig,
+    pub server_config: ChannelConfig,
+}
+
+pub struct NegotiationResult {
+    pub protocol_version: u16,
+    pub channels: Vec<NegotiatedChannel>,
+    pub rejected_channels: Vec<u16>,
+    pub display_codec: String,
+}
+```
+
+### 4.2 Version Compatibility
+
+| Client Version | Server Version | Behavior |
+|---------------|---------------|----------|
+| v1 | v1 | Full compatibility |
+| v2 | v1 | Server offers v1 channels only. Client uses v1 semantics. |
+| v1 | v2 | Client offers v1 channels only. Server responds at v1. |
+| v2 | v2 | Full v2 compatibility |
+
+Per-channel versioning allows gradual evolution. A v2 Display channel can coexist with a v1 Clipboard channel.
+
+---
+
+## 5. Control Channel Protocol
+
+### 5.1 Message Type Registry
+
+All Control channel messages use the PRISM header with `channel_id = CHANNEL_CONTROL`. The `msg_type` field identifies the message:
+
+```rust
+pub mod control_msg {
+    // Session management
+    pub const HEARTBEAT: u8 = 0x01;
+    pub const HEARTBEAT_ACK: u8 = 0x02;
+    pub const CAPABILITY_UPDATE: u8 = 0x03;
+    pub const PROFILE_SWITCH: u8 = 0x04;
+    pub const SESSION_INFO: u8 = 0x10;
+    pub const SHUTDOWN_NOTICE: u8 = 0x20;
+
+    // Quality & probing
+    pub const PROBE_REQUEST: u8 = 0x05;
+    pub const PROBE_RESPONSE: u8 = 0x06;
+    pub const CLIENT_FEEDBACK: u8 = 0x07;
+    pub const CLIENT_ALERT: u8 = 0x08;
+    pub const QUALITY_UPDATE: u8 = 0x0D;
+    pub const REDUCE_SEND_RATE: u8 = 0x0E;
+
+    // Overlay
+    pub const OVERLAY_TOGGLE: u8 = 0x09;
+    pub const OVERLAY_DATA: u8 = 0x0A;
+
+    // Security (delegated to SecurityGate)
+    pub const KEY_ROTATION: u8 = 0x0B;
+    pub const CERT_RENEWAL: u8 = 0x0C;
+
+    // Multi-client
+    pub const CHANNEL_TRANSFER: u8 = 0x0F;
+    pub const MONITOR_LAYOUT: u8 = 0x11;
+
+    // Transport
+    pub const THROUGHPUT_TOKEN: u8 = 0x12;
+}
+```
+
+### 5.2 Message Payloads
+
+| Msg Type | Payload | Direction | Transport |
+|----------|---------|-----------|-----------|
+| HEARTBEAT | Empty (header only, 16 bytes) | Both | Datagram |
+| HEARTBEAT_ACK | Empty | Both | Datagram |
+| PROBE_REQUEST | 8 bytes (send timestamp) | Both | Datagram |
+| PROBE_RESPONSE | 8 bytes (echoed timestamp) | Both | Datagram |
+| CLIENT_FEEDBACK | ClientFeedback struct (JSON) | Client→Server | Stream (framed) |
+| CLIENT_ALERT | ClientAlert struct (JSON) | Client→Server | Datagram |
+| OVERLAY_DATA | OverlayPacket (128 bytes binary) | Server→Client | Datagram |
+| QUALITY_UPDATE | ConnectionQuality summary (JSON) | Server→Client | Stream (framed) |
+| SHUTDOWN_NOTICE | ShutdownNotice struct (JSON) | Server→Client | Stream (framed) |
+| CHANNEL_TRANSFER | Transfer request/ack (JSON) | Both | Stream (framed) |
+| MONITOR_LAYOUT | MonitorLayout struct (JSON) | Server→Client | Stream (framed) |
+
+Lightweight messages (heartbeat, probe, overlay, alert) use datagrams. Structured messages (feedback, quality, shutdown) use the long-lived Control stream with FramedWriter/FramedReader.
+
+---
+
+## 6. Connection Lifecycle & Reconnection
 
 ### 4.1 Connection Flow
 
@@ -371,7 +569,104 @@ Any packet from a client resets its heartbeat timer — not just heartbeat messa
 
 ---
 
-## 5. Bandwidth Arbiter
+## 7. Channel Dispatch
+
+### 7.1 Channel Dispatcher
+
+Concrete mechanism for routing messages to channel handlers. Handlers register at startup.
+
+```rust
+pub struct ChannelDispatcher {
+    handlers: HashMap<u16, Arc<dyn ChannelHandler>>,
+    routing_table: Arc<RoutingTable>,
+    bandwidth_tracker: Arc<ChannelBandwidthTracker>,
+}
+
+impl ChannelDispatcher {
+    pub fn register(&mut self, handler: Arc<dyn ChannelHandler>) {
+        self.handlers.insert(handler.channel_id(), handler);
+    }
+
+    pub async fn dispatch_datagram(&self, from: ClientId, header: PrismHeader, data: Bytes) {
+        if let Some(handler) = self.handlers.get(&header.channel_id) {
+            let packet = PrismPacket { header, payload: data.slice(HEADER_SIZE..) };
+            match handler.handle(from, packet, &self.routing_table).await {
+                Ok(control_msgs) => {
+                    for msg in control_msgs {
+                        self.handle_control_msg(msg).await;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Channel 0x{:03X} handler error: {}", header.channel_id, e);
+                }
+            }
+        }
+    }
+
+    pub async fn handle_stream(
+        &self,
+        from: ClientId,
+        send: OwnedSendStream,
+        recv: OwnedRecvStream,
+    ) {
+        let mut framed = FramedReader::new(recv);
+        if let Ok(first_msg) = framed.recv().await {
+            if first_msg.len() >= HEADER_SIZE {
+                if let Ok(header) = PrismHeader::decode(&mut Bytes::from(first_msg.clone())) {
+                    if let Some(handler) = self.handlers.get(&header.channel_id) {
+                        handler.handle_stream(from, send, framed, &self.routing_table).await;
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### 7.2 ChannelHandler Trait (Revised)
+
+Adds `handle_stream()` for stream-based channels and `bandwidth_needs()` for arbiter integration:
+
+```rust
+pub trait ChannelHandler: Send + Sync {
+    fn channel_id(&self) -> u16;
+
+    /// Handle a datagram-delivered message.
+    async fn handle(
+        &self, from: ClientId, msg: PrismPacket, routes: &RoutingTable,
+    ) -> Result<Vec<ControlMsg>, ChannelError>;
+
+    /// Handle a stream-delivered channel. Called once per stream.
+    /// Default: frame-by-frame dispatch via handle().
+    async fn handle_stream(
+        &self,
+        from: ClientId,
+        send: OwnedSendStream,
+        recv: FramedReader,
+        routes: &RoutingTable,
+    ) {
+        // Default: read framed messages, dispatch via handle()
+        // Channels needing custom stream logic (FileShare, Control) override this.
+    }
+
+    /// Recovery state for reconnection (R5).
+    fn reconnect_state(&self, client: ClientId) -> ChannelRecoveryState;
+
+    /// Apply recovery after reconnect.
+    async fn apply_reconnect(
+        &self, client: ClientId, state: &ChannelRecoveryState, routes: &RoutingTable,
+    ) -> Result<Vec<ControlMsg>, ChannelError>;
+
+    /// Dynamic bandwidth needs for arbiter (default: no bandwidth needed).
+    fn bandwidth_needs(&self) -> BandwidthNeeds {
+        BandwidthNeeds { min_bps: 0, ideal_bps: 0, max_bps: 0, urgency: 0.0 }
+    }
+}
+```
+
+---
+
+## 8. Bandwidth Arbiter
 
 ### 5.1 Architecture (R13, R14, R47)
 
@@ -556,7 +851,7 @@ Display Engine subscribes and adjusts encoder bitrate on the next frame (~16ms r
 
 ---
 
-## 6. Connection Profiles (R39)
+## 9. Connection Profiles (R39)
 
 | Profile | Optimize For | Region Detection | Max FPS | Encoder Preset | Lossless Text |
 |---------|-------------|-----------------|---------|----------------|---------------|
@@ -587,7 +882,7 @@ Client selects during handshake or switches mid-session via Control channel. Pro
 
 ---
 
-## 7. Recv Loop & Dispatch
+## 10. Recv Loop
 
 Session Manager owns all receive I/O. Two tasks per connection (datagram + stream), one dispatch point.
 
@@ -640,7 +935,124 @@ Probe echoes route to the ConnectionProber via channel (prober never touches the
 
 ---
 
-## 8. Observability: prism-metrics
+## 11. Client-Side Session
+
+The client needs its own session logic: heartbeats, feedback, overlay rendering, server message handling.
+
+```rust
+pub struct ClientSessionState {
+    server_caps: ServerCapabilities,
+    negotiated_channels: Vec<NegotiatedChannel>,
+    channel_assignments: Vec<ChannelAssignment>,
+    profile: ConnectionProfile,
+    overlay_enabled: bool,
+    feedback_config: ClientFeedbackConfig,
+    feedback_state: FeedbackState,
+}
+
+enum FeedbackState {
+    Normal { next_report: Instant },
+    Stressed { next_report: Instant },
+}
+
+impl ClientSessionState {
+    async fn run(
+        &mut self,
+        control_stream: (FramedWriter, FramedReader),
+        conn: &dyn PrismConnection,
+    ) {
+        let (mut writer, mut reader) = control_stream;
+        let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(5));
+        let heartbeat_gen = HeartbeatGenerator::new();
+
+        loop {
+            tokio::select! {
+                _ = heartbeat_interval.tick() => {
+                    // Zero-allocation heartbeat (S11)
+                    conn.try_send_datagram(heartbeat_gen.next()).ok();
+                }
+                Ok(msg) = reader.recv() => {
+                    self.handle_server_message(&msg, &mut writer).await;
+                }
+                _ = self.feedback_timer() => {
+                    self.send_feedback(&mut writer).await;
+                }
+            }
+        }
+    }
+
+    async fn handle_server_message(&mut self, data: &[u8], writer: &mut FramedWriter) {
+        if data.len() < HEADER_SIZE { return; }
+        if let Ok(header) = PrismHeader::decode(&mut Bytes::from(data.to_vec())) {
+            match header.msg_type {
+                control_msg::OVERLAY_DATA => { /* update overlay display */ }
+                control_msg::QUALITY_UPDATE => { /* adjust decoders per recommendation */ }
+                control_msg::REDUCE_SEND_RATE => { /* reduce input/clipboard send rate */ }
+                control_msg::SHUTDOWN_NOTICE => { /* show notification, prepare reconnect */ }
+                control_msg::CERT_RENEWAL => { /* store new TLS cert hash (browser) */ }
+                control_msg::MONITOR_LAYOUT => { /* update multi-monitor layout */ }
+                control_msg::CHANNEL_TRANSFER => { /* handle ownership change */ }
+                _ => {}
+            }
+        }
+    }
+
+    fn feedback_timer(&self) -> tokio::time::Sleep {
+        let interval = match &self.feedback_state {
+            FeedbackState::Normal { .. } => self.feedback_config.normal_interval,
+            FeedbackState::Stressed { .. } => self.feedback_config.stressed_interval,
+        };
+        tokio::time::sleep(interval)
+    }
+}
+```
+
+---
+
+## 12. Graceful Shutdown
+
+### 12.1 Shutdown Sequence
+
+1. Session Manager sends `SHUTDOWN_NOTICE` to all clients (30s warning)
+2. Clients show "Server shutting down in 30s" notification
+3. Session Manager pauses new channel activations
+4. Active FileShare transfers signaled to pause (clients can resume later)
+5. After 30s (or all clients disconnect): close all connections
+6. Quinn endpoint closes
+
+```rust
+pub struct ShutdownNotice {
+    pub reason: String,           // "Server restarting", "User initiated"
+    pub seconds_remaining: u32,
+    pub will_restart: bool,       // client should attempt reconnect
+}
+```
+
+### 12.2 Tombstone Persistence
+
+If `will_restart` is true, tombstones are persisted to disk so clients can reconnect after server restart.
+
+```rust
+impl TombstoneStore {
+    pub fn persist(&self, path: &Path) -> Result<(), std::io::Error> {
+        let data = serde_json::to_vec(&self.tombstones)?;
+        std::fs::write(path, data)?;
+        Ok(())
+    }
+
+    pub fn restore(path: &Path, max_age: Duration) -> Result<Self, std::io::Error> {
+        if !path.exists() { return Ok(Self::new(max_age)); }
+        let data = std::fs::read(path)?;
+        let mut tombstones: HashMap<ClientId, Tombstone> = serde_json::from_slice(&data)?;
+        tombstones.retain(|_, t| t.created_at.elapsed() < max_age);
+        Ok(Self { tombstones, max_age })
+    }
+}
+```
+
+---
+
+## 13. Observability: prism-metrics
 
 ### 8.1 MetricsRecorder (Const-Generic, Compile-Time Safe)
 
@@ -815,7 +1227,7 @@ Prometheus labels: `prism_display_frames_encoded{client="uuid"}`.
 
 ---
 
-## 9. Observability: Frame Tracing
+## 14. Observability: Frame Tracing
 
 ### 9.1 Frame Trace
 
@@ -888,7 +1300,7 @@ impl FrameTracer {
 
 ---
 
-## 10. Observability: Client Feedback (R17)
+## 15. Observability: Client Feedback (R17)
 
 ### 10.1 Tiered Feedback Frequency
 
@@ -938,7 +1350,7 @@ Sent immediately, does not wait for feedback interval. Server reacts within one 
 
 ---
 
-## 11. Observability: Collection & Export
+## 16. Observability: Collection & Export
 
 ### 11.1 MetricsCollector
 
@@ -1012,7 +1424,7 @@ HTTP endpoint at `localhost:9090/metrics`. Converts `RecorderSnapshot` to Promet
 
 ---
 
-## 12. Phase Mapping
+## 17. Phase Mapping
 
 | Component | Phase 1 | Phase 2 | Phase 3 | Phase 4 |
 |-----------|---------|---------|---------|---------|
@@ -1032,10 +1444,15 @@ HTTP endpoint at `localhost:9090/metrics`. Converts `RecorderSnapshot` to Promet
 | Time-Series | 5-minute history | No change | No change | No change |
 | Client Overlay | 128-byte binary packet | No change | No change | No change |
 | Prometheus Export | Optional | No change | No change | No change |
+| Capability Negotiation | Extensible intersection | No change | No change | No change |
+| Control Protocol | 18 message types | No change | No change | No change |
+| Channel Dispatch | Handler registration + dispatch | No change | No change | No change |
+| Client Session | Heartbeat + feedback + overlay | No change | No change | No change |
+| Graceful Shutdown | Tombstone persistence | No change | No change | No change |
 
 ---
 
-## 13. File Layout
+## 18. File Layout
 
 ```
 crates/prism-metrics/
@@ -1069,6 +1486,11 @@ crates/prism-session/
             starvation.rs       # StarvationDetector, StarvationWarning
             tracker.rs          # ChannelBandwidthTracker (atomic counters)
         events.rs               # SessionEvent, ArbiterEvent
+        negotiation.rs          # CapabilityNegotiator, NegotiationResult
+        control_msg.rs          # Control channel message type registry
+        dispatch.rs             # ChannelDispatcher, handler registration
+        shutdown.rs             # ShutdownNotice, graceful shutdown
+        client_session.rs       # ClientSessionState (client-side logic)
 
 crates/prism-observability/
     Cargo.toml
@@ -1086,7 +1508,7 @@ crates/prism-observability/
 
 ---
 
-## 14. Testing Strategy
+## 19. Testing Strategy
 
 | Category | What | How |
 |----------|------|-----|
@@ -1116,10 +1538,18 @@ crates/prism-observability/
 | Perf: MetricsRecorder | inc/set/observe cost | Benchmark, verify < 5ns each |
 | Perf: Histogram record | Cost including min/max CAS | Benchmark, verify < 10ns |
 | Perf: Collector snapshot | All subsystem snapshots + time-series record | Benchmark, verify < 100us |
+| Unit: Negotiation | Phase 3 client → Phase 1 server, codec priority | Verify intersection, codec fallback |
+| Unit: Control msg | All 18 message types parse correctly | Round-trip encode/decode |
+| Unit: Dispatcher | Register handler, dispatch datagram, dispatch stream | Verify correct handler called |
+| Unit: Shutdown | Shutdown notice, tombstone persist/restore | Verify clients notified, tombstones survive |
+| Unit: Batch routing | 6 AddRoutes = 1 swap, RemoveClient cleans all | Verify generation increments once |
+| Integration: Client session | Client heartbeat, feedback tiering, overlay toggle | Two endpoints, verify message flow |
+| Integration: Graceful shutdown | Server shuts down, client reconnects | Tombstone persist + restore |
+| Integration: Capability negotiation | Mismatched versions, missing channels | Verify intersection behavior |
 
 ---
 
-## 15. Optimizations Index
+## 20. Optimizations Index
 
 | ID | Optimization | Impact | Phase |
 |----|-------------|--------|-------|
@@ -1138,6 +1568,11 @@ crates/prism-observability/
 | M6 | Adaptive frame trace sampling | Always captures slow frames | 1 |
 | M7 | Tiered client feedback (1s normal, 200ms stressed) | 200ms degradation detection | 1 |
 | M8 | Time-series ring buffers (5min history) | Sparkline overlay, 240KB memory | 1 |
+| S8 | Single-client routing cache (no atomic) | ~1ns reads in Phase 1 | 1 |
+| S9 | Batch routing mutations (single swap) | 6x fewer Arc allocations on connect | 1 |
+| S10 | Skip inactive clients in arbiter tick | Tick cost proportional to active clients | 1 |
+| S11 | Pre-built heartbeat packets | Zero-allocation heartbeat path | 1 |
+| S12 | ConnectionQuality caching (ArcSwap) | ~1ns quality read vs ~5µs recompute | 1 |
 
 ---
 
