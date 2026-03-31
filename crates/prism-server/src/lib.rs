@@ -29,3 +29,6 @@ pub use recv_loop::{classify_datagram, record_datagram_bandwidth, DatagramAction
 
 // test_pattern
 pub use test_pattern::TestPatternCapture;
+
+// acceptor
+pub use acceptor::{ConnectionAcceptor, SelfSignedCert};

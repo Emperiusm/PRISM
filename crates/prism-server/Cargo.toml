@@ -21,7 +21,7 @@ arc-swap.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
 quinn.workspace = true
-
-[dev-dependencies]
 rcgen.workspace = true
 rustls.workspace = true
+
+[dev-dependencies]
