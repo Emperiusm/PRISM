@@ -1,0 +1,1 @@
+// Quality degradation logic - placeholder

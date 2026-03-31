@@ -1,0 +1,1 @@
+// Damage region tracking - placeholder

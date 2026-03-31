@@ -1,0 +1,1 @@
+// Window lifecycle events - placeholder
