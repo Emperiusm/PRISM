@@ -5,6 +5,7 @@ pub mod client_session;
 pub mod recv_loop;
 pub mod quality_monitor;
 pub mod shutdown;
+pub mod test_pattern;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -25,3 +26,6 @@ pub use shutdown::{ShutdownCoordinator, ShutdownState};
 
 // recv_loop
 pub use recv_loop::{classify_datagram, record_datagram_bandwidth, DatagramAction};
+
+// test_pattern
+pub use test_pattern::TestPatternCapture;
