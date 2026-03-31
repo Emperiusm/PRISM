@@ -12,6 +12,7 @@ pub mod client_connections;
 pub mod dda_capture;
 pub mod hw_encoder;
 pub mod heartbeat_task;
+pub mod control_handler;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -50,3 +51,6 @@ pub use client_connections::ClientConnectionStore;
 
 // heartbeat_task
 pub use heartbeat_task::HeartbeatGenerator;
+
+// control_handler
+pub use control_handler::ControlChannelHandler;
