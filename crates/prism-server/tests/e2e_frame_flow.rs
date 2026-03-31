@@ -241,6 +241,57 @@ async fn noise_ik_handshake_over_quic_bi_stream() {
     );
 }
 
+/// An input datagram built by [`prism_client::InputSender`] arrives at the server
+/// with the correct channel ID and deserialises to the expected [`InputEvent`].
+#[tokio::test]
+async fn input_datagram_reaches_server() {
+    use prism_protocol::header::HEADER_SIZE;
+    use prism_protocol::input::{InputEvent, INPUT_EVENT_SIZE};
+
+    let (server_conn, client_conn) = make_loopback_pair().await;
+
+    // Build input datagram on the client side.
+    let mut input_sender = prism_client::InputSender::new();
+    let datagram = input_sender.build_datagram(
+        InputEvent::KeyDown { scancode: 0x1E, vk: 0x41 },
+    );
+
+    // Send client → server.
+    client_conn
+        .send_datagram(bytes::Bytes::copy_from_slice(&datagram))
+        .expect("send_datagram must succeed");
+
+    // Server receives within 2 seconds.
+    let received = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        server_conn.read_datagram(),
+    )
+    .await
+    .expect("read must not time out")
+    .expect("read_datagram must succeed");
+
+    // Verify the datagram is large enough and has the right channel.
+    assert!(
+        received.len() >= HEADER_SIZE + INPUT_EVENT_SIZE,
+        "datagram must be at least header + event bytes"
+    );
+    let header = prism_protocol::header::PrismHeader::decode_from_slice(&received)
+        .expect("header must decode");
+    assert_eq!(
+        header.channel_id,
+        prism_protocol::channel::CHANNEL_INPUT,
+        "channel must be INPUT"
+    );
+
+    // Deserialise the input event and confirm it matches.
+    let event = InputEvent::from_bytes(&received[HEADER_SIZE..])
+        .expect("InputEvent must parse");
+    assert!(
+        matches!(event, InputEvent::KeyDown { scancode: 0x1E, vk: 0x41 }),
+        "event must be KeyDown {{ scancode: 0x1E, vk: 0x41 }}, got {event:?}"
+    );
+}
+
 /// Unit-level smoke test: `build_display_datagram` produces a buffer whose
 /// decoded header has the correct channel, sequence, and message type.
 #[tokio::test]
