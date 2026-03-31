@@ -145,7 +145,7 @@ struct MeshInvite {
 }
 ```
 
-C receives: "Ehsan's Desktop wants to introduce Ehsan's Phone. Accept?" If accepted, C initiates direct pairing with B using B's public key from the invite. Both sides still verify via Noise NK. A's introduction just provides the initial key exchange. Phase 2+.
+C receives: "Ehsan's Desktop wants to introduce Ehsan's Phone. Accept?" If accepted, C initiates direct pairing with B using B's public key from the invite. Both sides still verify via Noise IK. A's introduction just provides the initial key exchange. Phase 2+.
 
 ### 2.2 Pairing Store
 
@@ -218,15 +218,15 @@ The TLS cert is derived from the Noise static key (see Section 5). When the key 
 
 ### 4.2 Forward Secrecy Note
 
-Noise NK provides forward secrecy for the initiator's messages but not the responder's. If the server's static key is later compromised, an attacker who recorded past handshakes could learn which clients connected historically. Data confidentiality is not affected — QUIC/TLS provides its own forward secrecy for all application data. Mitigation: periodic key rotation + hardware keystore makes key compromise harder.
+Noise IK provides forward secrecy for the initiator's messages but not the responder's. If the server's static key is later compromised, an attacker who recorded past handshakes could learn which clients connected historically. Data confidentiality is not affected — QUIC/TLS provides its own forward secrecy for all application data. Mitigation: periodic key rotation + hardware keystore makes key compromise harder.
 
 ---
 
 ## 5. Authentication Flow
 
-### 5.1 Noise NK Inside QUIC (Auth Only)
+### 5.1 Noise IK Inside QUIC (Auth Only)
 
-QUIC/TLS 1.3 handles all encryption. Noise NK runs as application-layer messages inside the encrypted QUIC connection, providing only mutual identity authentication. No double encryption.
+QUIC/TLS 1.3 handles all encryption. Noise IK runs as application-layer messages inside the encrypted QUIC connection, providing only mutual identity authentication. No double encryption.
 
 ```
 Client                                              Server
@@ -250,7 +250,7 @@ Client                                              Server
   |  -------->                                           |
   |                                                      |
   |  4. Server:                                          |
-  |     a. Process Noise NK (Curve25519 DH, ~50us)       |
+  |     a. Process Noise IK (Curve25519 DH, ~50us)       |
   |     b. Extract client's static key                   |
   |     c. Look up in pairing store                      |
   |     d. Unknown + no pairing in progress: silent drop  |
@@ -329,7 +329,7 @@ True zero-allocation pre-auth (validate before QUIC state) would require embeddi
 
 1. Rate limiter checks source IP (O(1), ~5ns)
 2. Accept QUIC TLS handshake (allocates ~2KB connection state)
-3. Read first app message (Noise NK init)
+3. Read first app message (Noise IK init)
 4. Validate identity (~50us)
 5. Unknown device + no pairing in progress: stop reading, drop connection handle. Do NOT send QUIC CONNECTION_CLOSE (that reveals the server exists). Let the connection idle-timeout silently. From the attacker's perspective, indistinguishable from "host doesn't exist" (R3).
 6. Blocked device: same as unknown — silent drop, no response.
@@ -687,7 +687,7 @@ Defense in depth:
 |-----------|---------|---------|---------|---------|
 | Identity | DeviceIdentity (UUID + key + name) | + Browser identity (Web Crypto) | No change | + Coordination service |
 | Pairing | Manual + Tailscale + SPAKE2 | + QR code + Mesh invite | No change | + Coordination discovery |
-| Auth | Noise NK inside QUIC, TLS cert bound | + Browser WebTransport path | No change | No change |
+| Auth | Noise IK inside QUIC, TLS cert bound | + Browser WebTransport path | No change | No change |
 | Pre-auth | Accept QUIC, validate, close fast | No change | No change | + Rate limiter (public relay) |
 | Key Rotation | Signed rotation + user confirm | No change | No change | + Quorum rotation |
 | SecurityGate | Full trait, AllowAll for all channels | No change | + Clipboard + Notify filters | + Camera/Sensor gates |
@@ -708,7 +708,7 @@ The contract that Transport and Session Manager code against from Phase 1:
 ```rust
 trait SecurityGate: Send + Sync {
     /// Authenticate a newly connected client.
-    /// Called after QUIC TLS, reads Noise NK init from first stream message.
+    /// Called after QUIC TLS, reads Noise IK init from first stream message.
     /// Returns None = close connection.
     async fn authenticate(
         &self,
@@ -790,7 +790,7 @@ crates/prism-security/src/
             tailscale.rs    # Tailscale auto-discovery
             spake2.rs       # Short code pairing
             qr.rs           # QR code pairing (Phase 2)
-    handshake.rs            # Noise NK inside QUIC, TLS cert binding
+    handshake.rs            # Noise IK inside QUIC, TLS cert binding
     gate.rs                 # SecurityGate trait + default implementation
     context.rs              # SecurityContext, ChannelFilterState, CachedPermissions
     filters/
@@ -814,7 +814,7 @@ crates/prism-security/src/
 | Unit: Filters | Each filter vs known inputs (passwords, CC, OTP, benign text) | Table-driven tests |
 | Unit: Entropy | Shannon entropy vs known strings | "aaaa" = low, random = high |
 | Unit: Pairing Store | Save/load/search, snapshot consistency | Tempdir, concurrent R/W |
-| Integration: Handshake | Full Noise NK inside QUIC between two identities | Two quinn endpoints, localhost |
+| Integration: Handshake | Full Noise IK inside QUIC between two identities | Two quinn endpoints, localhost |
 | Integration: Pre-auth | Unknown device closed, no crash, no state leak | Random key, verify server health |
 | Integration: SPAKE2 | Correct code succeeds, wrong code fails after 5 attempts | Two processes, simulated input |
 | Integration: Key Rotation | Rotate on A, verify B accepts with confirmation | Two paired devices |

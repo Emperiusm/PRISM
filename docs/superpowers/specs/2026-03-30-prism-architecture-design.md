@@ -92,7 +92,7 @@ Laptop                                                Desktop
   |                                                      |
   |  1. Resolve desktop's Tailscale IP (100.x.y.z)      |
   |                                                      |
-  |  2. -- QUIC Initial + Noise NK Handshake ----------> |
+  |  2. -- QUIC Initial + Noise IK Handshake ----------> |
   |        TLS ClientHello with ALPN "prism/1"           |
   |        + ephemeral key, encrypted static key,        |
   |          capability message                          |
@@ -129,7 +129,7 @@ Laptop                                                Desktop
 
 - **R1: Extensible capability negotiation.** Capability message is a list of `(channel_id, channel_version, channel_config)` tuples. Not a flat struct that changes every phase. Phase 1 negotiates codecs and display. Phase 3 adds clipboard. Phase 4 adds mobile. Same message format throughout.
 - **R2: Server-authoritative channel assignments.** Server decides which QUIC stream IDs and datagram flows map to which PRISM channels. Client reads the assignment table from the handshake — never assumes channel 0x001 = stream 0.
-- **R3: Silent drop indistinguishable from "host doesn't exist."** No ICMP unreachable, no TLS alert, no QUIC CONNECTION_CLOSE. The QUIC listener validates the Noise NK initial before sending any response.
+- **R3: Silent drop indistinguishable from "host doesn't exist."** No ICMP unreachable, no TLS alert, no QUIC CONNECTION_CLOSE. The QUIC listener validates the Noise IK initial before sending any response.
 - **R4: Direct LAN transport follows the same sequence.** The only difference is IP/key discovery (manual config vs Tailscale identity). `PrismTransport` trait produces a `QuicConnection` — everything above that is identical.
 
 ### Scenario 2: Reconnection After Network Drop
@@ -430,7 +430,7 @@ Result: works like standard RDP quality. Better than nothing.
 |  +-------------------------------+  +---------------------------+ |
 |  |  Display Engine               |  |  Security                 | |
 |  |                               |  |                           | |
-|  |  - Capture (WGC/DDA/SCK/PW)  |  |  - Noise NK handshake    | |
+|  |  - Capture (WGC/DDA/SCK/PW)  |  |  - Noise IK handshake    | |
 |  |  - Region classifier (GPU)   |  |  - Key management        | |
 |  |  - Encoder pool (parallel)   |  |  - Allowlist             | |
 |  |  - Frame pipeline (ring buf) |  |  - Content filters       | |
@@ -789,7 +789,7 @@ struct ExtensionManifest {
 ### 3.7 Subsystem 5: Security
 
 ```rust
-/// Security owns: Noise NK handshake, key management, allowlist,
+/// Security owns: Noise IK handshake, key management, allowlist,
 /// pre-authentication (R3), content filters.
 /// Sits between Transport and everything else.
 
@@ -1111,7 +1111,7 @@ Each subsystem gets its own design spec after this architecture is approved:
 | Subsystem | Spec File | Scope | Phase |
 |-----------|-----------|-------|-------|
 | Transport | `transport-design.md` | QUIC, probing cascade, TCP fallback, migration, DERP integration | 1 |
-| Security | `security-design.md` | Noise NK, key management, allowlist, content filters, silent drop | 1 |
+| Security | `security-design.md` | Noise IK, key management, allowlist, content filters, silent drop | 1 |
 | Display Engine | `display-engine-design.md` | Capture traits, region detection (GPU), encoder pool, degradation ladder, virtual display, all H-optimizations | 1-2 |
 | Session Manager | `session-manager-design.md` | Multi-client, channel ownership, bandwidth arbiter, capability negotiation, reconnection, profiles, routing table | 1 (single), 3 (multi) |
 | Clipboard | `clipboard-design.md` | Continuous sync, fan-out, source tagging, content-type thresholds, security filters | 3 |
