@@ -292,6 +292,29 @@ async fn input_datagram_reaches_server() {
     );
 }
 
+/// Pure-protocol test: `ClipboardMessage::text` round-trips through JSON with
+/// the same content and hash, with no network I/O required.
+#[test]
+fn clipboard_message_json_roundtrip() {
+    let msg = prism_protocol::clipboard::ClipboardMessage::text("Hello from PRISM!");
+    let json = msg.to_json();
+    let decoded = prism_protocol::clipboard::ClipboardMessage::from_json(&json).unwrap();
+    assert_eq!(decoded.text_content().unwrap(), "Hello from PRISM!");
+    assert_eq!(decoded.content_hash, msg.content_hash);
+}
+
+/// Pure-protocol test: `ClipboardEchoGuard` suppresses a hash it has already
+/// seen, but allows a different hash through.
+#[test]
+fn clipboard_echo_guard_suppresses_echoes() {
+    let guard = prism_protocol::clipboard::ClipboardEchoGuard::new();
+    let msg = prism_protocol::clipboard::ClipboardMessage::text("test");
+    guard.remember(msg.content_hash);
+    assert!(!guard.should_send(msg.content_hash));
+    let msg2 = prism_protocol::clipboard::ClipboardMessage::text("different");
+    assert!(guard.should_send(msg2.content_hash));
+}
+
 /// Unit-level smoke test: `build_display_datagram` produces a buffer whose
 /// decoded header has the correct channel, sequence, and message type.
 #[tokio::test]
