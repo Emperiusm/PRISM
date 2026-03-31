@@ -34,6 +34,7 @@ hkdf = "0.12"
 sha2 = "0.10"
 arc-swap = "1"
 tempfile = "3"
+minifb = "0.28"
 
 quinn = "0.11"
 tokio = { version = "1", features = ["sync", "time", "net", "macros", "rt-multi-thread"] }
