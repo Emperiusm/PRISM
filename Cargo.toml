@@ -8,6 +8,7 @@ members = [
     "crates/prism-observability",
     "crates/prism-session",
     "crates/prism-display",
+    "crates/prism-server",
 ]
 
 [workspace.package]
@@ -47,3 +48,4 @@ prism-transport = { path = "crates/prism-transport" }
 prism-observability = { path = "crates/prism-observability" }
 prism-session = { path = "crates/prism-session" }
 prism-display = { path = "crates/prism-display" }
+prism-server = { path = "crates/prism-server" }

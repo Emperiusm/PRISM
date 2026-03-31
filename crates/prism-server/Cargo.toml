@@ -1,0 +1,27 @@
+[package]
+name = "prism-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prism-protocol.workspace = true
+prism-metrics.workspace = true
+prism-security.workspace = true
+prism-transport.workspace = true
+prism-observability.workspace = true
+prism-session.workspace = true
+prism-display.workspace = true
+bytes.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+arc-swap.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+quinn.workspace = true
+
+[dev-dependencies]
+rcgen.workspace = true
+rustls.workspace = true
