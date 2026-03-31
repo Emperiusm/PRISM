@@ -1,6 +1,7 @@
 // Transport connection types: errors, transport variants, stream priorities, metrics, events.
 
 use std::net::SocketAddr;
+#[cfg(test)]
 use std::sync::{Arc, Mutex as StdMutex, atomic::{AtomicBool, Ordering}};
 use bytes::Bytes;
 use async_trait::async_trait;

@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-const DEFAULT_CHECK_INTERVAL: Duration = Duration::from_secs(30);
+const DEFAULT_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
 pub struct MtuTracker {
     last_known: usize,

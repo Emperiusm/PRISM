@@ -3,7 +3,7 @@
 use bytes::BytesMut;
 use std::time::{Duration, Instant};
 
-const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(5);
+const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(1);
 
 pub struct DatagramCoalescer {
     buffer: BytesMut,
