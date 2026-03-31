@@ -1,5 +1,6 @@
 pub mod config;
 pub mod acceptor;
+pub mod allow_all_gate;
 pub mod session_manager;
 pub mod client_session;
 pub mod recv_loop;
@@ -32,3 +33,6 @@ pub use test_pattern::TestPatternCapture;
 
 // acceptor
 pub use acceptor::{ConnectionAcceptor, SelfSignedCert};
+
+// allow_all_gate
+pub use allow_all_gate::AllowAllGate;
