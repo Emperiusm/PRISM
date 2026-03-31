@@ -32,6 +32,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dispatcher = Arc::new(prism_session::ChannelDispatcher::new());
     let tracker = Arc::new(prism_session::ChannelBandwidthTracker::new());
 
+    // Shared connection store for broadcasting frames
+    let conn_store = Arc::new(prism_server::ClientConnectionStore::new());
+
     // QUIC endpoint
     let acceptor = prism_server::ConnectionAcceptor::bind(config.listen_addr, cert)?;
     println!("QUIC endpoint bound to {}", acceptor.local_addr());
@@ -43,6 +46,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         while let Some(client_id) = activity_rx.recv().await {
             sm_activity.lock().await.activity(client_id);
+        }
+    });
+
+    // Spawn frame sender task (~30fps)
+    let conn_store_send = conn_store.clone();
+    tokio::spawn(async move {
+        let mut seq: u32 = 0;
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30fps
+        let mut last_log = std::time::Instant::now();
+        let mut sent_this_second = 0u32;
+
+        loop {
+            interval.tick().await;
+
+            if conn_store_send.client_count() == 0 {
+                continue; // no clients, skip
+            }
+
+            // Build a small test payload
+            let payload = format!("frame_{:06}", seq);
+            let datagram = prism_server::build_display_datagram(seq, payload.as_bytes(), 0);
+
+            let (sent, _errors) = conn_store_send.broadcast_datagram(&datagram);
+            if sent > 0 {
+                sent_this_second += sent as u32;
+            }
+            seq += 1;
+
+            // Log every second
+            if last_log.elapsed() >= std::time::Duration::from_secs(1) {
+                if sent_this_second > 0 {
+                    println!(
+                        "[FrameSender] Sent {} datagrams to {} clients ({} fps)",
+                        sent_this_second,
+                        conn_store_send.client_count(),
+                        seq.min(30)
+                    );
+                }
+                sent_this_second = 0;
+                last_log = std::time::Instant::now();
+            }
         }
     });
 
@@ -60,6 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let disp = dispatcher.clone();
         let track = tracker.clone();
         let act_tx = activity_tx.clone();
+        let conn_store_clone = conn_store.clone();
 
         tokio::spawn(async move {
             match incoming.await {
@@ -67,8 +112,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let remote = quinn_conn.remote_address();
                     println!("[{}] Connected", remote);
 
-                    // Clone the quinn connection so we can use it for both
-                    // the UnifiedConnection (session) and the recv loop.
+                    // Clone quinn_conn before it is consumed by QuicConnection::new.
+                    // We need one handle for the recv loop and one to store for sending.
+                    let quinn_conn_for_store = quinn_conn.clone();
                     let qc_recv = Arc::new(prism_transport::QuicConnection::new(quinn_conn.clone()));
                     let qc_session = prism_transport::QuicConnection::new(quinn_conn);
                     let unified = Arc::new(prism_transport::UnifiedConnection::new(
@@ -97,6 +143,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     match channels {
                         Ok(granted) => {
                             println!("[{}] Session: {} channels granted", remote, granted.len());
+
+                            // Store connection for frame sending
+                            conn_store_clone.add(client_id, quinn_conn_for_store);
+                            println!(
+                                "[{}] Registered for frame broadcast ({})",
+                                remote,
+                                &client_id.to_string()[..8]
+                            );
+
                             let _handle = prism_server::spawn_recv_loop(
                                 client_id,
                                 qc_recv as Arc<dyn prism_transport::PrismConnection>,
@@ -110,7 +165,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 &client_id.to_string()[..8]
                             );
                         }
-                        Err(e) => println!("[{}] Session failed: {}", remote, e),
+                        Err(e) => {
+                            println!("[{}] Session failed: {}", remote, e);
+                        }
                     }
                 }
                 Err(e) => println!("Connection error: {}", e),
