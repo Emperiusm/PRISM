@@ -151,7 +151,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // ── minifb render loop on the main thread ─────────────────────────────────
-    // Initial window size; will be resized on first frame if needed.
+    // Initial window size matches server resolution.
     let initial_w = 640;
     let initial_h = 480;
 
