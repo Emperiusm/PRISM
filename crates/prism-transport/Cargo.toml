@@ -1,0 +1,21 @@
+[package]
+name = "prism-transport"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+prism-protocol.workspace = true
+prism-metrics.workspace = true
+bytes.workspace = true
+thiserror.workspace = true
+quinn.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+socket2.workspace = true
+
+[dev-dependencies]
+rcgen.workspace = true
+rustls.workspace = true
