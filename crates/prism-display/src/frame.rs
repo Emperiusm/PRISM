@@ -1,0 +1,1 @@
+// Frame pipeline types - placeholder

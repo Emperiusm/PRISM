@@ -1,0 +1,1 @@
+// Texture atlas management - placeholder
