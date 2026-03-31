@@ -1,0 +1,6 @@
+[package]
+name = "prism-metrics"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
