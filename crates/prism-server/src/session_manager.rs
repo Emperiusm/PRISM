@@ -459,4 +459,134 @@ mod tests {
         assert!(!b_channels.contains(&DISPLAY), "Display must be denied to B");
         assert!(b_channels.contains(&CONTROL), "Control (shared) must be granted to B");
     }
+
+    // ── Integration tests ─────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn integration_session_with_mock_transport() {
+        let mut mgr = make_manager();
+        let client_id = new_id();
+        let device_id = new_id();
+
+        // Connect with Display + Control, verify routing snapshot.
+        let granted = mgr
+            .new_session(
+                client_id,
+                device_id,
+                make_conn(),
+                ConnectionProfile::gaming(),
+                &[DISPLAY, CONTROL],
+            )
+            .unwrap();
+
+        assert!(granted.contains(&DISPLAY));
+        assert!(granted.contains(&CONTROL));
+        assert_eq!(mgr.client_count(), 1);
+
+        let snap = mgr.routing_table().snapshot();
+        assert!(snap.channel_routes.contains_key(&DISPLAY));
+        assert!(snap.channel_routes.contains_key(&CONTROL));
+        assert_eq!(snap.channel_routes[&DISPLAY][0].client_id, client_id);
+        assert_eq!(snap.channel_routes[&CONTROL][0].client_id, client_id);
+
+        // Disconnect and verify cleanup.
+        mgr.disconnect(client_id, "done".to_string());
+        assert_eq!(mgr.client_count(), 0);
+        assert!(mgr.get_session(client_id).is_none());
+
+        let snap_after = mgr.routing_table().snapshot();
+        assert!(!snap_after.channel_routes.contains_key(&DISPLAY));
+        assert!(!snap_after.channel_routes.contains_key(&CONTROL));
+    }
+
+    #[tokio::test]
+    async fn integration_multi_client_channel_conflict() {
+        // CLIPBOARD = 0x004, shared channel.
+        const CLIPBOARD: u16 = 0x004;
+
+        let mut mgr = make_manager();
+        let a = new_id();
+        let b = new_id();
+
+        // Client A gets Display (exclusive) + Control (shared) + Clipboard (shared).
+        let a_channels = mgr
+            .new_session(
+                a,
+                new_id(),
+                make_conn(),
+                ConnectionProfile::gaming(),
+                &[DISPLAY, CONTROL, CLIPBOARD],
+            )
+            .unwrap();
+        assert!(a_channels.contains(&DISPLAY), "A must get exclusive Display");
+        assert!(a_channels.contains(&CONTROL));
+        assert!(a_channels.contains(&CLIPBOARD));
+
+        // Client B: Display denied (A holds it), Control + Clipboard granted (shared).
+        let b_channels = mgr
+            .new_session(
+                b,
+                new_id(),
+                make_conn(),
+                ConnectionProfile::gaming(),
+                &[DISPLAY, CONTROL, CLIPBOARD],
+            )
+            .unwrap();
+        assert!(!b_channels.contains(&DISPLAY), "B must be denied exclusive Display");
+        assert!(b_channels.contains(&CONTROL), "B must get shared Control");
+        assert!(b_channels.contains(&CLIPBOARD), "B must get shared Clipboard");
+
+        // Routing: Display has exactly 1 route (A), Control has 2 routes (A + B).
+        let snap = mgr.routing_table().snapshot();
+        assert_eq!(snap.channel_routes[&DISPLAY].len(), 1);
+        assert_eq!(snap.channel_routes[&DISPLAY][0].client_id, a);
+        assert_eq!(snap.channel_routes[&CONTROL].len(), 2);
+    }
+
+    #[tokio::test]
+    async fn integration_reconnect_via_tombstone() {
+        let mut mgr = make_manager();
+        let client_id_a = new_id();
+        let device_id = new_id();
+
+        // Initial connection: client A claims Display.
+        let first_granted = mgr
+            .new_session(
+                client_id_a,
+                device_id,
+                make_conn(),
+                ConnectionProfile::gaming(),
+                &[DISPLAY, CONTROL],
+            )
+            .unwrap();
+        assert!(first_granted.contains(&DISPLAY));
+
+        // Disconnect creates a tombstone for this device.
+        mgr.disconnect(client_id_a, "network drop".to_string());
+        assert_eq!(mgr.client_count(), 0);
+
+        // Reconnect as a fresh client_id but the same device_id.
+        // Tombstone is claimed internally; Display should be re-granted because
+        // disconnect freed the exclusive slot.
+        let client_id_b = new_id();
+        let reconnect_granted = mgr
+            .new_session(
+                client_id_b,
+                device_id,
+                make_conn(),
+                ConnectionProfile::gaming(),
+                &[DISPLAY, CONTROL],
+            )
+            .unwrap();
+
+        assert!(
+            reconnect_granted.contains(&DISPLAY),
+            "reconnecting device must regain Display channel"
+        );
+        assert_eq!(mgr.client_count(), 1);
+
+        // Routing table should now point to the new client_id.
+        let snap = mgr.routing_table().snapshot();
+        assert_eq!(snap.channel_routes[&DISPLAY][0].client_id, client_id_b);
+    }
 }
