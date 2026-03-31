@@ -8,8 +8,20 @@ pub mod shutdown;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
+// config
 pub use config::ServerConfig;
+
+// client_session
 pub use client_session::ClientSession;
+
+// session_manager
 pub use session_manager::SessionManager;
+
+// quality_monitor
 pub use quality_monitor::{QualityMonitor, QualityUpdate};
+
+// shutdown
 pub use shutdown::{ShutdownCoordinator, ShutdownState};
+
+// recv_loop
+pub use recv_loop::{classify_datagram, record_datagram_bandwidth, DatagramAction};
