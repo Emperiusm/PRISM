@@ -152,15 +152,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── minifb render loop on the main thread ─────────────────────────────────
     // Initial window size matches server resolution.
-    let initial_w = 640;
-    let initial_h = 480;
+    let initial_w = 1920;
+    let initial_h = 1080;
 
     let mut window = Window::new(
         "PRISM Client",
         initial_w,
         initial_h,
         WindowOptions {
-            resize: false,
+            resize: true,
             ..WindowOptions::default()
         },
     )?;
