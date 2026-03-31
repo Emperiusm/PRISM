@@ -108,6 +108,20 @@ pub struct PairingSnapshot {
 }
 
 impl PairingSnapshot {
+    /// Check if a key is authorized (paired and not blocked). O(1).
+    pub fn is_authorized(&self, key: &[u8; 32]) -> bool {
+        self.by_key.get(key).is_some_and(|e| e.state == PairingState::Paired)
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.by_key.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_key.is_empty()
+    }
+
     fn from_entries(entries: Vec<PairingEntry>) -> Self {
         let mut snap = PairingSnapshot::default();
         for e in entries {

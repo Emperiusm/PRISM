@@ -139,6 +139,12 @@ impl LocalIdentity {
         let json = serde_json::to_string_pretty(&stored)?;
         if let Some(parent) = path.parent() { std::fs::create_dir_all(parent)?; }
         std::fs::write(path, json)?;
+        // Restrict file permissions — secret keys should only be readable by owner
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        }
         Ok(())
     }
 
