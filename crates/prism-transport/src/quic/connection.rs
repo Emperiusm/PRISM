@@ -33,10 +33,9 @@ impl PrismConnection for QuicConnection {
     }
 
     async fn send_datagram(&self, data: Bytes) -> Result<(), TransportError> {
-        if let Some(max) = self.connection.max_datagram_size() {
-            if data.len() <= max {
-                return self.try_send_datagram(data);
-            }
+        if let Some(max) = self.connection.max_datagram_size()
+            && data.len() <= max {
+            return self.try_send_datagram(data);
         }
         // Spill to uni stream when datagram is too large
         let mut s = self.connection

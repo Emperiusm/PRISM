@@ -127,10 +127,9 @@ impl ConnectionProber {
     /// Generate a probe if the interval has elapsed (or this is the very first probe).
     pub fn generate_probe(&mut self) -> Option<ProbePayload> {
         let now = Instant::now();
-        if let Some(last) = self.last_probe {
-            if now.duration_since(last) < self.interval {
-                return None;
-            }
+        if let Some(last) = self.last_probe
+            && now.duration_since(last) < self.interval {
+            return None;
         }
         let seq = self.next_seq;
         self.next_seq = self.next_seq.wrapping_add(1);

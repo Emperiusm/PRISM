@@ -104,16 +104,18 @@ impl ConnectionQuality {
 
         let recommendation = if score < 0.2 {
             QualityRecommendation::ConnectionUnusable
-        } else if loss_rate >= 0.02 && loss_rate <= 0.10 {
-            QualityRecommendation::EnableFec { ratio: loss_rate * 1.5 }
+        } else if (0.02..=0.10).contains(&loss_rate) {
+            QualityRecommendation::EnableFec { ratio: loss_rate * 2.0 }
         } else if score < 0.4 {
             QualityRecommendation::PauseNonEssential
         } else if score < 0.6 {
             QualityRecommendation::ReduceFramerate
         } else if score < 0.7 {
-            QualityRecommendation::ReduceBitrate { target_bps: (send_bps as f32 * 0.7) as u64 }
-        } else if score >= 0.9 {
-            QualityRecommendation::Optimal
+            QualityRecommendation::SwitchToStreamOnly
+        } else if score < 0.8 {
+            QualityRecommendation::ReduceResolution
+        } else if score < 0.9 {
+            QualityRecommendation::ReduceBitrate { target_bps: send_bps * 3 / 4 }
         } else {
             QualityRecommendation::Optimal
         };

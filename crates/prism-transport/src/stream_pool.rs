@@ -2,6 +2,8 @@
 
 use crate::connection::{OwnedSendStream, OwnedRecvStream, PrismConnection, StreamPriority, TransportError};
 
+pub const DEFAULT_POOL_SIZE: usize = 4;
+
 pub struct StreamPool {
     pool: Vec<(OwnedSendStream, OwnedRecvStream)>,
     pool_size: usize,
