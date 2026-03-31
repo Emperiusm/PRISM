@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[[bin]]
+name = "prism-server"
+path = "src/main.rs"
+
 [dependencies]
 prism-protocol.workspace = true
 prism-metrics.workspace = true
