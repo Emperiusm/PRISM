@@ -8,6 +8,7 @@ pub mod quality_monitor;
 pub mod shutdown;
 pub mod test_pattern;
 pub mod frame_sender;
+pub mod client_connections;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -40,3 +41,6 @@ pub use allow_all_gate::AllowAllGate;
 
 // frame_sender
 pub use frame_sender::{FrameSender, build_display_datagram};
+
+// client_connections
+pub use client_connections::ClientConnectionStore;
