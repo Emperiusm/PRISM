@@ -54,10 +54,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn frame sender task (~10fps) — encodes BGRA→H.264 and sends over QUIC uni streams.
     let conn_store_send = conn_store.clone();
     tokio::spawn(async move {
-        // 320×240 test pattern capture.
-        let pattern_capture = prism_server::TestPatternCapture::with_resolution(320, 240);
-        const WIDTH: u32 = 320;
-        const HEIGHT: u32 = 240;
+        // 640×480 test pattern capture.
+        let pattern_capture = prism_server::TestPatternCapture::with_resolution(640, 480);
+        const WIDTH: u32 = 640;
+        const HEIGHT: u32 = 480;
 
         // Create H.264 encoder. Dimensions are inferred from the YUVSource on first encode.
         let mut encoder = match Encoder::with_api_config(
