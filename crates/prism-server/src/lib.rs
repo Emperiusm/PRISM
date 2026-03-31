@@ -26,7 +26,7 @@ pub use quality_monitor::{QualityMonitor, QualityUpdate};
 pub use shutdown::{ShutdownCoordinator, ShutdownState};
 
 // recv_loop
-pub use recv_loop::{classify_datagram, record_datagram_bandwidth, DatagramAction};
+pub use recv_loop::{classify_datagram, record_datagram_bandwidth, DatagramAction, RecvLoopHandle, spawn_recv_loop};
 
 // test_pattern
 pub use test_pattern::TestPatternCapture;

@@ -4,11 +4,15 @@
 // later task. This module contains the pure classification and bandwidth-tracking
 // logic, which is fully testable without a real connection.
 
+use std::sync::Arc;
+
 use bytes::Bytes;
+use tokio::sync::mpsc;
 use prism_protocol::header::{PrismHeader, HEADER_SIZE};
 use prism_protocol::channel::CHANNEL_CONTROL;
-use prism_session::ChannelBandwidthTracker;
+use prism_session::{ChannelBandwidthTracker, ChannelDispatcher, ClientId};
 use prism_session::control_msg;
+use prism_transport::{PrismConnection, TransportError};
 
 /// The action the recv loop should take for a received datagram.
 #[derive(Debug, PartialEq)]
@@ -53,6 +57,86 @@ pub fn classify_datagram(data: &Bytes) -> DatagramAction {
 #[inline(always)]
 pub fn record_datagram_bandwidth(tracker: &ChannelBandwidthTracker, header: &PrismHeader) {
     tracker.record_recv(header.channel_id, header.payload_length);
+}
+
+// ── LiveRecvLoop ──────────────────────────────────────────────────────────────
+
+/// A handle to a running per-client receive loop.
+///
+/// Call [`RecvLoopHandle::stop`] to cancel the loop gracefully.
+pub struct RecvLoopHandle {
+    cancel_tx: mpsc::Sender<()>,
+}
+
+impl RecvLoopHandle {
+    /// Signal the recv loop to stop. Non-blocking; the loop will exit at the
+    /// next iteration.
+    pub async fn stop(&self) {
+        let _ = self.cancel_tx.send(()).await;
+    }
+}
+
+/// Spawn an async per-client datagram receive loop.
+///
+/// Reads datagrams from `connection`, classifies them, and either dispatches
+/// them via `dispatcher` or records bandwidth via `tracker`. Sends an activity
+/// ping on `activity_tx` for every valid datagram received.
+///
+/// Returns a [`RecvLoopHandle`] that can be used to stop the loop.
+pub fn spawn_recv_loop(
+    client_id: ClientId,
+    connection: Arc<dyn PrismConnection>,
+    dispatcher: Arc<ChannelDispatcher>,
+    tracker: Arc<ChannelBandwidthTracker>,
+    activity_tx: mpsc::Sender<ClientId>,
+) -> RecvLoopHandle {
+    let (cancel_tx, mut cancel_rx) = mpsc::channel::<()>(1);
+
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                biased;
+                _ = cancel_rx.recv() => {
+                    break;
+                }
+                result = connection.recv_datagram() => {
+                    match result {
+                        Ok(data) => {
+                            // Notify activity monitor.
+                            let _ = activity_tx.try_send(client_id);
+
+                            match classify_datagram(&data) {
+                                DatagramAction::ChannelDispatch { channel_id } => {
+                                    // Record bandwidth, then dispatch.
+                                    if let Ok(header) = PrismHeader::decode_from_slice(&data) {
+                                        record_datagram_bandwidth(&tracker, &header);
+                                    }
+                                    dispatcher.dispatch(client_id, channel_id, data).await;
+                                }
+                                DatagramAction::ProbeResponse => {
+                                    // RTT probe — record bandwidth only.
+                                    if let Ok(header) = PrismHeader::decode_from_slice(&data) {
+                                        record_datagram_bandwidth(&tracker, &header);
+                                    }
+                                }
+                                DatagramAction::Drop => {
+                                    // Malformed — discard silently.
+                                }
+                            }
+                        }
+                        Err(TransportError::ConnectionClosed) => {
+                            break;
+                        }
+                        Err(_) => {
+                            // Transient error — keep looping.
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    RecvLoopHandle { cancel_tx }
 }
 
 #[cfg(test)]
@@ -125,5 +209,13 @@ mod tests {
         };
         record_datagram_bandwidth(&tracker, &header);
         assert_eq!(tracker.recv_bytes(0x001), 5000);
+    }
+
+    #[tokio::test]
+    async fn recv_loop_handle_can_be_created_and_stopped() {
+        let (tx, _rx) = tokio::sync::mpsc::channel::<()>(1);
+        let handle = RecvLoopHandle { cancel_tx: tx };
+        handle.stop().await;
+        // No panic = success
     }
 }
