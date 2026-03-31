@@ -11,7 +11,7 @@
 //!   [h264_len bytes: H.264 NAL bitstream]
 
 use std::sync::mpsc as std_mpsc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 
@@ -49,6 +49,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             key.copy_from_slice(&bytes);
             key
         });
+
+    // Parse --tofu flag (trust-on-first-use pairing mode).
+    let tofu_mode = args.iter().any(|a| a == "--tofu");
+    if tofu_mode {
+        println!("[PRISM] TOFU mode enabled — unknown servers will be auto-paired on first contact.");
+    }
 
     println!("=== PRISM Client v0.1.0 ===");
     println!("Connecting to {}...", server_addr);
@@ -247,6 +253,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
+    // ── Clipboard setup ───────────────────────────────────────────────────────
+    // arboard::Clipboard::new() can fail on headless systems; we wrap it in an
+    // Option so the rest of the client continues working if clipboard access is
+    // unavailable.
+    let mut clipboard: Option<arboard::Clipboard> = arboard::Clipboard::new().ok();
+    let clipboard_echo_guard = prism_protocol::clipboard::ClipboardEchoGuard::new();
+    let mut last_clipboard_check = Instant::now();
+    let mut last_clipboard_hash: u64 = 0;
+
     // ── minifb render loop on the main thread ─────────────────────────────────
     // Initial window size matches server resolution.
     let initial_w = 1920;
@@ -371,6 +386,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         last_left = left_down;
         last_right = right_down;
         last_middle = middle_down;
+
+        // ── Clipboard poll (every 500 ms) ────────────────────────────────────
+        if last_clipboard_check.elapsed() >= Duration::from_millis(500) {
+            last_clipboard_check = Instant::now();
+
+            if let Some(ref mut cb) = clipboard {
+                if let Ok(text) = cb.get_text() {
+                    let msg = prism_protocol::clipboard::ClipboardMessage::text(&text);
+                    // Only forward if content has changed and is not an echo of
+                    // something we already sent.
+                    if msg.content_hash != last_clipboard_hash
+                        && clipboard_echo_guard.should_send(msg.content_hash)
+                    {
+                        last_clipboard_hash = msg.content_hash;
+                        // TODO: send over QUIC stream once stream setup is wired in.
+                        // For now, print to demonstrate the polling works.
+                        println!(
+                            "[Clipboard] new content detected ({} bytes), hash={:#x}",
+                            msg.data.len(),
+                            msg.content_hash,
+                        );
+                    }
+                }
+            }
+        }
     }
 
     connector.close();

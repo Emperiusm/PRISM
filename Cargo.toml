@@ -35,6 +35,7 @@ sha2 = "0.10"
 arc-swap = "1"
 tempfile = "3"
 minifb = "0.28"
+arboard = "3"
 openh264 = "0.9"
 ffmpeg-next = "8"
 

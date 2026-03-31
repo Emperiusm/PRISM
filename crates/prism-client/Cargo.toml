@@ -17,6 +17,7 @@ rustls = { workspace = true }
 minifb = { workspace = true }
 openh264 = { workspace = true }
 hex = { workspace = true }
+arboard = { workspace = true }
 
 [[bin]]
 name = "prism-client"
