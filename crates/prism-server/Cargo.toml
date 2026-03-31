@@ -27,5 +27,6 @@ async-trait.workspace = true
 quinn.workspace = true
 rcgen.workspace = true
 rustls.workspace = true
+openh264.workspace = true
 
 [dev-dependencies]
