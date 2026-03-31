@@ -51,20 +51,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Spawn frame sender task (~10fps) — encodes BGRA→H.264 and sends over QUIC uni streams.
+    // Spawn frame sender task (~15fps) — encodes BGRA→H.264 and sends over QUIC uni streams.
     let conn_store_send = conn_store.clone();
     tokio::spawn(async move {
-        // 640×480 test pattern capture.
-        let pattern_capture = prism_server::TestPatternCapture::with_resolution(640, 480);
-        const WIDTH: u32 = 640;
-        const HEIGHT: u32 = 480;
+        // 1920×1080 test pattern capture.
+        let pattern_capture = prism_server::TestPatternCapture::with_resolution(1920, 1080);
+        const WIDTH: u32 = 1920;
+        const HEIGHT: u32 = 1080;
 
         // Create H.264 encoder. Dimensions are inferred from the YUVSource on first encode.
         let mut encoder = match Encoder::with_api_config(
             openh264::OpenH264API::from_source(),
             EncoderConfig::new()
-                .max_frame_rate(openh264::encoder::FrameRate::from_hz(10.0))
-                .bitrate(openh264::encoder::BitRate::from_bps(1_000_000)),
+                .max_frame_rate(openh264::encoder::FrameRate::from_hz(15.0))
+                .bitrate(openh264::encoder::BitRate::from_bps(5_000_000)),
         ) {
             Ok(e) => e,
             Err(e) => {
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let mut seq: u32 = 0;
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(100)); // ~10fps
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(67)); // ~15fps
         let mut last_log = std::time::Instant::now();
         let mut frames_sent = 0u32;
         let mut bytes_sent_total: u64 = 0;
