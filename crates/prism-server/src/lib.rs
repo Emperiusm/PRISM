@@ -13,6 +13,7 @@ pub mod dda_capture;
 pub mod hw_encoder;
 pub mod heartbeat_task;
 pub mod control_handler;
+pub mod input_handler;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -54,3 +55,6 @@ pub use heartbeat_task::HeartbeatGenerator;
 
 // control_handler
 pub use control_handler::ControlChannelHandler;
+
+// input_handler
+pub use input_handler::InputChannelHandler;
