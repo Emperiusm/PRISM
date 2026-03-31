@@ -91,6 +91,99 @@ impl FrameTrace {
     }
 }
 
+/// Adaptive frame tracer: decides which frames are worth capturing full
+/// [`FrameTrace`] data for, balancing overhead against observability.
+///
+/// Two capture strategies are combined:
+/// - **Uniform sampling** – every `uniform_rate`-th frame is always traced.
+/// - **Slow-frame capture** – any frame whose end-to-end latency exceeds
+///   `slow_frame_threshold_us` is traced regardless of the uniform counter.
+///
+/// A per-second budget (`max_traces_per_second`) caps total captures so that
+/// a pathological stream of slow frames doesn't flood the trace store.
+#[derive(Debug, Clone)]
+pub struct FrameTracer {
+    /// Trace 1-in-N frames uniformly. Default: 60 (one per second at 60 fps).
+    pub uniform_rate: u64,
+    /// Internal counter for uniform sampling; wraps at `uniform_rate`.
+    uniform_counter: u64,
+    /// Frames slower than this are always traced (subject to budget). Default: 20 ms.
+    pub slow_frame_threshold_us: u64,
+    /// How many traces have been emitted in the current one-second window.
+    traces_this_second: u32,
+    /// Hard cap on traces per second. Default: 10.
+    pub max_traces_per_second: u32,
+}
+
+impl Default for FrameTracer {
+    fn default() -> Self {
+        Self {
+            uniform_rate: 60,
+            uniform_counter: 0,
+            slow_frame_threshold_us: 20_000,
+            traces_this_second: 0,
+            max_traces_per_second: 10,
+        }
+    }
+}
+
+impl FrameTracer {
+    /// Create a new `FrameTracer` with default parameters.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Decide whether the next frame should be fully traced.
+    ///
+    /// `last_frame_total_us` is the end-to-end latency of the frame that just
+    /// completed (from [`FrameLatencyBreakdown::total_us`] or equivalent).
+    ///
+    /// Must be called once per frame in presentation order.
+    pub fn should_trace(&mut self, last_frame_total_us: u64) -> bool {
+        // Always increment the uniform counter so the cadence is independent
+        // of whether we are over budget.
+        self.uniform_counter += 1;
+        let uniform_tick = self.uniform_counter >= self.uniform_rate;
+        if uniform_tick {
+            self.uniform_counter = 0;
+        }
+
+        // Budget check: if we've already hit the cap this second, suppress.
+        if self.traces_this_second >= self.max_traces_per_second {
+            return false;
+        }
+
+        // Slow frames are always traced (within budget).
+        if last_frame_total_us >= self.slow_frame_threshold_us {
+            self.traces_this_second += 1;
+            return true;
+        }
+
+        // Uniform sampling.
+        if uniform_tick {
+            self.traces_this_second += 1;
+            return true;
+        }
+
+        false
+    }
+
+    /// Update the slow-frame threshold to a new p95 latency value.
+    ///
+    /// Callers should pass the rolling p95 of recent `total_us` values so the
+    /// threshold adapts as network conditions change.
+    pub fn update_threshold(&mut self, p95_us: u64) {
+        self.slow_frame_threshold_us = p95_us;
+    }
+
+    /// Reset the per-second budget counter.
+    ///
+    /// Should be called once per wall-clock second (or equivalent tick).
+    pub fn reset_second(&mut self) {
+        self.traces_this_second = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +270,88 @@ mod tests {
         assert_eq!(bd.capture_us, 0);
         assert_eq!(bd.classify_us, 0);
         assert_eq!(bd.network_us, Some(0));
+    }
+
+    // --- FrameTracer tests ---
+
+    #[test]
+    fn uniform_sampling_2_traces_in_120_frames() {
+        // uniform_rate = 60 → frames 60 and 120 are sampled (2 in 120).
+        let mut tracer = FrameTracer::new();
+        // Use a latency well below the slow-frame threshold so only uniform ticks fire.
+        let fast = 1_000u64; // 1 ms
+        let mut count = 0u32;
+        for _ in 0..120 {
+            if tracer.should_trace(fast) {
+                count += 1;
+            }
+        }
+        assert_eq!(count, 2, "expected exactly 2 uniform traces in 120 frames");
+    }
+
+    #[test]
+    fn slow_frames_always_traced() {
+        let mut tracer = FrameTracer::new(); // threshold = 20 ms
+        let slow = 30_000u64; // 30 ms → above threshold
+
+        // Drive 5 consecutive slow frames; all should be traced (budget = 10).
+        let mut count = 0u32;
+        for _ in 0..5 {
+            if tracer.should_trace(slow) {
+                count += 1;
+            }
+        }
+        assert_eq!(count, 5);
+    }
+
+    #[test]
+    fn budget_caps_at_max_traces_per_second() {
+        let mut tracer = FrameTracer::new(); // max = 10
+        let slow = 50_000u64; // always above threshold
+
+        let mut count = 0u32;
+        for _ in 0..30 {
+            if tracer.should_trace(slow) {
+                count += 1;
+            }
+        }
+        assert_eq!(count, 10, "budget must cap traces at max_traces_per_second");
+    }
+
+    #[test]
+    fn budget_resets_after_reset_second() {
+        let mut tracer = FrameTracer::new(); // max = 10
+        let slow = 50_000u64;
+
+        // Exhaust budget.
+        for _ in 0..30 {
+            tracer.should_trace(slow);
+        }
+        assert_eq!(tracer.traces_this_second, 10);
+
+        // Reset and verify new traces are allowed.
+        tracer.reset_second();
+        assert_eq!(tracer.traces_this_second, 0);
+
+        let mut count = 0u32;
+        for _ in 0..5 {
+            if tracer.should_trace(slow) {
+                count += 1;
+            }
+        }
+        assert_eq!(count, 5);
+    }
+
+    #[test]
+    fn update_threshold_changes_slow_frame_detection() {
+        let mut tracer = FrameTracer::new(); // default threshold = 20 ms
+        // Frame at 15 ms — not slow by default.
+        assert!(!tracer.should_trace(15_000));
+
+        // Lower threshold to 10 ms; now 15 ms is slow.
+        tracer.update_threshold(10_000);
+        // Recheck: budget still open.
+        tracer.reset_second();
+        assert!(tracer.should_trace(15_000));
     }
 }
