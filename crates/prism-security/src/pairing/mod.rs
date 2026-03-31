@@ -35,28 +35,36 @@ impl From<crate::crypto::CryptoError> for PairingError {
 
 // ── Permission types ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Permission {
-    Read,
-    Write,
-    Admin,
+    Allow,
+    Deny,
+    Ask,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ChannelPermissions {
-    pub clipboard: bool,
-    pub files: bool,
-    pub notifications: bool,
-    pub input: bool,
+    pub display: Permission,
+    pub input: Permission,
+    pub clipboard: Permission,
+    pub fileshare: Permission,
+    pub notify: Permission,
+    pub camera: Permission,
+    pub sensor: Permission,
+    pub filesystem_browse: Permission,
 }
 
 impl Default for ChannelPermissions {
     fn default() -> Self {
-        ChannelPermissions {
-            clipboard: true,
-            files: true,
-            notifications: true,
-            input: false,
+        Self {
+            display: Permission::Allow,
+            input: Permission::Allow,
+            clipboard: Permission::Allow,
+            fileshare: Permission::Allow,
+            notify: Permission::Allow,
+            camera: Permission::Ask,
+            sensor: Permission::Ask,
+            filesystem_browse: Permission::Ask,
         }
     }
 }
@@ -446,9 +454,11 @@ mod tests {
     #[test]
     fn default_permissions() {
         let perms = ChannelPermissions::default();
-        assert!(perms.clipboard);
-        assert!(perms.files);
-        assert!(perms.notifications);
-        assert!(!perms.input);
+        assert_eq!(perms.clipboard, Permission::Allow);
+        assert_eq!(perms.fileshare, Permission::Allow);
+        assert_eq!(perms.notify, Permission::Allow);
+        assert_eq!(perms.input, Permission::Allow);
+        assert_eq!(perms.camera, Permission::Ask);
+        assert_eq!(perms.sensor, Permission::Ask);
     }
 }
