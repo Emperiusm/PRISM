@@ -10,3 +10,4 @@ pub use connection::{TransportError, TransportType, StreamPriority, TransportMet
 pub use framing::{FramedWriter, FramedReader, MAX_MESSAGE_SIZE};
 pub use unified::{UnifiedConnection, ChannelRouting, ConnectionSlot};
 pub use quality::{ConnectionQuality, QualityRecommendation};
+pub use quic::QuicConnection;
