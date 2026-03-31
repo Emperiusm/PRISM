@@ -1,0 +1,25 @@
+[package]
+name = "prism-security"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+prism-protocol.workspace = true
+prism-metrics.workspace = true
+snow.workspace = true
+x25519-dalek.workspace = true
+ed25519-dalek.workspace = true
+uuid.workspace = true
+rand.workspace = true
+hex.workspace = true
+aes-gcm.workspace = true
+hkdf.workspace = true
+sha2.workspace = true
+arc-swap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+bytes.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
