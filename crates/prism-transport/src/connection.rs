@@ -1,6 +1,10 @@
 // Transport connection types: errors, transport variants, stream priorities, metrics, events.
 
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex as StdMutex, atomic::{AtomicBool, Ordering}};
+use bytes::Bytes;
+use async_trait::async_trait;
+use tokio::sync::broadcast;
 use thiserror::Error;
 use prism_protocol::channel::ChannelPriority;
 
@@ -121,6 +125,259 @@ pub enum TransportEvent {
     Disconnected { reason: String },
 }
 
+// ── Stream inner enums ────────────────────────────────────────────────────────
+
+enum SendStreamInner {
+    Quic(quinn::SendStream),
+    #[cfg(test)]
+    Mock {
+        buffer: Arc<StdMutex<Vec<u8>>>,
+        finished: Arc<AtomicBool>,
+    },
+}
+
+enum RecvStreamInner {
+    Quic(quinn::RecvStream),
+    #[cfg(test)]
+    Mock {
+        cursor: StdMutex<std::io::Cursor<Vec<u8>>>,
+    },
+}
+
+// ── OwnedSendStream ───────────────────────────────────────────────────────────
+
+pub struct OwnedSendStream {
+    inner: SendStreamInner,
+}
+
+impl OwnedSendStream {
+    pub fn from_quic(s: quinn::SendStream) -> Self {
+        Self { inner: SendStreamInner::Quic(s) }
+    }
+
+    pub async fn write(&mut self, data: &[u8]) -> Result<(), TransportError> {
+        match &mut self.inner {
+            SendStreamInner::Quic(s) => {
+                s.write_all(data).await.map_err(|e| TransportError::StreamError(e.to_string()))
+            }
+            #[cfg(test)]
+            SendStreamInner::Mock { buffer, .. } => {
+                buffer.lock().unwrap().extend_from_slice(data);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn set_priority(&mut self, priority: StreamPriority) -> Result<(), TransportError> {
+        match &mut self.inner {
+            SendStreamInner::Quic(s) => {
+                s.set_priority(priority.to_quinn_priority())
+                    .map_err(|e| TransportError::StreamError(e.to_string()))
+            }
+            #[cfg(test)]
+            SendStreamInner::Mock { .. } => Ok(()),
+        }
+    }
+
+    pub async fn finish(self) -> Result<(), TransportError> {
+        match self.inner {
+            SendStreamInner::Quic(mut s) => {
+                s.finish().map_err(|e| TransportError::StreamError(e.to_string()))
+            }
+            #[cfg(test)]
+            SendStreamInner::Mock { finished, .. } => {
+                finished.store(true, Ordering::Release);
+                Ok(())
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub fn mock() -> (Self, Arc<StdMutex<Vec<u8>>>) {
+        let buffer = Arc::new(StdMutex::new(Vec::new()));
+        let finished = Arc::new(AtomicBool::new(false));
+        let stream = Self {
+            inner: SendStreamInner::Mock {
+                buffer: Arc::clone(&buffer),
+                finished,
+            },
+        };
+        (stream, buffer)
+    }
+}
+
+// ── OwnedRecvStream ───────────────────────────────────────────────────────────
+
+pub struct OwnedRecvStream {
+    inner: RecvStreamInner,
+}
+
+impl OwnedRecvStream {
+    pub fn from_quic(s: quinn::RecvStream) -> Self {
+        Self { inner: RecvStreamInner::Quic(s) }
+    }
+
+    pub async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), TransportError> {
+        match &mut self.inner {
+            RecvStreamInner::Quic(s) => {
+                s.read_exact(buf).await.map_err(|e| TransportError::StreamError(e.to_string()))
+            }
+            #[cfg(test)]
+            RecvStreamInner::Mock { cursor } => {
+                use std::io::Read;
+                cursor.lock().unwrap().read_exact(buf)
+                    .map_err(|e| TransportError::StreamError(e.to_string()))
+            }
+        }
+    }
+
+    pub async fn read_to_end(self, limit: usize) -> Result<Vec<u8>, TransportError> {
+        match self.inner {
+            RecvStreamInner::Quic(mut s) => {
+                s.read_to_end(limit).await.map_err(|e| TransportError::StreamError(e.to_string()))
+            }
+            #[cfg(test)]
+            RecvStreamInner::Mock { cursor } => {
+                use std::io::Read;
+                let mut buf = Vec::new();
+                cursor.into_inner().unwrap().read_to_end(&mut buf)
+                    .map_err(|e| TransportError::StreamError(e.to_string()))?;
+                if buf.len() > limit {
+                    return Err(TransportError::MessageTooLarge(buf.len()));
+                }
+                Ok(buf)
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub fn mock(data: Vec<u8>) -> Self {
+        Self {
+            inner: RecvStreamInner::Mock {
+                cursor: StdMutex::new(std::io::Cursor::new(data)),
+            },
+        }
+    }
+}
+
+// ── PrismConnection trait ─────────────────────────────────────────────────────
+
+#[async_trait]
+pub trait PrismConnection: Send + Sync {
+    fn try_send_datagram(&self, data: Bytes) -> Result<(), TransportError>;
+    async fn send_datagram(&self, data: Bytes) -> Result<(), TransportError>;
+    async fn recv_datagram(&self) -> Result<Bytes, TransportError>;
+    async fn open_bi(&self, priority: StreamPriority) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError>;
+    async fn open_uni(&self, priority: StreamPriority) -> Result<OwnedSendStream, TransportError>;
+    async fn accept_bi(&self) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError>;
+    async fn accept_uni(&self) -> Result<OwnedRecvStream, TransportError>;
+    fn metrics(&self) -> TransportMetrics;
+    fn transport_type(&self) -> TransportType;
+    fn max_datagram_size(&self) -> usize;
+    fn events(&self) -> broadcast::Receiver<TransportEvent>;
+    async fn close(&self);
+}
+
+// ── MockConnection ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) mod mock {
+    use super::*;
+    use std::collections::VecDeque;
+    use tokio::sync::Mutex as TokioMutex;
+
+    pub struct MockConnection {
+        max_datagram_size: usize,
+        datagrams_sent: Arc<StdMutex<Vec<Bytes>>>,
+        recv_queue: Arc<TokioMutex<VecDeque<Bytes>>>,
+        event_tx: broadcast::Sender<TransportEvent>,
+    }
+
+    impl MockConnection {
+        pub fn new(max_datagram_size: usize) -> Self {
+            let (event_tx, _) = broadcast::channel(16);
+            Self {
+                max_datagram_size,
+                datagrams_sent: Arc::new(StdMutex::new(Vec::new())),
+                recv_queue: Arc::new(TokioMutex::new(VecDeque::new())),
+                event_tx,
+            }
+        }
+
+        pub fn sent_datagrams(&self) -> Vec<Bytes> {
+            self.datagrams_sent.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl PrismConnection for MockConnection {
+        fn try_send_datagram(&self, data: Bytes) -> Result<(), TransportError> {
+            if data.len() > self.max_datagram_size {
+                return Err(TransportError::DatagramTooLarge {
+                    size: data.len(),
+                    max: self.max_datagram_size,
+                });
+            }
+            self.datagrams_sent.lock().unwrap().push(data);
+            Ok(())
+        }
+
+        async fn send_datagram(&self, data: Bytes) -> Result<(), TransportError> {
+            self.try_send_datagram(data)
+        }
+
+        async fn recv_datagram(&self) -> Result<Bytes, TransportError> {
+            loop {
+                {
+                    let mut q = self.recv_queue.lock().await;
+                    if let Some(dgram) = q.pop_front() {
+                        return Ok(dgram);
+                    }
+                }
+                // yield to avoid busy-spin in tests that don't push anything
+                tokio::task::yield_now().await;
+            }
+        }
+
+        async fn open_bi(&self, _priority: StreamPriority) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
+            let (send, _buf) = OwnedSendStream::mock();
+            let recv = OwnedRecvStream::mock(Vec::new());
+            Ok((send, recv))
+        }
+
+        async fn open_uni(&self, _priority: StreamPriority) -> Result<OwnedSendStream, TransportError> {
+            let (send, _buf) = OwnedSendStream::mock();
+            Ok(send)
+        }
+
+        async fn accept_bi(&self) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
+            std::future::pending().await
+        }
+
+        async fn accept_uni(&self) -> Result<OwnedRecvStream, TransportError> {
+            std::future::pending().await
+        }
+
+        fn metrics(&self) -> TransportMetrics {
+            TransportMetrics::default()
+        }
+
+        fn transport_type(&self) -> TransportType {
+            TransportType::Quic
+        }
+
+        fn max_datagram_size(&self) -> usize {
+            self.max_datagram_size
+        }
+
+        fn events(&self) -> broadcast::Receiver<TransportEvent> {
+            self.event_tx.subscribe()
+        }
+
+        async fn close(&self) {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,5 +466,66 @@ mod tests {
         } else {
             panic!("expected Degraded");
         }
+    }
+
+    // ── Task 4: OwnedSendStream / OwnedRecvStream / MockConnection ────────────
+
+    #[tokio::test]
+    async fn mock_send_stream_captures_writes() {
+        let (mut stream, buffer) = OwnedSendStream::mock();
+        stream.write(b"hello").await.unwrap();
+        stream.write(b" world").await.unwrap();
+        assert_eq!(buffer.lock().unwrap().as_slice(), b"hello world");
+    }
+
+    #[tokio::test]
+    async fn mock_send_stream_finish() {
+        let (stream, _buffer) = OwnedSendStream::mock();
+        stream.finish().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn mock_recv_stream_read_exact() {
+        let mut stream = OwnedRecvStream::mock(b"hello world".to_vec());
+        let mut buf = [0u8; 5];
+        stream.read_exact(&mut buf).await.unwrap();
+        assert_eq!(&buf, b"hello");
+        stream.read_exact(&mut buf).await.unwrap();
+        assert_eq!(&buf, b" worl");
+    }
+
+    #[tokio::test]
+    async fn mock_recv_stream_read_to_end() {
+        let stream = OwnedRecvStream::mock(b"payload".to_vec());
+        let data = stream.read_to_end(1024).await.unwrap();
+        assert_eq!(data, b"payload");
+    }
+
+    #[tokio::test]
+    async fn mock_connection_datagram_roundtrip() {
+        let conn = mock::MockConnection::new(1200);
+        conn.try_send_datagram(bytes::Bytes::from_static(b"hello")).unwrap();
+        assert_eq!(conn.sent_datagrams().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn mock_connection_datagram_too_large() {
+        let conn = mock::MockConnection::new(4);
+        let result = conn.try_send_datagram(bytes::Bytes::from_static(b"toolarge"));
+        assert!(matches!(result, Err(TransportError::DatagramTooLarge { .. })));
+    }
+
+    #[tokio::test]
+    async fn mock_connection_open_bi() {
+        let conn = mock::MockConnection::new(1200);
+        let (mut send, _recv) = conn.open_bi(StreamPriority::Normal).await.unwrap();
+        send.write(b"data").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn mock_connection_metadata() {
+        let conn = mock::MockConnection::new(1200);
+        assert_eq!(conn.transport_type(), TransportType::Quic);
+        assert_eq!(conn.max_datagram_size(), 1200);
     }
 }
