@@ -10,6 +10,7 @@ pub mod test_pattern;
 pub mod frame_sender;
 pub mod client_connections;
 pub mod dda_capture;
+pub mod hw_encoder;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
