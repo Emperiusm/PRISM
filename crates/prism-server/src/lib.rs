@@ -14,6 +14,7 @@ pub mod hw_encoder;
 pub mod heartbeat_task;
 pub mod control_handler;
 pub mod input_handler;
+pub mod audio_sender;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
