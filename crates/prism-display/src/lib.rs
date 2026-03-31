@@ -47,4 +47,7 @@ pub use encode_config::{
 };
 pub use packet::{SlicePayloadHeader, SLICE_HEADER_SIZE};
 pub use atlas::{RegionKey, StaticDecision, StaticAtlasTracker};
-// encode_queue, window_event, encoder_backend, keyframe re-exports added in Task 14
+pub use encode_queue::EncodeQueue;
+pub use window_event::WindowEvent;
+pub use encoder_backend::{EncoderBackend, select_best_encoder};
+pub use keyframe::KeyframeDecider;
