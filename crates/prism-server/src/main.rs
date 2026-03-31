@@ -9,6 +9,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== PRISM Server v0.1.0 ===");
 
     let use_dda = std::env::args().any(|a| a == "--dda");
+    let noise_mode = std::env::args().any(|a| a == "--noise");
+
+    // Generate Noise IK server identity (always, so the key is ready if needed).
+    let server_identity = Arc::new(prism_security::identity::LocalIdentity::generate("PRISM Server"));
+    if noise_mode {
+        println!("Noise IK enabled. Server public key:");
+        println!("  {}", hex::encode(server_identity.x25519_public_bytes()));
+    }
 
     let config = prism_server::ServerConfig::default();
     println!("Listening on {}", config.listen_addr);
@@ -251,12 +259,75 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let track = tracker.clone();
         let act_tx = activity_tx.clone();
         let conn_store_clone = conn_store.clone();
+        let server_identity_task = server_identity.clone();
 
         tokio::spawn(async move {
             match incoming.await {
                 Ok(quinn_conn) => {
                     let remote = quinn_conn.remote_address();
                     println!("[{}] Connected", remote);
+
+                    // ── Noise IK handshake (when --noise is set) ──────────────
+                    if noise_mode {
+                        // Accept the first bidirectional stream opened by the client
+                        // for the Noise IK handshake exchange.
+                        let (mut send, mut recv) = match quinn_conn.accept_bi().await {
+                            Ok(streams) => streams,
+                            Err(e) => {
+                                println!("[{}] Noise: failed to accept bi stream: {}", remote, e);
+                                return;
+                            }
+                        };
+
+                        // Read the client's Noise initiator message.
+                        let client_msg = match recv.read_to_end(4096).await {
+                            Ok(data) => data,
+                            Err(e) => {
+                                println!("[{}] Noise: failed to read initiator: {}", remote, e);
+                                return;
+                            }
+                        };
+
+                        // Build and run the server-side Noise IK handshake.
+                        let mut hs = match prism_security::handshake::ServerHandshake::new(&*server_identity_task) {
+                            Ok(hs) => hs,
+                            Err(e) => {
+                                println!("[{}] Noise: handshake init failed: {}", remote, e);
+                                return;
+                            }
+                        };
+
+                        let response = match hs.respond(&client_msg) {
+                            Ok(r) => r,
+                            Err(e) => {
+                                println!("[{}] Noise: respond failed (bad client key?): {}", remote, e);
+                                return;
+                            }
+                        };
+
+                        // Send the server's Noise response.
+                        if let Err(e) = send.write_all(&response).await {
+                            println!("[{}] Noise: failed to write response: {}", remote, e);
+                            return;
+                        }
+                        let _ = send.finish();
+
+                        // Finalise the handshake and extract the client's static key.
+                        let result = match hs.finalize() {
+                            Ok(r) => r,
+                            Err(e) => {
+                                println!("[{}] Noise: finalize failed: {}", remote, e);
+                                return;
+                            }
+                        };
+
+                        let client_key = result.remote_static.unwrap();
+                        println!(
+                            "[{}] Noise IK handshake OK. Client key: {}…",
+                            remote,
+                            hex::encode(&client_key[..8]),
+                        );
+                    }
 
                     // Clone quinn_conn before it is consumed by QuicConnection::new.
                     // We need one handle for the recv loop and one to store for sending.

@@ -1005,10 +1005,12 @@ name = "prism-client"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "hex",
  "minifb",
  "openh264",
  "prism-display",
  "prism-protocol",
+ "prism-security",
  "prism-transport",
  "quinn",
  "rustls",
@@ -1093,6 +1095,7 @@ dependencies = [
  "arc-swap",
  "async-trait",
  "bytes",
+ "hex",
  "openh264",
  "prism-display",
  "prism-metrics",

@@ -29,10 +29,24 @@ struct Frame {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let server_addr = std::env::args()
-        .nth(1)
+    let args: Vec<String> = std::env::args().collect();
+
+    let server_addr = args.get(1)
+        .cloned()
         .unwrap_or_else(|| "127.0.0.1:9876".to_string());
     let server_addr: std::net::SocketAddr = server_addr.parse()?;
+
+    // Parse --noise <server_pubkey_hex> flag.
+    let noise_server_key: Option<[u8; 32]> = args.iter()
+        .position(|a| a == "--noise")
+        .and_then(|i| args.get(i + 1))
+        .map(|hex_key| {
+            let bytes = hex::decode(hex_key).expect("--noise: invalid hex key");
+            let mut key = [0u8; 32];
+            assert_eq!(bytes.len(), 32, "--noise: key must be 32 bytes (64 hex chars)");
+            key.copy_from_slice(&bytes);
+            key
+        });
 
     println!("=== PRISM Client v0.1.0 ===");
     println!("Connecting to {}...", server_addr);
@@ -40,6 +54,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let connector = prism_client::ClientConnector::new(prism_client::TlsMode::InsecureTrustAll)?;
     let connection = connector.connect(server_addr, "localhost").await?;
     println!("Connected to {}", connection.remote_address());
+
+    // ── Noise IK handshake (when --noise <server_pubkey_hex> is provided) ────
+    if let Some(ref server_pubkey) = noise_server_key {
+        let client_identity = prism_security::identity::LocalIdentity::generate("PRISM Client");
+        println!(
+            "Noise IK: client key: {}…",
+            hex::encode(&client_identity.x25519_public_bytes()[..8])
+        );
+
+        // Open a bidirectional stream for the handshake.
+        let (mut send, mut recv) = connection.open_bi().await
+            .map_err(|e| format!("Noise: open_bi failed: {}", e))?;
+
+        // Build the client-side Noise IK handshake and send the initiator message.
+        let mut hs = prism_security::handshake::ClientHandshake::new(&client_identity, server_pubkey)
+            .map_err(|e| format!("Noise: handshake init failed: {}", e))?;
+        let init_msg = hs.initiate()
+            .map_err(|e| format!("Noise: initiate failed: {}", e))?;
+
+        send.write_all(&init_msg).await
+            .map_err(|e| format!("Noise: write init failed: {}", e))?;
+        let _ = send.finish();
+
+        // Read the server's response and complete the handshake.
+        let server_response = recv.read_to_end(4096).await
+            .map_err(|e| format!("Noise: read response failed: {}", e))?;
+
+        hs.process_response(&server_response)
+            .map_err(|e| format!("Noise: process_response failed: {}", e))?;
+
+        let _result = hs.finalize()
+            .map_err(|e| format!("Noise: finalize failed: {}", e))?;
+
+        println!("Noise IK handshake complete! Proceeding with authenticated connection.");
+    }
 
     // Channel: async receiver -> main-thread renderer.
     // Use std::sync::mpsc so the sender (tokio task) can send without async,

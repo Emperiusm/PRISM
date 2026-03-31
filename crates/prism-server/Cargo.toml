@@ -28,6 +28,7 @@ quinn.workspace = true
 rcgen.workspace = true
 rustls.workspace = true
 openh264.workspace = true
+hex.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
