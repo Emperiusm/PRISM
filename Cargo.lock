@@ -1223,6 +1223,7 @@ dependencies = [
  "ffmpeg-next",
  "hex",
  "openh264",
+ "prism-client",
  "prism-display",
  "prism-metrics",
  "prism-observability",
