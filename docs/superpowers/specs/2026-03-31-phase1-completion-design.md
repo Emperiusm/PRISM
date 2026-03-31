@@ -1,54 +1,78 @@
-# PRISM Phase 1 Completion — Design Spec
+# PRISM Phase 1 Completion — Design Spec (Revised)
 
 **Protocol for Remote Interactive Streaming & Multiplexing**
 
 | Field       | Value                          |
 |-------------|--------------------------------|
-| Version     | 1.0                            |
+| Version     | 1.1                            |
 | Status      | DRAFT                          |
 | Date        | 2026-03-31                     |
 | Authors     | Ehsan + Claude                 |
 | Parent spec | 2026-03-30-prism-architecture-design.md |
 
-This document covers the remaining Phase 1 features needed to make PRISM a **usable remote desktop**: input forwarding, control channel handler, quality feedback loop, clipboard sync, audio streaming, and manual pairing. These features wire into the existing 10-crate architecture without creating new crates.
+This document covers the remaining Phase 1 features needed to make PRISM a **usable remote desktop**: input forwarding with local cursor prediction, control channel handler with zero-allocation heartbeats, event-driven quality feedback loop, clipboard sync with hash-based echo suppression, audio streaming with silence detection, and SSH-style trust-on-first-use pairing. These features wire into the existing 10-crate architecture without creating new crates.
 
 ---
 
 ## 1. Input Forwarding (Client → Server)
 
-### 1.1 Client-Side Input Capture
-
-The client captures keyboard and mouse events from the minifb window and sends them as datagrams to the server on `CHANNEL_INPUT` (0x002).
+### 1.1 Input Event Types
 
 ```rust
 /// Input event types sent from client to server.
 #[derive(Debug, Clone, Copy)]
 pub enum InputEvent {
+    // Keyboard
     KeyDown { scancode: u16, vk: u16 },
     KeyUp { scancode: u16, vk: u16 },
-    MouseMove { x: u16, y: u16 },         // normalized 0-65535
+    TextInput { codepoint: u32 },                       // IME/Unicode/emoji
+
+    // Mouse — absolute mode (desktop use)
+    MouseMove { x: u16, y: u16 },                       // normalized 0-65535
     MouseDown { button: MouseButton },
     MouseUp { button: MouseButton },
     MouseScroll { delta_x: i16, delta_y: i16 },
+
+    // Mouse — relative mode (games/FPS)
+    MouseMoveRelative { dx: i16, dy: i16 },             // raw delta
+
+    // Mode switching
+    SetMouseMode { relative: bool },                    // client requests mode toggle
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum MouseButton { Left, Right, Middle, X1, X2 }
 ```
 
-Wire format: PRISM header (16B) + InputEvent binary (8B fixed). Total: 24 bytes per event. Sent as datagrams (latency-critical, loss-tolerant).
+Wire format: PRISM header (16B) + InputEvent binary (12B fixed, padded). Total: 28 bytes per event. Sent as datagrams on `CHANNEL_INPUT` (0x002).
 
-Mouse coordinates are normalized to 0–65535 range (resolution-independent). Server maps to actual screen coordinates using the captured display's resolution.
+**Pre-built header template (P1 optimization):** The PRISM header for input events only changes in sequence and timestamp. Pre-build the 16-byte header at session start, patch 8 bytes per packet. Eliminates ~5 buffer operations per event.
 
-### 1.2 Server-Side Input Injection (Windows)
+### 1.2 Client-Side Local Cursor Rendering (R32)
 
-Server receives input datagrams, decodes `InputEvent`, and calls Win32 `SendInput()` to inject keyboard/mouse events into the desktop.
+The client renders the cursor locally at zero latency. Server sends cursor position corrections only when prediction diverges.
+
+```
+Client event loop:
+  1. User moves mouse → update local cursor position immediately (0ms)
+  2. Send MouseMove datagram to server
+  3. Server processes input → DDA captures new frame → sends back
+  4. Frame arrives with cursor_x/cursor_y in SlicePayloadHeader
+  5. Client compares server cursor position to local prediction
+  6. If divergent by >5px: snap to server position (correction)
+  7. If consistent: local prediction was right (no visible correction)
+```
+
+The minifb window hides the OS cursor (if supported) and renders a custom cursor sprite at the local predicted position. The existing `CursorShape` and `CursorPosition` types in prism-display handle this.
+
+### 1.3 Server-Side Input Injection (Windows)
 
 ```rust
-/// InputInjector is #[cfg(windows)] — uses Win32 SendInput API.
+/// #[cfg(windows)] — Uses Win32 SendInput API.
 pub struct InputInjector {
     screen_width: u32,
     screen_height: u32,
+    relative_mode: bool,
 }
 
 impl InputInjector {
@@ -56,92 +80,192 @@ impl InputInjector {
 }
 ```
 
-Win32 `SendInput` accepts `INPUT` structs with `KEYBDINPUT` or `MOUSEINPUT`. Mouse coordinates use absolute positioning (0–65535 range matches `MOUSEEVENTF_ABSOLUTE`).
+Mouse coordinates: absolute mode uses `MOUSEEVENTF_ABSOLUTE` (0–65535 matches the normalized range directly). Relative mode uses `MOUSEEVENTF_MOVE` with raw deltas.
 
-### 1.3 Input Channel Handler
+`TextInput`: uses `SendInput` with `KEYEVENTF_UNICODE` flag and the codepoint as `wScan`. Handles CJK, emoji, and composed characters.
 
-Implements `ChannelHandler` for `CHANNEL_INPUT`. Registered with `ChannelDispatcher` at server startup. Receives datagrams from the recv loop, parses `InputEvent`, calls `InputInjector::inject()`.
+### 1.4 Input-Triggered Capture (R32)
 
-### 1.4 Debouncing
+When the server receives ANY input event, it immediately triggers a DDA capture (bypasses the frame pacer interval). This cuts perceived input latency by up to 16ms (one frame interval).
 
-Input events are sent immediately (no coalescing) — latency is critical. The existing `InputTriggerCoalescer` (8ms debounce) applies only to input-triggered capture, not to input forwarding itself.
+```rust
+// In InputChannelHandler::handle_datagram():
+self.injector.inject(event)?;
+self.capture_trigger.send(()).ok();  // signal DDA to capture NOW
+```
 
-Mouse move events may be rate-limited to 125Hz (one per 8ms) to avoid flooding the network. At 24 bytes per event, 125Hz = 3 KB/sec — negligible.
+The existing `InputTriggerCoalescer` (8ms debounce) prevents excessive captures from rapid input.
+
+### 1.5 Input Batching
+
+Mouse move events within a 1ms window are coalesced using the existing `DatagramCoalescer`. At 125Hz mouse polling, this batches 1-2 moves per datagram, halving syscall overhead. Keyboard events are never coalesced (each keypress matters).
 
 ---
 
 ## 2. Control Channel Handler
 
-### 2.1 Heartbeat Exchange
+### 2.1 Zero-Allocation Heartbeat (S11)
 
-Both sides send `HEARTBEAT` datagrams every 5 seconds. Receiver resets the heartbeat timer on any packet (not just heartbeat messages). If no packet arrives for 10 seconds → suspend. 60 seconds → tombstone.
+The heartbeat packet is always the same 16 bytes. Pre-build once at session start:
 
-Wire format: PRISM header with `channel_id = CHANNEL_CONTROL`, `msg_type = HEARTBEAT` (0x01). Empty payload (16 bytes total — just the header).
+```rust
+pub struct HeartbeatGenerator {
+    packet: Bytes,  // pre-built, immutable, clone is Arc increment
+}
 
-The server's `HeartbeatMonitor` is already implemented. What's missing: a background task that sends heartbeat datagrams and a ControlChannelHandler that processes incoming heartbeats.
+impl HeartbeatGenerator {
+    pub fn new() -> Self {
+        let header = PrismHeader {
+            version: PROTOCOL_VERSION,
+            channel_id: CHANNEL_CONTROL,
+            msg_type: control_msg::HEARTBEAT,
+            flags: 0, sequence: 0, timestamp_us: 0, payload_length: 0,
+        };
+        let mut buf = BytesMut::with_capacity(HEADER_SIZE);
+        header.encode(&mut buf);
+        Self { packet: buf.freeze() }
+    }
+
+    pub fn next(&self) -> Bytes { self.packet.clone() }  // Arc clone, zero alloc
+}
+```
+
+`try_send_datagram(heartbeat_gen.next())` every 5 seconds. Zero heap allocation on the hot path.
 
 ### 2.2 Control Channel Handler
 
-Implements `ChannelHandler` for `CHANNEL_CONTROL` (0x006). Routes control messages by `msg_type`:
+Implements `ChannelHandler` for `CHANNEL_CONTROL` (0x006). Routes by `msg_type`:
 
-| msg_type | Action |
-|---|---|
-| HEARTBEAT (0x01) | Reset heartbeat timer (already happens via activity signal) |
-| HEARTBEAT_ACK (0x02) | Log RTT |
-| PROBE_REQUEST (0x05) | Echo back as PROBE_RESPONSE with timestamp |
-| PROBE_RESPONSE (0x06) | Forward to QualityMonitor prober |
-| CLIENT_FEEDBACK (0x07) | Parse JSON, feed to QualityMonitor |
-| CLIENT_ALERT (0x08) | Log alert, adjust quality immediately |
+| msg_type | Action | Transport |
+|---|---|---|
+| HEARTBEAT (0x01) | Reset heartbeat timer (activity signal) | Datagram |
+| HEARTBEAT_ACK (0x02) | Compute RTT from timestamp | Datagram |
+| PROBE_REQUEST (0x05) | Echo back as PROBE_RESPONSE | Datagram |
+| PROBE_RESPONSE (0x06) | Forward to QualityMonitor prober | Datagram |
+| CLIENT_FEEDBACK (0x07) | Deserialize, feed to QualityMonitor | Stream (framed) |
+| CLIENT_ALERT (0x08) | Log + adjust quality immediately | Datagram |
+| SHUTDOWN_NOTICE (0x20) | Client shows message, prepares reconnect | Stream (framed) |
 
-### 2.3 Heartbeat Background Task
+### 2.3 ChannelHandler Trait Refactor
 
-Server spawns a task per client that sends HEARTBEAT datagrams every 5 seconds via `connection.try_send_datagram()`. Client does the same. Both reset their timers on any received packet.
+The current `ChannelHandler` trait only has `handle_datagram`. Clipboard and client feedback need bidirectional streams. Add `handle_stream`:
+
+```rust
+#[async_trait]
+pub trait ChannelHandler: Send + Sync {
+    fn channel_id(&self) -> u16;
+    async fn handle_datagram(&self, from: ClientId, data: Bytes) -> Result<(), ChannelError>;
+
+    /// Handle a stream-delivered message. Default: no-op.
+    async fn handle_stream(
+        &self,
+        _from: ClientId,
+        _send: OwnedSendStream,
+        _recv: OwnedRecvStream,
+    ) -> Result<(), ChannelError> {
+        Ok(()) // channels that don't use streams ignore this
+    }
+}
+```
+
+The recv loop's `accept_bi` path dispatches to `handler.handle_stream()`.
 
 ---
 
 ## 3. Quality Feedback Loop
 
-### 3.1 Data Flow
+### 3.1 Event-Driven Architecture
+
+Quality evaluation is event-driven, NOT periodic polling. Triggers:
+1. **Probe echo received** → recompute quality (primary trigger)
+2. **Client feedback received** → recompute quality
+3. **500ms fallback timer** → recompute if no events (catch stale state)
+
+This saves CPU when quality is stable (typical case) while reacting within one probe interval (~2s) when quality changes.
+
+### 3.2 Data Flow
 
 ```
-Transport metrics (RTT, loss, bandwidth)
-        ↓
-ConnectionProber sends probe datagrams (2s interval during streaming)
-        ↓
-Probe echoes arrive via Control channel → ProbeResult (measured RTT)
-        ↓
-BandwidthEstimator + TrendDetector update
-        ↓
-ConnectionQuality::compute() → score + QualityRecommendation
-        ↓
-DegradationLadder::target_level() → new level
-        ↓
-Hysteresis check (2s downgrade, 10s upgrade)
-        ↓
-If level changed: adjust encoder bitrate + resolution
+ConnectionProber (2s/5s/30s/60s adaptive)
+    │ sends PROBE_REQUEST datagram
+    ▼
+Peer echoes PROBE_RESPONSE
+    │
+    ▼
+prober.process_echo() → ProbeResult { rtt }
+    │
+    ▼
+BandwidthEstimator::record_send/recv()  ← also fed by transport metrics
+TrendDetector::record(rtt)
+OneWayDelayEstimator::record()
+    │
+    ▼
+ConnectionQuality::compute(rtt, jitter, loss, bw_send, bw_recv, asymmetry)
+    │ score + QualityRecommendation
+    ▼
+ArcSwap<ConnectionQuality> cache (S12)
+    │ ~1ns reads by degradation ladder, overlay, frame sender
+    ▼
+DegradationLadder::target_level(&recommendation)
+    │
+    ▼
+Hysteresis::should_change(current, target)
+    │ 2s downgrade hold, 10s upgrade hold
+    ▼
+If level changed:
+    ├─ HwEncoder: reconfigure bitrate (cheap, no reinit)
+    ├─ HwEncoder: reconfigure resolution (expensive, reinit + IDR)
+    └─ Send QUALITY_UPDATE to client via Control stream
 ```
 
-### 3.2 Probe Task
+### 3.3 ConnectionQuality ArcSwap Cache (S12)
 
-Server spawns a per-client task that:
-1. Calls `ConnectionProber::generate_probe()` to get probe payloads
-2. Wraps in PRISM header (CHANNEL_CONTROL, PROBE_REQUEST)
-3. Sends as datagram
-4. When PROBE_RESPONSE arrives (via ControlChannelHandler), calls `prober.process_echo()` → gets RTT
+Quality is computed infrequently (~every 2s from probes) but read frequently (~60x/sec by frame sender, overlay, degradation ladder). Cache in `ArcSwap`:
 
-### 3.3 Quality Evaluation Task
+```rust
+pub struct QualityCache {
+    inner: ArcSwap<ConnectionQuality>,
+}
 
-Server spawns a periodic task (every 500ms or on quality change):
-1. Read transport metrics from QuicConnection
-2. Feed to `QualityMonitor::update(metrics)`
-3. If `level_changed`: apply new encoder bitrate via `HwEncoder` reconfig
-4. Send QUALITY_UPDATE to client via Control stream
+impl QualityCache {
+    /// Write: called by quality evaluation task (~0.5-2Hz)
+    pub fn update(&self, quality: ConnectionQuality) {
+        self.inner.store(Arc::new(quality));
+    }
 
-### 3.4 Client Feedback
+    /// Read: called by frame sender, overlay, etc. (~60Hz). Cost: ~1ns.
+    pub fn load(&self) -> Arc<ConnectionQuality> {
+        self.inner.load_full()
+    }
+}
+```
 
-Client tracks its own performance (decode time, frame drops, render time) and sends `ClientFeedback` every 1 second (normal) or 200ms (stressed) via the Control stream using `FramedWriter`.
+### 3.4 Keyframe Hint Integration
 
-Server's ControlChannelHandler deserializes and feeds to QualityMonitor for decision-making.
+Before encoding an IDR, the frame sender notifies the QualityMonitor. The arbiter temporarily boosts display allocation for 100ms by reducing lower-priority channels. This prevents congestion spikes from keyframe bursts.
+
+### 3.5 Asymmetry Response
+
+When `OneWayDelayEstimator` reports asymmetry:
+- `DownstreamSlow`: reduce outgoing (server→client) bandwidth allocation proportionally
+- `UpstreamSlow`: send `REDUCE_SEND_RATE` control message to client
+
+### 3.6 Client Feedback
+
+Client tracks performance locally and reports periodically:
+
+```rust
+pub struct ClientPerformanceTracker {
+    decode_times: VecDeque<u64>,     // last 60 decode times (µs)
+    render_times: VecDeque<u64>,     // last 60 render times (µs)
+    frames_decoded: u64,
+    frames_dropped: u64,
+    decoder_queue_depth: u8,
+    feedback_config: ClientFeedbackConfig,
+}
+```
+
+**Tiered frequency:** 1s normal, 200ms when stressed (queue depth ≥ 3 or drop rate ≥ 5%). Sent as JSON on the Control bidirectional stream via `FramedWriter`.
 
 ---
 
@@ -149,40 +273,62 @@ Server's ControlChannelHandler deserializes and feeds to QualityMonitor for deci
 
 ### 4.1 Architecture
 
-Bidirectional clipboard sync on `CHANNEL_CLIPBOARD` (0x004). When the user copies on either side, the clipboard content is sent to the other side.
+Bidirectional clipboard sync on `CHANNEL_CLIPBOARD` (0x004). Uses a bidirectional QUIC stream (clipboard content can be large).
 
 ```rust
 pub struct ClipboardMessage {
     pub format: ClipboardFormat,
     pub data: Vec<u8>,
+    pub content_hash: u64,           // for echo suppression
     pub source_device_id: Uuid,
-    pub sequence: u32,
 }
 
 pub enum ClipboardFormat {
     Text,
     Html,
     Image,   // PNG encoded
-    Files,   // JSON list of filenames (metadata only, not content)
+    Files,   // JSON metadata only
 }
 ```
 
-### 4.2 Platform Clipboard Access
+### 4.2 Hash-Based Echo Suppression
 
-- **Windows:** `OpenClipboard` / `GetClipboardData` / `SetClipboardData` via the `windows` crate. Use `AddClipboardFormatListener` to detect changes.
-- **Client (cross-platform):** `arboard` crate (cross-platform clipboard access).
+When we set the clipboard from a remote copy, we hash the content and store it. When the OS notifies us of a clipboard change, we hash the new content — if it matches our last-set hash, suppress the echo.
 
-### 4.3 Echo Suppression
+```rust
+pub struct ClipboardEchoGuard {
+    last_set_hash: AtomicU64,
+}
 
-When we set the clipboard ourselves (from a remote copy), we must not echo it back. Use a `last_set_sequence` counter — if the clipboard change matches what we just set, suppress it.
+impl ClipboardEchoGuard {
+    pub fn set_and_remember(&self, data: &[u8]) {
+        self.last_set_hash.store(fast_hash(data), Ordering::Relaxed);
+        // ... actually set clipboard
+    }
 
-### 4.4 Clipboard Channel Handler
+    pub fn should_send(&self, data: &[u8]) -> bool {
+        fast_hash(data) != self.last_set_hash.load(Ordering::Relaxed)
+    }
+}
+```
 
-Implements `ChannelHandler` for `CHANNEL_CLIPBOARD`. Messages sent via FramedWriter/FramedReader on a bidirectional stream (clipboard content can be large — images may be hundreds of KB).
+This is more robust than sequence-number-based suppression (handles network reordering, race conditions).
 
-### 4.5 Size Limits
+### 4.3 Platform Clipboard
 
-Text: 1MB max. Images: 10MB max. Files: metadata only (actual file transfer uses FileShare channel). Content exceeding limits is silently truncated with a warning.
+- **Server (Windows):** `windows` crate — `AddClipboardFormatListener` for change detection, `OpenClipboard`/`GetClipboardData`/`SetClipboardData` for access. Runs on a dedicated thread with a message pump (clipboard APIs require a window handle).
+- **Client:** `arboard` crate — cross-platform clipboard. Poll every 250ms for changes (arboard doesn't support change notifications on all platforms).
+
+### 4.4 Size Limits & Filtering
+
+| Format | Max Size | Exceeds Limit |
+|---|---|---|
+| Text | 1 MB | Truncate with warning |
+| HTML | 2 MB | Truncate with warning |
+| Image | 10 MB (PNG) | Skip with warning |
+| Files | Metadata only | File content via FileShare |
+
+The `SecurityContext` has a `ContentFilter` trait slot for clipboard — Phase 1 uses no-op (AllowAll). Phase 3 adds URL sanitization, size limits per device, etc.
 
 ---
 
@@ -190,22 +336,16 @@ Text: 1MB max. Images: 10MB max. Files: metadata only (actual file transfer uses
 
 ### 5.1 Architecture
 
-Server captures system audio → encodes with Opus → sends as datagrams on `CHANNEL_AUDIO` (0x003). Client decodes Opus → plays via audio output.
-
 ```
-Server: WASAPI loopback capture → Opus encode → PRISM datagram
-Client: PRISM datagram → Opus decode → cpal audio output
+Server: WASAPI loopback → silence detect → Opus encode → PRISM datagram
+Client: PRISM datagram → adaptive jitter buffer → Opus decode → cpal output
 ```
 
 ### 5.2 Audio Capture (Windows)
 
-WASAPI loopback capture (`IAudioClient` in shared mode with `AUDCLNT_STREAMFLAGS_LOOPBACK`). Captures all system audio without affecting playback.
+WASAPI loopback capture (`IAudioClient` in shared mode with `AUDCLNT_STREAMFLAGS_LOOPBACK`). Captures all system audio.
 
 ```rust
-pub struct WasapiCapture {
-    // #[cfg(windows)] — WASAPI COM interfaces
-}
-
 pub trait AudioCapture: Send + 'static {
     fn start(&mut self) -> Result<(), AudioError>;
     fn stop(&mut self);
@@ -215,55 +355,137 @@ pub trait AudioCapture: Send + 'static {
 }
 ```
 
-### 5.3 Opus Encoding/Decoding
+### 5.3 Silence Detection
 
-Use the `opus` crate (or `audiopus`). Encode at 48kHz stereo, 128kbps. Each Opus frame = 20ms of audio = 960 samples × 2 channels = ~200 bytes encoded.
+Before encoding, check if the audio buffer is silent (RMS below threshold). If silent for >100ms, stop sending packets. Resume on first non-silent frame. This saves ~10KB/sec during typical coding sessions.
 
-Wire format: PRISM header (16B) + Opus frame (~200B). Sent as datagrams (latency-critical). At 50 packets/sec × 216B = 10.8 KB/sec — negligible bandwidth.
+```rust
+pub struct SilenceDetector {
+    threshold_rms: f32,         // 0.001 (-60dB)
+    silent_frames: u32,
+    silent_threshold: u32,      // 5 frames = 100ms at 20ms/frame
+}
 
-### 5.4 Client Playback
+impl SilenceDetector {
+    pub fn is_silent(&mut self, samples: &[f32]) -> bool {
+        let rms = (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt();
+        if rms < self.threshold_rms {
+            self.silent_frames += 1;
+            self.silent_frames >= self.silent_threshold
+        } else {
+            self.silent_frames = 0;
+            false
+        }
+    }
+}
+```
 
-Use the `cpal` crate for cross-platform audio output. Decode Opus frames, write to audio output buffer. Buffer 3 frames (60ms) for jitter absorption.
+### 5.4 Opus Encoding
 
-### 5.5 Audio Channel Handler
+Use `audiopus` (bundles libopus, no system dependency). Encode at 48kHz stereo, 128kbps. 20ms frames = 960 samples × 2 channels.
 
-Server-side: implements `ChannelHandler` for `CHANNEL_AUDIO`. But audio flows server→client (not client→server), so the handler only processes client-originated messages (volume control, mute toggle). The main audio flow is a server-side task that captures and sends.
+Wire format:
+```
+PRISM header (16B):
+    channel_id = CHANNEL_AUDIO (0x003)
+    msg_type = 0x01 (audio frame)
+    timestamp_us = capture timestamp    ← A/V sync anchor
+    payload_length = opus_frame_len
+
+Opus frame (~100-300B)
+```
+
+The `timestamp_us` field in the PRISM header provides A/V synchronization. The client correlates audio timestamps with display frame timestamps to maintain lip sync.
+
+### 5.5 Client Playback — Adaptive Jitter Buffer
+
+Fixed buffers add unnecessary latency on LAN and cause glitches on WAN. Use an adaptive jitter buffer:
+
+```rust
+pub struct AdaptiveJitterBuffer {
+    buffer: VecDeque<AudioFrame>,
+    target_depth_ms: u32,       // starts at 20ms
+    min_depth_ms: u32,          // 20ms (LAN)
+    max_depth_ms: u32,          // 80ms (WAN)
+    jitter_estimator: f32,      // EMA of inter-arrival jitter
+}
+```
+
+- **LAN (~1ms RTT):** buffer depth = 20ms (1 Opus frame). Near-zero latency.
+- **WAN (~50ms RTT):** buffer depth grows to 40-60ms based on observed jitter.
+- **Bad network:** caps at 80ms. Beyond that, quality loop should reduce audio bitrate or skip.
+
+Audio output via `cpal` — write decoded PCM to the default output device.
+
+### 5.6 Audio Channel Handler
+
+Server-side handler for `CHANNEL_AUDIO` processes client→server control messages:
+- Volume adjustment
+- Mute toggle
+- Audio device selection (Phase 2)
+
+The main audio flow (capture→encode→send) is a server-side background task, not handler-driven.
 
 ---
 
-## 6. Manual Pairing Flow
+## 6. Pairing — Trust-On-First-Use (TOFU)
 
-### 6.1 Flow
+### 6.1 Model
 
-1. Server generates identity at startup, prints public key as hex
-2. User copies the 64-char hex string to the client machine
-3. Client passes it as `--server-key <hex>` CLI argument
-4. Client generates its own identity, starts Noise IK handshake with the server's key
-5. Server receives handshake, extracts client's public key
-6. If key is unknown: server prompts "New device 'Client-Name' wants to connect. Allow? [y/n]"
-7. If approved: server adds to PairingStore, session proceeds
-8. If denied: server drops connection
+SSH-style trust-on-first-use instead of interactive prompting:
 
-### 6.2 Implementation
+1. Server starts with `--noise` flag, generates identity, prints public key
+2. Client connects with `--server-key <hex>`
+3. Noise IK handshake completes → server extracts client's public key
+4. **First connection from this key:** server auto-pairs, logs warning:
+   ```
+   [SECURITY] New device paired: "Client-PC" (key: a3f1...beef)
+   ```
+5. **Subsequent connections:** recognized instantly, no warning
+6. **Key change detected:** server refuses connection, logs alert:
+   ```
+   [SECURITY] WARNING: Device "Client-PC" presented different key! Possible attack.
+   ```
 
-The existing `--noise` flag already does steps 1-5. What's missing:
-- Server-side prompt for unknown devices (interactive stdin)
-- PairingStore persistence (save/load paired devices)
-- Auto-approve option (`--auto-pair`) for development
-
-### 6.3 Persistent Pairing
-
-Paired devices are saved to `prism_pairing.json`. On next connection, the device is recognized by its public key and auto-authenticated without prompting.
+### 6.2 PairingStore Integration
 
 ```rust
-// At startup:
-let pairing_store = PairingStore::load_or_create(&config.pairing_path)?;
-let gate = DefaultSecurityGate::new(pairing_store, identity, audit_log);
+// In connection handler, after Noise handshake:
+let client_key = handshake_result.remote_static.unwrap();
 
-// On unknown device:
-// Interactive: prompt user
-// --auto-pair: auto-approve
+match gate.authenticate(&client_key, &device_identity) {
+    AuthResult::Authenticated(ctx) => {
+        // Known device → proceed
+    }
+    AuthResult::SilentDrop => {
+        // Unknown device → TOFU: auto-pair
+        if auto_pair_enabled {
+            pairing_store.pair(device_identity, PairingState::Paired);
+            log::warn!("New device paired: {}", device_identity.display_name);
+            // Retry authentication → now succeeds
+        } else {
+            // Strict mode: reject unknown devices
+            connection.close();
+        }
+    }
+    AuthResult::Blocked => {
+        // Blocked device (key changed) → reject
+        connection.close();
+    }
+}
 ```
+
+### 6.3 Persistence
+
+Paired devices saved to `prism_pairing.json` on each new pairing. Loaded at startup. The existing `PairingStore::persist()` and `PairingStore::restore()` methods handle this (defined in Plan 2).
+
+### 6.4 CLI Flags
+
+| Flag | Behavior |
+|---|---|
+| `--noise` | Enable Noise IK handshake (default: AllowAllGate) |
+| `--auto-pair` | TOFU: auto-pair unknown devices (default with --noise) |
+| `--strict` | Reject unknown devices (require manual pre-pairing) |
 
 ---
 
@@ -271,12 +493,13 @@ let gate = DefaultSecurityGate::new(pairing_store, identity, audit_log);
 
 | Component | This Plan | Phase 2+ |
 |---|---|---|
-| Input forwarding | Full: keyboard + mouse + scroll | Touch, pen, gamepad |
-| Control channel | Heartbeat, probe, feedback, alerts | Profile switching, overlay toggle |
-| Quality loop | Probes → metrics → degradation → encoder | Content-aware adaptation |
-| Clipboard | Text + image sync | File drag-and-drop |
-| Audio | WASAPI + Opus + cpal | Multi-channel, spatial |
-| Pairing | Manual hex + interactive prompt | SPAKE2 short code, Tailscale auto |
+| Input forwarding | Keyboard + mouse (absolute + relative) + scroll + Unicode | Touch, pen, gamepad |
+| Local cursor | Client-side prediction with server correction | Predictive cursor with RTT compensation |
+| Control channel | Heartbeat (zero-alloc), probe, feedback, alerts, shutdown | Profile switching, overlay toggle |
+| Quality loop | Event-driven probes → ArcSwap cache → degradation → encoder | Content-aware adaptation |
+| Clipboard | Text + image with hash echo suppression | File drag-and-drop, rich format |
+| Audio | WASAPI + silence detect + Opus + adaptive jitter + cpal | Multi-channel, spatial, device selection |
+| Pairing | TOFU + persistent PairingStore | SPAKE2 short code, Tailscale auto |
 
 ---
 
@@ -288,57 +511,82 @@ All new code goes into existing crates — no new crates needed.
 crates/prism-server/src/
     input_handler.rs            # InputChannelHandler + InputInjector (#[cfg(windows)])
     control_handler.rs          # ControlChannelHandler (heartbeat, probe, feedback routing)
-    heartbeat_task.rs           # Per-client heartbeat sender task
+    heartbeat_task.rs           # HeartbeatGenerator (zero-alloc) + per-client sender task
     probe_task.rs               # Per-client quality probe sender task
-    quality_task.rs             # Periodic quality evaluation + encoder adjustment
-    clipboard_handler.rs        # ClipboardChannelHandler + platform clipboard access
-    audio_capture.rs            # WasapiCapture (#[cfg(windows)]) + AudioCapture trait
-    audio_sender.rs             # Audio capture → Opus encode → datagram send task
+    quality_task.rs             # Event-driven quality evaluation + ArcSwap cache + encoder adjust
+    clipboard_handler.rs        # ClipboardChannelHandler + ClipboardEchoGuard
+    clipboard_win32.rs          # #[cfg(windows)] Win32 clipboard access + change listener
+    audio_capture.rs            # AudioCapture trait + WasapiCapture (#[cfg(windows)])
+    audio_sender.rs             # Silence detect → Opus encode → datagram send task
     main.rs                     # Wire all handlers + tasks into accept loop
 
 crates/prism-client/src/
     input_sender.rs             # Capture minifb keyboard/mouse → send input datagrams
+    cursor_renderer.rs          # Local cursor rendering + server correction
     control_client.rs           # Client heartbeat + feedback sender
-    clipboard_client.rs         # Client-side clipboard sync (arboard crate)
-    audio_player.rs             # Opus decode → cpal playback
-    main.rs                     # Wire input capture + audio + clipboard into client loop
+    performance_tracker.rs      # ClientPerformanceTracker (decode/render times)
+    clipboard_client.rs         # Client-side clipboard sync (arboard + echo guard)
+    audio_player.rs             # Adaptive jitter buffer → Opus decode → cpal playback
+    silence.rs                  # SilenceDetector (shared with server)
+    main.rs                     # Wire everything into client loop
 
 crates/prism-protocol/src/
-    input.rs                    # InputEvent, MouseButton wire types
+    input.rs                    # InputEvent, MouseButton, TextInput wire types
 
-crates/prism-display/src/
-    (no changes — display types already complete)
+crates/prism-session/src/
+    dispatch.rs                 # REFACTOR: add handle_stream() to ChannelHandler trait
 ```
 
 ### New Dependencies
 
 | Crate | Where | Purpose |
 |---|---|---|
-| `opus` or `audiopus` | prism-server, prism-client | Opus encode/decode |
-| `cpal` | prism-client | Audio output |
+| `audiopus` | prism-server, prism-client | Opus encode/decode (bundles libopus) |
+| `cpal` | prism-client | Cross-platform audio output |
 | `arboard` | prism-client | Cross-platform clipboard |
 
-Windows-only (already have `windows` crate):
-- WASAPI audio capture uses existing `Win32_Media_Audio` features
-- `SendInput` uses existing `Win32_UI_Input_KeyboardAndMouse` features
+Windows-only (already have `windows` crate, add features):
+- `Win32_Media_Audio` — WASAPI loopback capture
+- `Win32_UI_Input_KeyboardAndMouse` — SendInput for input injection
+- `Win32_System_DataExchange` — Clipboard APIs
 
 ---
 
-## 9. Testing Strategy
+## 9. Optimizations Index
+
+| ID | Optimization | Impact | Section |
+|---|---|---|---|
+| P1 | Pre-built input packet header template | ~5 fewer buffer ops per event | §1.1 |
+| S11 | Zero-allocation heartbeat (pre-built Bytes) | 0 heap alloc per heartbeat | §2.1 |
+| S12 | ConnectionQuality ArcSwap cache | ~1ns reads vs ~5µs recompute | §3.3 |
+| R32 | Input-triggered capture | Up to 16ms faster response | §1.4 |
+| — | Hash-based echo suppression | More robust than sequence-based | §4.2 |
+| — | Silence detection (-60dB threshold) | ~10KB/sec savings when silent | §5.3 |
+| — | Adaptive jitter buffer (20-80ms) | Optimal latency on any network | §5.5 |
+| — | Event-driven quality evaluation | CPU savings when stable | §3.1 |
+| — | Input batching (DatagramCoalescer) | 50% fewer syscalls for mouse | §1.5 |
+
+---
+
+## 10. Testing Strategy
 
 | Category | What | How |
 |---|---|---|
-| Unit: InputEvent | Serialize/deserialize roundtrip | Known bytes |
-| Unit: InputInjector | Coordinate mapping (normalized → screen) | Math tests (no actual injection) |
-| Unit: ControlHandler | Message routing by msg_type | Mock dispatcher |
-| Unit: ClipboardMessage | JSON roundtrip, size limits | Known payloads |
-| Unit: FrameStats | FPS, gap detection (existing) | Already tested |
-| Integration: Input roundtrip | Client sends KeyDown → server receives | Loopback QUIC |
-| Integration: Heartbeat | Both sides exchange heartbeats for 5s | Loopback, verify no timeout |
-| Integration: Probe → quality | Send probes, verify RTT computed | Loopback with artificial delay |
-| Integration: Clipboard | Set clipboard on server → verify client receives | Loopback + arboard |
-| Integration: Audio | Capture silence → encode → send → decode → verify samples | Loopback + synthetic audio |
+| Unit: InputEvent | Serialize/deserialize roundtrip, all variants | Known bytes |
+| Unit: InputInjector | Coordinate mapping (normalized → screen, relative deltas) | Math tests |
+| Unit: HeartbeatGenerator | Packet is exactly 16 bytes, parseable header | Roundtrip |
+| Unit: SilenceDetector | Detects silence, clears on sound, threshold | Synthetic audio |
+| Unit: ClipboardEchoGuard | Hash match suppresses, different data passes | Known data |
+| Unit: AdaptiveJitterBuffer | Grows on jitter, shrinks on stability | Simulated arrivals |
+| Unit: QualityCache | ArcSwap read/write, concurrent access | Spawn readers+writer |
+| Unit: ControlHandler | Routes msg_type correctly | Mock prober |
+| Integration: Input roundtrip | Client KeyDown → server receives → inject called | Loopback QUIC |
+| Integration: Heartbeat | Both sides exchange heartbeats, no timeout for 10s | Loopback |
+| Integration: Probe → quality | Send probes, verify RTT and quality score computed | Loopback |
+| Integration: Clipboard text | Set text on server → client receives → verify match | Loopback + arboard |
+| Integration: Audio flow | Synthetic sine wave → encode → send → decode → verify | Loopback + cpal |
+| Integration: TOFU pairing | Unknown client → auto-pair → reconnect → recognized | Loopback + PairingStore |
 
 ---
 
-*PRISM Phase 1 Completion Design v1.0 — CC0 Public Domain*
+*PRISM Phase 1 Completion Design v1.1 — CC0 Public Domain*
