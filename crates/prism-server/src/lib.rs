@@ -1,6 +1,7 @@
 pub mod config;
 pub mod acceptor;
 pub mod allow_all_gate;
+pub mod pairing_gate;
 pub mod session_manager;
 pub mod client_session;
 pub mod recv_loop;
@@ -44,6 +45,9 @@ pub use acceptor::{ConnectionAcceptor, SelfSignedCert};
 
 // allow_all_gate
 pub use allow_all_gate::AllowAllGate;
+
+// pairing_gate
+pub use pairing_gate::TofuGate;
 
 // frame_sender
 pub use frame_sender::{FrameSender, build_display_datagram};
