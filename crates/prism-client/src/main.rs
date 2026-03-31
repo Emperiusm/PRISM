@@ -13,6 +13,8 @@
 use std::sync::mpsc as std_mpsc;
 use std::time::Instant;
 
+use bytes::Bytes;
+
 use minifb::{Window, WindowOptions};
 use openh264::decoder::Decoder;
 use openh264::formats::YUVSource;
@@ -95,8 +97,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // and the receiver (main thread) can poll without blocking the event loop.
     let (tx, rx) = std_mpsc::sync_channel::<Frame>(4);
 
-    // Spawn the async frame-receive task.
+    // Channel: main-thread input capture -> async sender.
+    // Main thread sends input datagrams (built by InputSender); the async task
+    // forwards them to the server via connection.send_datagram().
+    let (input_tx, input_rx) = std_mpsc::sync_channel::<Bytes>(64);
+
+    // Spawn the async frame-receive + input-forward task.
     let conn_recv = connection.clone();
+    let conn_input = connection.clone();
+
+    // Spawn heartbeat sender.
+    let hb_conn = connection.clone();
+    tokio::spawn(async move {
+        // Build heartbeat packet inline using raw protocol constants.
+        // CHANNEL_CONTROL = 0x006, HEARTBEAT msg_type = 0x01
+        // PrismHeader wire: ver_chan LE u16, msg_type u8, flags u8,
+        //                   sequence LE u32, timestamp_us LE u32, payload_length LE u32
+        let ver_chan: u16 = (0u16 << 12) | 0x006u16; // version=0, channel=CONTROL
+        let mut header_bytes = [0u8; 16];
+        header_bytes[0..2].copy_from_slice(&ver_chan.to_le_bytes());
+        header_bytes[2] = 0x01; // HEARTBEAT
+        // remaining fields (flags, sequence, timestamp_us, payload_length) are all zero
+        let packet = Bytes::copy_from_slice(&header_bytes);
+
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            if hb_conn.send_datagram(packet.clone()).is_err() { break; }
+        }
+    });
+
+    // Spawn async input-forward task: drains the std_mpsc channel and sends datagrams.
+    tokio::spawn(async move {
+        loop {
+            // Non-blocking drain: pull all pending input datagrams.
+            // We use a short sleep to yield between polls so we don't spin 100%.
+            let mut sent_any = false;
+            while let Ok(dgram) = input_rx.try_recv() {
+                if conn_input.send_datagram(dgram).is_err() {
+                    return;
+                }
+                sent_any = true;
+            }
+            if !sent_any {
+                tokio::time::sleep(std::time::Duration::from_millis(4)).await;
+            }
+        }
+    });
+
     tokio::spawn(async move {
         // Create H.264 decoder.
         let mut decoder = match Decoder::new() {
@@ -222,6 +270,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut current_w = initial_w;
     let mut current_h = initial_h;
 
+    // Input sender and state tracking for the main-thread render loop.
+    let mut input_sender = prism_client::InputSender::new();
+    let mut last_mx: u16 = 0;
+    let mut last_my: u16 = 0;
+    let mut last_left = false;
+    let mut last_right = false;
+    let mut last_middle = false;
+
     while window.is_open() && !window.is_key_down(minifb::Key::Escape) {
         // Drain all pending frames from the channel; use the latest one.
         let mut latest: Option<Frame> = None;
@@ -248,6 +304,73 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         window
             .update_with_buffer(&current_buffer, current_w, current_h)
             .unwrap_or_else(|e| eprintln!("[Renderer] update error: {}", e));
+
+        // ── Input capture ────────────────────────────────────────────────────
+
+        // Key presses
+        for key in window.get_keys_pressed(minifb::KeyRepeat::Yes) {
+            let vk = key as u16;
+            let event = prism_protocol::input::InputEvent::KeyDown { scancode: vk, vk };
+            let dgram = input_sender.build_datagram(event);
+            input_tx.send(dgram).ok();
+        }
+
+        // Mouse position
+        if let Some((mx, my)) = window.get_mouse_pos(minifb::MouseMode::Clamp) {
+            let (nx, ny) = prism_client::normalize_mouse(mx, my, current_w as u32, current_h as u32);
+            if nx != last_mx || ny != last_my {
+                let event = prism_protocol::input::InputEvent::MouseMove { x: nx, y: ny };
+                let dgram = input_sender.build_datagram(event);
+                input_tx.send(dgram).ok();
+                last_mx = nx;
+                last_my = ny;
+            }
+        }
+
+        // Mouse buttons
+        let left_down = window.get_mouse_down(minifb::MouseButton::Left);
+        let right_down = window.get_mouse_down(minifb::MouseButton::Right);
+        let middle_down = window.get_mouse_down(minifb::MouseButton::Middle);
+
+        if left_down && !last_left {
+            let event = prism_protocol::input::InputEvent::MouseDown {
+                button: prism_protocol::input::MouseButton::Left,
+            };
+            input_tx.send(input_sender.build_datagram(event)).ok();
+        } else if !left_down && last_left {
+            let event = prism_protocol::input::InputEvent::MouseUp {
+                button: prism_protocol::input::MouseButton::Left,
+            };
+            input_tx.send(input_sender.build_datagram(event)).ok();
+        }
+
+        if right_down && !last_right {
+            let event = prism_protocol::input::InputEvent::MouseDown {
+                button: prism_protocol::input::MouseButton::Right,
+            };
+            input_tx.send(input_sender.build_datagram(event)).ok();
+        } else if !right_down && last_right {
+            let event = prism_protocol::input::InputEvent::MouseUp {
+                button: prism_protocol::input::MouseButton::Right,
+            };
+            input_tx.send(input_sender.build_datagram(event)).ok();
+        }
+
+        if middle_down && !last_middle {
+            let event = prism_protocol::input::InputEvent::MouseDown {
+                button: prism_protocol::input::MouseButton::Middle,
+            };
+            input_tx.send(input_sender.build_datagram(event)).ok();
+        } else if !middle_down && last_middle {
+            let event = prism_protocol::input::InputEvent::MouseUp {
+                button: prism_protocol::input::MouseButton::Middle,
+            };
+            input_tx.send(input_sender.build_datagram(event)).ok();
+        }
+
+        last_left = left_down;
+        last_right = right_down;
+        last_middle = middle_down;
     }
 
     connector.close();

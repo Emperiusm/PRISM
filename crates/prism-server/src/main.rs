@@ -56,7 +56,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session_manager = Arc::new(Mutex::new(prism_server::SessionManager::new(config.clone())));
 
     // Channel dispatcher + bandwidth tracker
-    let dispatcher = Arc::new(prism_session::ChannelDispatcher::new());
+    let mut dispatcher = prism_session::ChannelDispatcher::new();
+    dispatcher.register(Arc::new(prism_server::ControlChannelHandler::new()));
+    dispatcher.register(Arc::new(prism_server::InputChannelHandler::new(1920, 1080)));
+    let dispatcher = Arc::new(dispatcher);
     let tracker = Arc::new(prism_session::ChannelBandwidthTracker::new());
 
     // Shared connection store for broadcasting frames
@@ -355,6 +358,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(granted) => {
                             println!("[{}] Session: {} channels granted", remote, granted.len());
 
+                            // Clone before consuming: heartbeat sender needs its own handle.
+                            let hb_conn = quinn_conn_for_store.clone();
+
                             // Store connection for frame sending
                             conn_store_clone.add(client_id, quinn_conn_for_store);
                             println!(
@@ -375,6 +381,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 remote,
                                 &client_id.to_string()[..8]
                             );
+
+                            // Spawn heartbeat sender: 16-byte HEARTBEAT datagram every 5 seconds.
+                            let hb_gen = prism_server::HeartbeatGenerator::new();
+                            tokio::spawn(async move {
+                                let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+                                loop {
+                                    interval.tick().await;
+                                    if hb_conn.send_datagram(hb_gen.packet()).is_err() { break; }
+                                }
+                            });
                         }
                         Err(e) => {
                             println!("[{}] Session failed: {}", remote, e);
