@@ -1,5 +1,6 @@
 // Transport connection types: errors, transport variants, stream priorities, metrics, events.
 
+use std::net::SocketAddr;
 use thiserror::Error;
 use prism_protocol::channel::ChannelPriority;
 
@@ -61,6 +62,65 @@ impl From<ChannelPriority> for StreamPriority {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DelayAsymmetry {
+    Unknown,
+    Symmetric,
+    DownstreamSlow { ratio: f32 },
+    UpstreamSlow { ratio: f32 },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TransportMetrics {
+    pub rtt_us: u64,
+    pub rtt_variance_us: u64,
+    pub loss_rate: f32,
+    pub theoretical_bandwidth_bps: u64,
+    pub actual_send_bps: u64,
+    pub actual_recv_bps: u64,
+    pub downstream_delay_us: Option<i64>,
+    pub upstream_delay_us: Option<i64>,
+    pub delay_asymmetry: DelayAsymmetry,
+    pub transport_type: TransportType,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    pub datagrams_sent: u64,
+    pub datagrams_dropped: u64,
+    pub probe_rtt_us: u64,
+}
+
+impl Default for TransportMetrics {
+    fn default() -> Self {
+        Self {
+            rtt_us: 0,
+            rtt_variance_us: 0,
+            loss_rate: 0.0,
+            theoretical_bandwidth_bps: 0,
+            actual_send_bps: 0,
+            actual_recv_bps: 0,
+            downstream_delay_us: None,
+            upstream_delay_us: None,
+            delay_asymmetry: DelayAsymmetry::Unknown,
+            transport_type: TransportType::Quic,
+            bytes_sent: 0,
+            bytes_received: 0,
+            datagrams_sent: 0,
+            datagrams_dropped: 0,
+            probe_rtt_us: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TransportEvent {
+    Connected { transport_type: TransportType, remote_addr: SocketAddr },
+    Migrated { old_addr: SocketAddr, new_addr: SocketAddr },
+    MetricsUpdated(TransportMetrics),
+    Degraded { reason: String },
+    Upgraded { from: TransportType, to: TransportType },
+    Disconnected { reason: String },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,5 +172,42 @@ mod tests {
         assert_eq!(StreamPriority::from(ChannelPriority::Normal), StreamPriority::Normal);
         assert_eq!(StreamPriority::from(ChannelPriority::Low), StreamPriority::Low);
         assert_eq!(StreamPriority::from(ChannelPriority::Background), StreamPriority::Background);
+    }
+
+    #[test]
+    fn delay_asymmetry_default_is_unknown() {
+        let a = DelayAsymmetry::Unknown;
+        assert_eq!(a, DelayAsymmetry::Unknown);
+    }
+
+    #[test]
+    fn delay_asymmetry_downstream_slow() {
+        let a = DelayAsymmetry::DownstreamSlow { ratio: 2.5 };
+        if let DelayAsymmetry::DownstreamSlow { ratio } = a {
+            assert!((ratio - 2.5).abs() < f32::EPSILON);
+        } else {
+            panic!("expected DownstreamSlow");
+        }
+    }
+
+    #[test]
+    fn transport_metrics_default_is_zeroed() {
+        let m = TransportMetrics::default();
+        assert_eq!(m.rtt_us, 0);
+        assert_eq!(m.loss_rate, 0.0);
+        assert_eq!(m.bytes_sent, 0);
+        assert_eq!(m.transport_type, TransportType::Quic);
+        assert_eq!(m.delay_asymmetry, DelayAsymmetry::Unknown);
+    }
+
+    #[test]
+    fn transport_event_clone() {
+        let event = TransportEvent::Degraded { reason: "high loss".into() };
+        let cloned = event.clone();
+        if let TransportEvent::Degraded { reason } = cloned {
+            assert_eq!(reason, "high loss");
+        } else {
+            panic!("expected Degraded");
+        }
     }
 }
