@@ -93,6 +93,24 @@ impl AtomicHistogram {
         }
     }
 
+    /// Reset all counters to zero. Used for windowed measurements.
+    pub fn reset(&self) {
+        for bucket in &self.buckets {
+            bucket.store(0, Ordering::Relaxed);
+        }
+        self.sum.store(0, Ordering::Relaxed);
+        self.count.store(0, Ordering::Relaxed);
+        self.min.store(u64::MAX, Ordering::Relaxed);
+        self.max.store(0, Ordering::Relaxed);
+    }
+
+    /// Snapshot and reset. Returns the snapshot, then zeros counters.
+    pub fn snapshot_and_reset(&self) -> HistogramSnapshot {
+        let snap = self.snapshot();
+        self.reset();
+        snap
+    }
+
     fn percentile(buckets: &[u64; BUCKET_COUNT], total: u64, pct: f64) -> u64 {
         if total == 0 { return 0; }
         let target = (total as f64 * pct) as u64;
@@ -194,6 +212,33 @@ mod tests {
         for _ in 0..1000 { h.record(500); }
         let snap = h.snapshot();
         assert!(snap.p50_us >= 256 && snap.p50_us <= 512, "p50 was {}", snap.p50_us);
+    }
+
+    #[test]
+    fn reset_clears_all() {
+        let h = AtomicHistogram::new();
+        h.record(100);
+        h.record(200);
+        h.reset();
+        let snap = h.snapshot();
+        assert_eq!(snap.count, 0);
+        assert_eq!(snap.sum_us, 0);
+        assert_eq!(snap.min_us, 0);
+        assert_eq!(snap.max_us, 0);
+    }
+
+    #[test]
+    fn snapshot_and_reset_returns_data_then_clears() {
+        let h = AtomicHistogram::new();
+        h.record(100);
+        h.record(200);
+        let snap = h.snapshot_and_reset();
+        assert_eq!(snap.count, 2);
+        assert_eq!(snap.sum_us, 300);
+        // After reset
+        let snap2 = h.snapshot();
+        assert_eq!(snap2.count, 0);
+        assert_eq!(snap2.sum_us, 0);
     }
 
     #[test]

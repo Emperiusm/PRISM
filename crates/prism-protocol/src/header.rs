@@ -47,6 +47,74 @@ impl PrismHeader {
         buf.put_u32_le(self.payload_length);
     }
 
+    /// Validated constructor. Returns Err on invalid field values.
+    pub fn new(
+        channel_id: u16,
+        msg_type: u8,
+        flags: u8,
+        sequence: u32,
+        timestamp_us: u32,
+        payload_length: u32,
+    ) -> Result<Self, ProtocolError> {
+        if channel_id == 0x000 {
+            return Err(ProtocolError::ReservedChannel);
+        }
+        if channel_id > 0x0FFF {
+            return Err(ProtocolError::ChannelIdOverflow(channel_id));
+        }
+        Ok(Self {
+            version: PROTOCOL_VERSION,
+            channel_id,
+            msg_type,
+            flags,
+            sequence,
+            timestamp_us,
+            payload_length,
+        })
+    }
+
+    /// Encode header directly into a byte slice. Slice must be >= HEADER_SIZE bytes.
+    /// Zero-copy: no BytesMut allocation. Used by Display Engine packetizer.
+    #[inline(always)]
+    pub fn encode_to_slice(&self, buf: &mut [u8]) -> usize {
+        let ver_chan: u16 = ((self.version as u16 & 0x0F) << 12) | (self.channel_id & 0x0FFF);
+        buf[0..2].copy_from_slice(&ver_chan.to_le_bytes());
+        buf[2] = self.msg_type;
+        buf[3] = self.flags;
+        buf[4..8].copy_from_slice(&self.sequence.to_le_bytes());
+        buf[8..12].copy_from_slice(&self.timestamp_us.to_le_bytes());
+        buf[12..16].copy_from_slice(&self.payload_length.to_le_bytes());
+        HEADER_SIZE
+    }
+
+    /// Decode header from a byte slice. Zero-copy.
+    #[inline(always)]
+    pub fn decode_from_slice(buf: &[u8]) -> Result<Self, ProtocolError> {
+        if buf.len() < HEADER_SIZE {
+            return Err(ProtocolError::BufferTooShort(buf.len()));
+        }
+        let ver_chan = u16::from_le_bytes([buf[0], buf[1]]);
+        let version = ((ver_chan >> 12) & 0x0F) as u8;
+        let channel_id = ver_chan & 0x0FFF;
+
+        if version != PROTOCOL_VERSION {
+            return Err(ProtocolError::UnsupportedVersion(version));
+        }
+        if channel_id == 0x000 {
+            return Err(ProtocolError::ReservedChannel);
+        }
+
+        Ok(Self {
+            version,
+            channel_id,
+            msg_type: buf[2],
+            flags: buf[3],
+            sequence: u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]),
+            timestamp_us: u32::from_le_bytes([buf[8], buf[9], buf[10], buf[11]]),
+            payload_length: u32::from_le_bytes([buf[12], buf[13], buf[14], buf[15]]),
+        })
+    }
+
     /// Decode header from 16 bytes, little-endian.
     pub fn decode(buf: &mut impl Buf) -> Result<Self, ProtocolError> {
         if buf.remaining() < HEADER_SIZE {
@@ -192,6 +260,42 @@ mod tests {
         let first_u16 = u16::from_le_bytes([buf[0], buf[1]]);
         assert_eq!((first_u16 >> 12) & 0x0F, 0);
         assert_eq!(first_u16 & 0x0FFF, 0x0E1);
+    }
+
+    #[test]
+    fn new_validates_reserved_channel() {
+        let result = PrismHeader::new(0x000, 0, 0, 0, 0, 0);
+        assert!(matches!(result, Err(ProtocolError::ReservedChannel)));
+    }
+
+    #[test]
+    fn new_validates_channel_overflow() {
+        let result = PrismHeader::new(0x2000, 0, 0, 0, 0, 0);
+        assert!(matches!(result, Err(ProtocolError::ChannelIdOverflow(0x2000))));
+    }
+
+    #[test]
+    fn new_sets_protocol_version() {
+        let header = PrismHeader::new(0x001, 0x01, 0, 42, 0, 0).unwrap();
+        assert_eq!(header.version, PROTOCOL_VERSION);
+        assert_eq!(header.channel_id, 0x001);
+    }
+
+    #[test]
+    fn encode_decode_from_slice_roundtrip() {
+        let header = PrismHeader::new(0x001, 0x01, FLAG_KEYFRAME, 42, 123456, 1024).unwrap();
+        let mut buf = [0u8; HEADER_SIZE];
+        let written = header.encode_to_slice(&mut buf);
+        assert_eq!(written, HEADER_SIZE);
+        let decoded = PrismHeader::decode_from_slice(&buf).unwrap();
+        assert_eq!(decoded, header);
+    }
+
+    #[test]
+    fn decode_from_slice_too_short() {
+        let buf = [0u8; 8];
+        let result = PrismHeader::decode_from_slice(&buf);
+        assert!(matches!(result, Err(ProtocolError::BufferTooShort(8))));
     }
 
     #[test]

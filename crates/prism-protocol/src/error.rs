@@ -10,6 +10,8 @@ pub enum ProtocolError {
     ReservedChannel,
     #[error("unsupported protocol version {0}")]
     UnsupportedVersion(u8),
+    #[error("channel ID 0x{0:03X} exceeds 12-bit maximum (0xFFF)")]
+    ChannelIdOverflow(u16),
     #[error("serialization error: {0}")]
     SerializationError(#[from] serde_json::Error),
 }

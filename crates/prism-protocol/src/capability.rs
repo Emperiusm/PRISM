@@ -19,7 +19,7 @@ pub struct ChannelCap {
 
 /// Channel-specific configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type")]
+#[serde(tag = "channel_type")]
 pub enum ChannelConfig {
     Display(DisplayChannelConfig),
     Input(InputChannelConfig),

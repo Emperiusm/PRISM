@@ -1,6 +1,7 @@
-use bytes::Bytes;
+use bytes::{Buf, Bytes, BytesMut};
 
-use crate::header::PrismHeader;
+use crate::error::ProtocolError;
+use crate::header::{PrismHeader, HEADER_SIZE};
 
 // === Core channels (0x001-0x0FF) ===
 pub const CHANNEL_DISPLAY: u16 = 0x001;
@@ -26,6 +27,29 @@ pub const EXTENSION_CHANNEL_END: u16 = 0xFFF;
 pub struct PrismPacket {
     pub header: PrismHeader,
     pub payload: Bytes,
+}
+
+impl PrismPacket {
+    /// Encode the full packet (header + payload) into a buffer.
+    pub fn encode(&self, buf: &mut BytesMut) {
+        self.header.encode(buf);
+        buf.extend_from_slice(&self.payload);
+    }
+
+    /// Decode a packet from a buffer. Consumes header + payload_length bytes.
+    pub fn decode(buf: &mut impl Buf) -> Result<Self, ProtocolError> {
+        let header = PrismHeader::decode(buf)?;
+        if buf.remaining() < header.payload_length as usize {
+            return Err(ProtocolError::BufferTooShort(buf.remaining()));
+        }
+        let payload = buf.copy_to_bytes(header.payload_length as usize);
+        Ok(Self { header, payload })
+    }
+
+    /// Total wire size of this packet.
+    pub fn wire_size(&self) -> usize {
+        HEADER_SIZE + self.payload.len()
+    }
 }
 
 /// Channel priority levels for bandwidth arbitration (R14).
@@ -155,6 +179,48 @@ mod tests {
         assert_eq!(channel_transport(CHANNEL_SENSOR), ChannelTransport::Datagram);
         assert_eq!(channel_transport(CHANNEL_NOTIFY), ChannelTransport::Stream);
         assert_eq!(channel_transport(CHANNEL_TOUCH), ChannelTransport::Stream);
+    }
+
+    #[test]
+    fn packet_encode_decode_roundtrip() {
+        use bytes::BytesMut;
+        let header = PrismHeader {
+            version: 0,
+            channel_id: CHANNEL_CONTROL,
+            msg_type: 0x01,
+            flags: 0,
+            sequence: 1,
+            timestamp_us: 5000,
+            payload_length: 5,
+        };
+        let packet = PrismPacket {
+            header,
+            payload: Bytes::from_static(b"hello"),
+        };
+        let mut buf = BytesMut::with_capacity(packet.wire_size());
+        packet.encode(&mut buf);
+        assert_eq!(buf.len(), HEADER_SIZE + 5);
+
+        let decoded = PrismPacket::decode(&mut buf.freeze()).unwrap();
+        assert_eq!(decoded.header, header);
+        assert_eq!(decoded.payload, Bytes::from_static(b"hello"));
+    }
+
+    #[test]
+    fn packet_wire_size() {
+        let packet = PrismPacket {
+            header: PrismHeader {
+                version: 0,
+                channel_id: 0x001,
+                msg_type: 0,
+                flags: 0,
+                sequence: 0,
+                timestamp_us: 0,
+                payload_length: 100,
+            },
+            payload: Bytes::from(vec![0u8; 100]),
+        };
+        assert_eq!(packet.wire_size(), HEADER_SIZE + 100);
     }
 
     #[test]

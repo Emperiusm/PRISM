@@ -28,26 +28,31 @@ impl<const C: usize, const G: usize, const H: usize> MetricsRecorder<C, G, H> {
 
     #[inline(always)]
     pub fn inc(&self, counter: usize, value: u64) {
+        debug_assert!(counter < C, "counter index {counter} out of bounds (recorder has {C} counters)");
         self.counters[counter].fetch_add(value, Ordering::Relaxed);
     }
 
     #[inline(always)]
     pub fn counter(&self, counter: usize) -> u64 {
+        debug_assert!(counter < C, "counter index {counter} out of bounds (recorder has {C} counters)");
         self.counters[counter].load(Ordering::Relaxed)
     }
 
     #[inline(always)]
     pub fn set(&self, gauge: usize, value: i64) {
+        debug_assert!(gauge < G, "gauge index {gauge} out of bounds (recorder has {G} gauges)");
         self.gauges[gauge].store(value, Ordering::Relaxed);
     }
 
     #[inline(always)]
     pub fn gauge(&self, gauge: usize) -> i64 {
+        debug_assert!(gauge < G, "gauge index {gauge} out of bounds (recorder has {G} gauges)");
         self.gauges[gauge].load(Ordering::Relaxed)
     }
 
     #[inline(always)]
     pub fn observe(&self, histogram: usize, value_us: u64) {
+        debug_assert!(histogram < H, "histogram index {histogram} out of bounds (recorder has {H} histograms)");
         self.histograms[histogram].record(value_us);
     }
 
