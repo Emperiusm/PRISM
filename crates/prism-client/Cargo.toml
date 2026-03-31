@@ -1,0 +1,19 @@
+[package]
+name = "prism-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prism-protocol = { workspace = true }
+prism-transport = { workspace = true }
+prism-display = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+quinn = { workspace = true }
+tokio = { workspace = true }
+rustls = { workspace = true }
+
+[[bin]]
+name = "prism-client"
+path = "src/main.rs"
