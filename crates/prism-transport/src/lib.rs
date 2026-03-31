@@ -5,3 +5,5 @@ pub mod coalesce;
 pub mod stream_pool;
 pub mod quality;
 pub mod quic;
+
+pub use connection::{TransportError, TransportType, StreamPriority};
