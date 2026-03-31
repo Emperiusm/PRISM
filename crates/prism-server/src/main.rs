@@ -8,6 +8,8 @@ use openh264::formats::YUVBuffer;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== PRISM Server v0.1.0 ===");
 
+    let use_dda = std::env::args().any(|a| a == "--dda");
+
     let config = prism_server::ServerConfig::default();
     println!("Listening on {}", config.listen_addr);
 
@@ -19,13 +21,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _gate = Arc::new(prism_server::AllowAllGate::new());
     println!("Security: AllowAllGate (dev mode)");
 
-    // Test pattern capture
-    let capture = prism_server::TestPatternCapture::new();
-    let monitors = capture.enumerate_monitors()?;
-    println!(
-        "Capture: TestPattern {}x{} @ {}fps",
-        monitors[0].resolution.0, monitors[0].resolution.1, monitors[0].refresh_rate
-    );
+    // Capture backend selection
+    #[cfg(windows)]
+    if use_dda {
+        use prism_server::dda_capture::dda_capture::DdaDesktopCapture;
+        match DdaDesktopCapture::new() {
+            Ok(cap) => {
+                println!("Capture: DDA Desktop {}x{}", cap.width(), cap.height());
+            }
+            Err(e) => {
+                eprintln!("DDA capture initialisation failed: {} — falling back to TestPattern", e);
+            }
+        }
+    }
+
+    if !use_dda || !cfg!(windows) {
+        // Test pattern capture (fallback / non-Windows)
+        let capture = prism_server::TestPatternCapture::new();
+        let monitors = capture.enumerate_monitors()?;
+        println!(
+            "Capture: TestPattern {}x{} @ {}fps",
+            monitors[0].resolution.0, monitors[0].resolution.1, monitors[0].refresh_rate
+        );
+    }
 
     // Session manager
     let session_manager = Arc::new(Mutex::new(prism_server::SessionManager::new(config.clone())));
@@ -54,12 +72,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn frame sender task (~15fps) — encodes BGRA→H.264 and sends over QUIC uni streams.
     let conn_store_send = conn_store.clone();
     tokio::spawn(async move {
-        // 1920×1080 test pattern capture.
-        let pattern_capture = prism_server::TestPatternCapture::with_resolution(1920, 1080);
-        const WIDTH: u32 = 1920;
-        const HEIGHT: u32 = 1080;
+        // Decide capture source: DDA on Windows when --dda, else test pattern.
+        #[cfg(windows)]
+        let dda = if use_dda {
+            use prism_server::dda_capture::dda_capture::DdaDesktopCapture;
+            match DdaDesktopCapture::new() {
+                Ok(cap) => Some(cap),
+                Err(e) => {
+                    eprintln!("[FrameSender] DDA init failed: {} — using TestPattern", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
 
-        // Create H.264 encoder. Dimensions are inferred from the YUVSource on first encode.
+        // Determine frame dimensions from the active capture source.
+        #[cfg(windows)]
+        let (width, height) = if let Some(ref cap) = dda {
+            (cap.width(), cap.height())
+        } else {
+            (1920u32, 1080u32)
+        };
+
+        #[cfg(not(windows))]
+        let (width, height) = (1920u32, 1080u32);
+
+        // Test-pattern capture (used when DDA is unavailable or not requested).
+        let pattern_capture =
+            prism_server::TestPatternCapture::with_resolution(width, height);
+
+        // Create H.264 encoder.
         let mut encoder = match Encoder::with_api_config(
             openh264::OpenH264API::from_source(),
             EncoderConfig::new()
@@ -86,11 +129,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue; // no clients, skip
             }
 
-            // Generate BGRA pixel data for this frame.
-            let pixels = pattern_capture.generate_pattern(seq);
+            // Acquire BGRA pixel data — DDA when available, test pattern otherwise.
+            #[cfg(windows)]
+            let pixels_opt: Option<Vec<u8>> = if let Some(ref cap) = dda {
+                match cap.capture_frame() {
+                    Ok(Some(p)) => Some(p),
+                    Ok(None) => {
+                        // No new desktop frame yet — skip this tick.
+                        seq = seq.wrapping_add(1);
+                        continue;
+                    }
+                    Err(e) => {
+                        eprintln!("[FrameSender] DDA capture error: {}", e);
+                        seq = seq.wrapping_add(1);
+                        continue;
+                    }
+                }
+            } else {
+                Some(pattern_capture.generate_pattern(seq))
+            };
+
+            #[cfg(not(windows))]
+            let pixels_opt: Option<Vec<u8>> = Some(pattern_capture.generate_pattern(seq));
+
+            let pixels = match pixels_opt {
+                Some(p) => p,
+                None => {
+                    seq = seq.wrapping_add(1);
+                    continue;
+                }
+            };
 
             // Convert BGRA → YUV I420.
-            let yuv = bgra_to_yuv420(&pixels, WIDTH as usize, HEIGHT as usize);
+            let yuv = bgra_to_yuv420(&pixels, width as usize, height as usize);
 
             // Encode YUV → H.264 bitstream.
             let h264_data = match encoder.encode(&yuv) {
@@ -116,8 +187,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             //   [h264_len bytes: H.264 NAL bitstream]
             let h264_len = h264_data.len() as u32;
             let mut frame_data = Vec::with_capacity(16 + h264_data.len());
-            frame_data.extend_from_slice(&WIDTH.to_le_bytes());
-            frame_data.extend_from_slice(&HEIGHT.to_le_bytes());
+            frame_data.extend_from_slice(&width.to_le_bytes());
+            frame_data.extend_from_slice(&height.to_le_bytes());
             frame_data.extend_from_slice(&seq.to_le_bytes());
             frame_data.extend_from_slice(&h264_len.to_le_bytes());
             frame_data.extend_from_slice(&h264_data);
@@ -153,8 +224,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "[FrameSender] {} frames/s to {} client(s) — {}x{} H.264 @ ~{}KB/frame",
                         frames_sent,
                         conn_store_send.client_count(),
-                        WIDTH,
-                        HEIGHT,
+                        width,
+                        height,
                         bytes_sent_total / (frames_sent as u64) / 1024,
                     );
                 }
