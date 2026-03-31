@@ -7,6 +7,7 @@ pub mod recv_loop;
 pub mod quality_monitor;
 pub mod shutdown;
 pub mod test_pattern;
+pub mod frame_sender;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -36,3 +37,6 @@ pub use acceptor::{ConnectionAcceptor, SelfSignedCert};
 
 // allow_all_gate
 pub use allow_all_gate::AllowAllGate;
+
+// frame_sender
+pub use frame_sender::{FrameSender, build_display_datagram};
