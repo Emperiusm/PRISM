@@ -8,7 +8,12 @@ license.workspace = true
 name = "prism-server"
 path = "src/main.rs"
 
+[features]
+default = []
+hwenc = ["dep:ffmpeg-next"]
+
 [dependencies]
+ffmpeg-next = { workspace = true, optional = true }
 prism-protocol.workspace = true
 prism-metrics.workspace = true
 prism-security.workspace = true
