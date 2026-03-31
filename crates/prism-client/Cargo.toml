@@ -13,6 +13,7 @@ thiserror = { workspace = true }
 quinn = { workspace = true }
 tokio = { workspace = true }
 rustls = { workspace = true }
+minifb = { workspace = true }
 
 [[bin]]
 name = "prism-client"
