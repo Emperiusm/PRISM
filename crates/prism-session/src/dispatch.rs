@@ -19,6 +19,20 @@ pub enum ChannelError {
 pub trait ChannelHandler: Send + Sync {
     fn channel_id(&self) -> u16;
     async fn handle_datagram(&self, from: ClientId, data: Bytes) -> Result<(), ChannelError>;
+
+    /// Handle an incoming bidirectional stream for this channel.
+    ///
+    /// The default implementation immediately drops both stream halves and
+    /// returns `Ok(())`, making this a non-breaking addition for existing
+    /// implementors.
+    async fn handle_stream(
+        &self,
+        _from: ClientId,
+        _send: prism_transport::OwnedSendStream,
+        _recv: prism_transport::OwnedRecvStream,
+    ) -> Result<(), ChannelError> {
+        Ok(())
+    }
 }
 
 /// Routes incoming datagrams to the correct [`ChannelHandler`] by channel ID.
