@@ -7,3 +7,4 @@ pub mod quality;
 pub mod quic;
 
 pub use connection::{TransportError, TransportType, StreamPriority, TransportMetrics, DelayAsymmetry, TransportEvent, OwnedSendStream, OwnedRecvStream, PrismConnection};
+pub use framing::{FramedWriter, FramedReader, MAX_MESSAGE_SIZE};
