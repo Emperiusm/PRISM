@@ -1,8 +1,7 @@
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 use prism_display::capture::PlatformCapture;
-use openh264::encoder::{Encoder, EncoderConfig};
-use openh264::formats::YUVBuffer;
+use prism_server::hw_encoder::HwEncoder;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -110,14 +109,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let pattern_capture =
             prism_server::TestPatternCapture::with_resolution(width, height);
 
-        // Create H.264 encoder.
-        let mut encoder = match Encoder::with_api_config(
-            openh264::OpenH264API::from_source(),
-            EncoderConfig::new()
-                .max_frame_rate(openh264::encoder::FrameRate::from_hz(15.0))
-                .bitrate(openh264::encoder::BitRate::from_bps(5_000_000)),
-        ) {
-            Ok(e) => e,
+        // Create H.264 encoder — probes for hardware acceleration automatically.
+        let mut encoder = match HwEncoder::new(width, height, 5_000_000) {
+            Ok(e) => {
+                println!("[FrameSender] Encoder: {} ({}x{})", e.backend().name(), width, height);
+                e
+            }
             Err(e) => {
                 eprintln!("[FrameSender] Failed to create H.264 encoder: {}", e);
                 return;
@@ -168,12 +165,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            // Convert BGRA → YUV I420.
-            let yuv = bgra_to_yuv420(&pixels, width as usize, height as usize);
-
-            // Encode YUV → H.264 bitstream.
-            let h264_data = match encoder.encode(&yuv) {
-                Ok(bitstream) => bitstream.to_vec(),
+            // Encode BGRA → H.264 bitstream (conversion happens inside HwEncoder).
+            let h264_data = match encoder.encode_bgra(&pixels) {
+                Ok(data) => data,
                 Err(e) => {
                     eprintln!("[FrameSender] encode error: {}", e);
                     seq = seq.wrapping_add(1);
@@ -395,48 +389,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// ── BGRA → YUV I420 conversion ────────────────────────────────────────────────
-
-/// Convert a BGRA8 frame to a packed YUV I420 [`YUVBuffer`].
-///
-/// BGRA memory layout: [B, G, R, A] per pixel, row-major.
-/// YUV I420: full-resolution Y plane, half-resolution U and V planes.
-fn bgra_to_yuv420(bgra: &[u8], width: usize, height: usize) -> YUVBuffer {
-    let y_size = width * height;
-    let uv_w = (width + 1) / 2;
-    let uv_h = (height + 1) / 2;
-    let uv_size = uv_w * uv_h;
-    let mut yuv_data = vec![0u8; y_size + 2 * uv_size];
-
-    let y_plane = &mut yuv_data[..y_size];
-    // Fill Y plane (full resolution).
-    for row in 0..height {
-        for col in 0..width {
-            let src = (row * width + col) * 4;
-            let b = bgra[src] as f32;
-            let g = bgra[src + 1] as f32;
-            let r = bgra[src + 2] as f32;
-            let y = (0.299 * r + 0.587 * g + 0.114 * b).round() as u8;
-            y_plane[row * width + col] = y;
-        }
-    }
-
-    // Fill U and V planes (half resolution — average 2×2 blocks).
-    for uv_row in 0..uv_h {
-        for uv_col in 0..uv_w {
-            // Sample the top-left pixel of each 2×2 block.
-            let src_row = uv_row * 2;
-            let src_col = uv_col * 2;
-            let src = (src_row * width + src_col) * 4;
-            let b = bgra[src] as f32;
-            let g = bgra[src + 1] as f32;
-            let r = bgra[src + 2] as f32;
-            let u = (-0.169 * r - 0.331 * g + 0.500 * b + 128.0).round().clamp(0.0, 255.0) as u8;
-            let v = (0.500 * r - 0.419 * g - 0.081 * b + 128.0).round().clamp(0.0, 255.0) as u8;
-            yuv_data[y_size + uv_row * uv_w + uv_col] = u;
-            yuv_data[y_size + uv_size + uv_row * uv_w + uv_col] = v;
-        }
-    }
-
-    YUVBuffer::from_vec(yuv_data, width, height)
-}
