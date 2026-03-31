@@ -38,6 +38,12 @@ impl ClientConnectionStore {
     pub fn client_count(&self) -> usize {
         self.connections.lock().unwrap().len()
     }
+
+    /// Snapshot all current connections for async use (avoids holding the mutex
+    /// across await points).
+    pub fn snapshot(&self) -> Vec<quinn::Connection> {
+        self.connections.lock().unwrap().values().cloned().collect()
+    }
 }
 
 impl Default for ClientConnectionStore {

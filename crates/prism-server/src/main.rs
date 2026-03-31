@@ -49,13 +49,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Spawn frame sender task (~30fps)
+    // Spawn frame sender task (~10fps) — sends BGRA frames over QUIC uni streams.
     let conn_store_send = conn_store.clone();
     tokio::spawn(async move {
+        // 320×240 test pattern capture.
+        let pattern_capture = prism_server::TestPatternCapture::with_resolution(320, 240);
+        const WIDTH: u32 = 320;
+        const HEIGHT: u32 = 240;
+
         let mut seq: u32 = 0;
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30fps
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(100)); // ~10fps
         let mut last_log = std::time::Instant::now();
-        let mut sent_this_second = 0u32;
+        let mut frames_sent = 0u32;
 
         loop {
             interval.tick().await;
@@ -64,27 +69,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue; // no clients, skip
             }
 
-            // Build a small test payload
-            let payload = format!("frame_{:06}", seq);
-            let datagram = prism_server::build_display_datagram(seq, payload.as_bytes(), 0);
+            // Generate BGRA pixel data for this frame.
+            let pixels = pattern_capture.generate_pattern(seq);
 
-            let (sent, _errors) = conn_store_send.broadcast_datagram(&datagram);
-            if sent > 0 {
-                sent_this_second += sent as u32;
+            // Build wire frame: [width u32 LE][height u32 LE][seq u32 LE][BGRA pixels]
+            let mut frame_data = Vec::with_capacity(12 + pixels.len());
+            frame_data.extend_from_slice(&WIDTH.to_le_bytes());
+            frame_data.extend_from_slice(&HEIGHT.to_le_bytes());
+            frame_data.extend_from_slice(&seq.to_le_bytes());
+            frame_data.extend_from_slice(&pixels);
+
+            // Snapshot connections so we don't hold the mutex across await.
+            let conns = conn_store_send.snapshot();
+            let mut sent = 0u32;
+            for conn in &conns {
+                match conn.open_uni().await {
+                    Ok(mut send_stream) => {
+                        if send_stream.write_all(&frame_data).await.is_ok() {
+                            let _ = send_stream.finish();
+                            sent += 1;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[FrameSender] open_uni error: {}", e);
+                    }
+                }
             }
-            seq += 1;
 
-            // Log every second
+            if sent > 0 {
+                frames_sent += 1;
+            }
+            seq = seq.wrapping_add(1);
+
+            // Log every second.
             if last_log.elapsed() >= std::time::Duration::from_secs(1) {
-                if sent_this_second > 0 {
+                if frames_sent > 0 {
                     println!(
-                        "[FrameSender] Sent {} datagrams to {} clients ({} fps)",
-                        sent_this_second,
+                        "[FrameSender] {} frames sent to {} client(s) (~10fps, {}x{} BGRA)",
+                        frames_sent,
                         conn_store_send.client_count(),
-                        seq.min(30)
+                        WIDTH,
+                        HEIGHT
                     );
                 }
-                sent_this_second = 0;
+                frames_sent = 0;
                 last_log = std::time::Instant::now();
             }
         }
