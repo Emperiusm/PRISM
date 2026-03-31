@@ -5,6 +5,7 @@ members = [
     "crates/prism-metrics",
     "crates/prism-security",
     "crates/prism-transport",
+    "crates/prism-observability",
 ]
 
 [workspace.package]
@@ -41,3 +42,4 @@ prism-protocol = { path = "crates/prism-protocol" }
 prism-metrics = { path = "crates/prism-metrics" }
 prism-security = { path = "crates/prism-security" }
 prism-transport = { path = "crates/prism-transport" }
+prism-observability = { path = "crates/prism-observability" }
