@@ -100,6 +100,7 @@ pub use overlay_sender::{build_overlay_datagram, build_overlay_packet};
 // throughput_endpoint
 pub use throughput_endpoint::{ThroughputEndpointConfig, build_throughput_config, is_throughput_channel};
 
+pub mod service;
 pub mod speculative_idr;
 pub mod encode_pool;
 pub mod static_cache;
@@ -124,3 +125,6 @@ pub use client_metrics::ClientMetrics;
 
 // metrics_collector
 pub use metrics_collector::MetricsCollector;
+
+// service
+pub use service::{ServiceCommand, is_service_mode, sc_create_command, sc_delete_command};
