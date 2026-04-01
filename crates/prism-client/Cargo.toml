@@ -21,6 +21,11 @@ quinn = { workspace = true }
 tokio = { workspace = true }
 rustls = { workspace = true }
 minifb = { workspace = true }
+wgpu.workspace = true
+winit.workspace = true
+glyphon.workspace = true
+bytemuck.workspace = true
+image.workspace = true
 openh264 = { workspace = true }
 hex = { workspace = true }
 arboard = { workspace = true }
