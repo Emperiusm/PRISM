@@ -80,6 +80,7 @@ pub fn build_overlay_datagram(packet: &OverlayPacket) -> Bytes {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prism_observability::OVERLAY_PACKET_SIZE;
     use prism_protocol::header::PrismHeader;
     use prism_session::control_msg::OVERLAY_DATA;
 
