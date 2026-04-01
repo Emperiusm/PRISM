@@ -1,6 +1,6 @@
-/// Service mode detection and configuration.
-/// When --service flag is passed, the server should run as a Windows service
-/// instead of a console application.
+//! Service mode detection and configuration.
+//! When --service flag is passed, the server should run as a Windows service
+//! instead of a console application.
 
 /// Detect if we're running as a service.
 pub fn is_service_mode() -> bool {

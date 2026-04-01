@@ -3,6 +3,7 @@
 /// Uses DXGI Desktop Duplication to capture the primary display into CPU-accessible
 /// BGRA pixel buffers at screen resolution.
 #[cfg(windows)]
+#[allow(clippy::module_inception)]
 pub mod dda_capture {
     use windows::Win32::Graphics::Dxgi::Common::{
         DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC,

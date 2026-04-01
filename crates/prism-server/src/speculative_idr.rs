@@ -26,10 +26,8 @@ impl SpeculativeIdrController {
         }
 
         // Check cooldown
-        if let Some(last) = self.last_idr_time {
-            if last.elapsed() < self.cooldown {
-                return false;
-            }
+        if self.last_idr_time.is_some_and(|last| last.elapsed() < self.cooldown) {
+            return false;
         }
 
         let hwnd = event.hwnd();

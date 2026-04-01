@@ -5,7 +5,7 @@
 //! to produce a 144-byte PRISM control datagram ready for `send_datagram`.
 
 use bytes::{Bytes, BytesMut};
-use prism_observability::overlay::{OverlayPacket, OVERLAY_PACKET_SIZE};
+use prism_observability::overlay::OverlayPacket;
 use prism_protocol::{
     channel::CHANNEL_CONTROL,
     header::{PrismHeader, HEADER_SIZE, PROTOCOL_VERSION},

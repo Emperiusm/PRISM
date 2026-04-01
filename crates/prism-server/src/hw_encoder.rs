@@ -60,22 +60,26 @@ impl HwEncoderBackend {
 /// the corresponding FFmpeg encoder is found). `Software` is always appended
 /// last as the guaranteed fallback.
 pub fn detect_available_encoders() -> Vec<HwEncoderBackend> {
-    let mut available = Vec::new();
+    #[cfg(not(feature = "hwenc"))]
+    return vec![HwEncoderBackend::Software];
 
     #[cfg(feature = "hwenc")]
     {
         // Initialise FFmpeg once; ignore errors (may already be initialised).
         let _ = ffmpeg_next::init();
 
-        for backend in [HwEncoderBackend::Nvenc, HwEncoderBackend::Qsv, HwEncoderBackend::Amf] {
-            if ffmpeg_next::encoder::find_by_name(backend.ffmpeg_codec_name()).is_some() {
-                available.push(backend);
-            }
-        }
-    }
+        let mut available: Vec<HwEncoderBackend> = [
+            HwEncoderBackend::Nvenc,
+            HwEncoderBackend::Qsv,
+            HwEncoderBackend::Amf,
+        ]
+        .into_iter()
+        .filter(|b| ffmpeg_next::encoder::find_by_name(b.ffmpeg_codec_name()).is_some())
+        .collect();
 
-    available.push(HwEncoderBackend::Software);
-    available
+        available.push(HwEncoderBackend::Software);
+        available
+    }
 }
 
 // ── HwEncoder ─────────────────────────────────────────────────────────────────
@@ -232,7 +236,7 @@ impl HwEncoder {
         let old = self.bitrate_bps;
         self.bitrate_bps = bitrate_bps;
         let ratio = if old > 0 { bitrate_bps as f64 / old as f64 } else { 2.0 };
-        if ratio < 0.8 || ratio > 1.2 {
+        if !(0.8..=1.2).contains(&ratio) {
             tracing::info!(old_bps = old, new_bps = bitrate_bps, "encoder bitrate reconfigure");
             *self = Self::create_software(self.width, self.height, bitrate_bps)?;
         }
@@ -327,8 +331,8 @@ impl HwEncoder {
 /// each 2×2 block.
 pub fn bgra_to_yuv420_raw(bgra: &[u8], width: usize, height: usize) -> Vec<u8> {
     let y_size = width * height;
-    let uv_w = (width + 1) / 2;
-    let uv_h = (height + 1) / 2;
+    let uv_w = width.div_ceil(2);
+    let uv_h = height.div_ceil(2);
     let uv_size = uv_w * uv_h;
     let mut yuv = vec![0u8; y_size + 2 * uv_size];
 
