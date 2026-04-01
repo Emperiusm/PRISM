@@ -111,7 +111,9 @@ pub struct AnimationPool {
 impl AnimationPool {
     /// Create an empty pool.
     pub fn new() -> Self {
-        Self { animations: Vec::new() }
+        Self {
+            animations: Vec::new(),
+        }
     }
 
     /// Add an animation and return its id.
@@ -172,7 +174,11 @@ mod tests {
         let mut anim = Animation::new(EaseCurve::EaseOut, 300.0);
         anim.set_target(1.0);
         anim.tick(300.0);
-        assert!((anim.value() - 1.0).abs() < 0.001, "value was {}", anim.value());
+        assert!(
+            (anim.value() - 1.0).abs() < 0.001,
+            "value was {}",
+            anim.value()
+        );
     }
 
     #[test]
@@ -181,7 +187,11 @@ mod tests {
         anim.set_target(1.0);
         // Tick to 40% of duration — spring should already be past midpoint due to overshoot
         anim.tick(120.0);
-        assert!(anim.value() > 0.5, "spring value at 40% was {}", anim.value());
+        assert!(
+            anim.value() > 0.5,
+            "spring value at 40% was {}",
+            anim.value()
+        );
     }
 
     #[test]
@@ -204,7 +214,11 @@ mod tests {
         let mut anim = Animation::new(EaseCurve::Linear, 200.0);
         anim.set_target(1.0);
         anim.tick(100.0); // 50% of duration
-        assert!((anim.value() - 0.5).abs() < 0.001, "value was {}", anim.value());
+        assert!(
+            (anim.value() - 0.5).abs() < 0.001,
+            "value was {}",
+            anim.value()
+        );
     }
 
     #[test]
@@ -215,8 +229,16 @@ mod tests {
         pool.set_target(a, 1.0);
         pool.set_target(b, 1.0);
         pool.tick_all(100.0);
-        assert!((pool.value(a) - 0.5).abs() < 0.001, "a was {}", pool.value(a));
-        assert!((pool.value(b) - 0.5).abs() < 0.001, "b was {}", pool.value(b));
+        assert!(
+            (pool.value(a) - 0.5).abs() < 0.001,
+            "a was {}",
+            pool.value(a)
+        );
+        assert!(
+            (pool.value(b) - 0.5).abs() < 0.001,
+            "b was {}",
+            pool.value(b)
+        );
     }
 
     #[test]

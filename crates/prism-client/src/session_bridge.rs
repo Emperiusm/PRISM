@@ -78,18 +78,13 @@ pub enum EncryptionStatus {
 }
 
 /// Server status from pinger
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum ServerStatus {
+    #[default]
     Unknown,
     /// RTT
     Online(Duration),
     Offline,
-}
-
-impl Default for ServerStatus {
-    fn default() -> Self {
-        ServerStatus::Unknown
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -264,8 +259,14 @@ mod tests {
     fn bridge_stats_latest_only() {
         let (bridge, network) = SessionBridge::create_connected();
 
-        let _ = network.stats_tx.send(SessionStats { fps: 30.0, ..Default::default() });
-        let _ = network.stats_tx.send(SessionStats { fps: 60.0, ..Default::default() });
+        let _ = network.stats_tx.send(SessionStats {
+            fps: 30.0,
+            ..Default::default()
+        });
+        let _ = network.stats_tx.send(SessionStats {
+            fps: 60.0,
+            ..Default::default()
+        });
 
         let stats = bridge.current_stats().unwrap();
         assert_eq!(stats.fps, 60.0);

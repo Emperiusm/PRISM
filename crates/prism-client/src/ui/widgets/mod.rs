@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Widget trait, layout primitives, and draw batching.
 
-pub mod label;
 pub mod button;
-pub mod separator;
 pub mod checkbox;
+pub mod dropdown;
+pub mod label;
+pub mod monitor_map;
+pub mod separator;
 pub mod slider;
 pub mod sparkline;
-pub mod dropdown;
 pub mod text_input;
-pub mod monitor_map;
 
 // ---------------------------------------------------------------------------
 // Geometry
@@ -184,9 +184,14 @@ pub enum EventResponse {
 
 #[derive(Debug, Clone)]
 pub enum UiAction {
-    Connect { address: String, noise_key: Option<String> },
+    Connect {
+        address: String,
+        noise_key: Option<String>,
+    },
     Disconnect,
-    SwitchServer { address: String },
+    SwitchServer {
+        address: String,
+    },
     SwitchProfile(String),
     UpdateQuality {
         preset: Option<String>,
@@ -239,7 +244,13 @@ impl SpatialHash {
         let cell_w = width / cols as f32;
         let cell_h = height / rows as f32;
         let cells = vec![Vec::new(); cols * rows];
-        Self { cells, cell_w, cell_h, cols, rows }
+        Self {
+            cells,
+            cell_w,
+            cell_h,
+            cols,
+            rows,
+        }
     }
 
     pub fn clear(&mut self) {

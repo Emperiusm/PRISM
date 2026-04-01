@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! UI state machine and widget system for launcher and in-session overlay.
 
-pub mod widgets;
 pub mod launcher;
 pub mod overlay;
+pub mod widgets;
 
 use crate::config::LaunchMode;
 
@@ -60,7 +60,10 @@ mod tests {
     #[test]
     fn initial_state_from_launch_mode() {
         assert_eq!(UiState::initial(LaunchMode::Launcher), UiState::Launcher);
-        assert_eq!(UiState::initial(LaunchMode::DirectConnect), UiState::Connecting);
+        assert_eq!(
+            UiState::initial(LaunchMode::DirectConnect),
+            UiState::Connecting
+        );
     }
 
     #[test]

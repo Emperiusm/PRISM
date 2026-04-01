@@ -34,14 +34,18 @@ pub struct StreamTexture {
 impl StreamTexture {
     /// Create a new `StreamTexture` sized `width × height` pixels.
     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
-        let half_w = (width + 1) / 2;
-        let half_h = (height + 1) / 2;
+        let half_w = width.div_ceil(2);
+        let half_h = height.div_ceil(2);
 
         // ── Y plane textures (full resolution, R8Unorm) ───────────────────────
         let y_texture = std::array::from_fn(|i| {
             device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(&format!("y-plane-{i}")),
-                size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
@@ -55,7 +59,11 @@ impl StreamTexture {
         let u_texture = std::array::from_fn(|i| {
             device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(&format!("u-plane-{i}")),
-                size: wgpu::Extent3d { width: half_w, height: half_h, depth_or_array_layers: 1 },
+                size: wgpu::Extent3d {
+                    width: half_w,
+                    height: half_h,
+                    depth_or_array_layers: 1,
+                },
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
@@ -69,7 +77,11 @@ impl StreamTexture {
         let v_texture = std::array::from_fn(|i| {
             device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(&format!("v-plane-{i}")),
-                size: wgpu::Extent3d { width: half_w, height: half_h, depth_or_array_layers: 1 },
+                size: wgpu::Extent3d {
+                    width: half_w,
+                    height: half_h,
+                    depth_or_array_layers: 1,
+                },
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
@@ -82,7 +94,11 @@ impl StreamTexture {
         // ── RGBA output texture ───────────────────────────────────────────────
         let output_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("yuv-output"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -164,11 +180,26 @@ impl StreamTexture {
                 label: Some(&format!("yuv-bg-{slot}")),
                 layout: &bgl,
                 entries: &[
-                    wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&y_view) },
-                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&u_view) },
-                    wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&v_view) },
-                    wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&output_view) },
-                    wgpu::BindGroupEntry { binding: 4, resource: params_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&y_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&u_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&v_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::TextureView(&output_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: params_buffer.as_entire_binding(),
+                    },
                 ],
             })
         });
@@ -190,18 +221,18 @@ impl StreamTexture {
     }
 
     /// Upload a YUV420 frame. Writes to the *opposite* ring slot, then swaps.
-    pub fn upload_yuv(
-        &mut self,
-        queue: &wgpu::Queue,
-        y_data: &[u8],
-        u_data: &[u8],
-        v_data: &[u8],
-    ) {
+    pub fn upload_yuv(&mut self, queue: &wgpu::Queue, y_data: &[u8], u_data: &[u8], v_data: &[u8]) {
         let write_slot = 1 - self.current_slot;
-        let half_w = (self.width + 1) / 2;
-        let half_h = (self.height + 1) / 2;
+        let half_w = self.width.div_ceil(2);
+        let half_h = self.height.div_ceil(2);
 
-        upload_plane(queue, &self.y_texture[write_slot], y_data, self.width, self.height);
+        upload_plane(
+            queue,
+            &self.y_texture[write_slot],
+            y_data,
+            self.width,
+            self.height,
+        );
         upload_plane(queue, &self.u_texture[write_slot], u_data, half_w, half_h);
         upload_plane(queue, &self.v_texture[write_slot], v_data, half_w, half_h);
 
@@ -216,8 +247,8 @@ impl StreamTexture {
             return;
         }
 
-        let wg_x = (self.width + 15) / 16;
-        let wg_y = (self.height + 15) / 16;
+        let wg_x = self.width.div_ceil(16);
+        let wg_y = self.height.div_ceil(16);
 
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -246,7 +277,13 @@ impl StreamTexture {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Upload raw bytes into a single-channel R8 plane texture.
-fn upload_plane(queue: &wgpu::Queue, texture: &wgpu::Texture, data: &[u8], width: u32, height: u32) {
+fn upload_plane(
+    queue: &wgpu::Queue,
+    texture: &wgpu::Texture,
+    data: &[u8],
+    width: u32,
+    height: u32,
+) {
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
             texture,
@@ -260,7 +297,11 @@ fn upload_plane(queue: &wgpu::Queue, texture: &wgpu::Texture, data: &[u8], width
             bytes_per_row: Some(width),
             rows_per_image: Some(height),
         },
-        wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
     );
 }
 

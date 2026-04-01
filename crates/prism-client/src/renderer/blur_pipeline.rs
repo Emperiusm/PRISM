@@ -18,6 +18,7 @@ struct BlurUniforms {
 ///
 /// The caller provides a `wgpu::BindGroup` for the source texture on every
 /// [`BlurPipeline::run`] call; the pipeline owns all intermediate state.
+#[allow(dead_code)]
 pub struct BlurPipeline {
     h_pipeline: wgpu::RenderPipeline,
     v_pipeline: wgpu::RenderPipeline,
@@ -45,8 +46,8 @@ impl BlurPipeline {
         _surface_format: wgpu::TextureFormat,
     ) -> Self {
         // ── Quarter resolution ────────────────────────────────────────────────
-        let width = (source_width + 3) / 4;
-        let height = (source_height + 3) / 4;
+        let width = source_width.div_ceil(4);
+        let height = source_height.div_ceil(4);
 
         // ── Intermediate and output textures ──────────────────────────────────
         let blur_format = wgpu::TextureFormat::Rgba8Unorm;
@@ -55,7 +56,11 @@ impl BlurPipeline {
 
         let intermediate_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("blur-intermediate"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -68,7 +73,11 @@ impl BlurPipeline {
 
         let output_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("blur-output"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -267,11 +276,7 @@ impl BlurPipeline {
     ///
     /// Typically the caller builds an input bind group that wraps the downscaled
     /// stream texture and the horizontal uniform buffer.
-    pub fn run(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        input_bind_group: &wgpu::BindGroup,
-    ) {
+    pub fn run(&self, encoder: &mut wgpu::CommandEncoder, input_bind_group: &wgpu::BindGroup) {
         // ── Pass 1: horizontal blur → intermediate ────────────────────────────
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

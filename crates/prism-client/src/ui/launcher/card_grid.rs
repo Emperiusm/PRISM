@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Responsive flow grid of server cards plus an "+ Add Server" card.
 
+use super::server_card::ServerCard;
 use crate::config::servers::SavedServer;
 use crate::ui::widgets::{
     EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
     Widget,
 };
-use super::server_card::ServerCard;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -69,7 +69,11 @@ impl CardGrid {
             let items_in_row = if row == total / cards_per_row {
                 // last (possibly partial) row
                 let remainder = total % cards_per_row;
-                if remainder == 0 { cards_per_row } else { remainder }
+                if remainder == 0 {
+                    cards_per_row
+                } else {
+                    remainder
+                }
             } else {
                 cards_per_row
             };
@@ -82,7 +86,8 @@ impl CardGrid {
             let x = self.rect.x + x_offset + col as f32 * (CARD_WIDTH + CARD_GAP);
             let y = self.rect.y + row as f32 * (CARD_HEIGHT + CARD_GAP);
 
-            self.positions.push(Rect::new(x, y, CARD_WIDTH, CARD_HEIGHT));
+            self.positions
+                .push(Rect::new(x, y, CARD_WIDTH, CARD_HEIGHT));
         }
     }
 
@@ -211,12 +216,15 @@ impl Widget for CardGrid {
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
         // Check the Add card first for click events
-        if let UiEvent::MouseDown { x, y, button: MouseButton::Left } = event {
-            if let Some(add_rect) = self.add_card_rect() {
-                if add_rect.contains(*x, *y) {
-                    return EventResponse::Action(UiAction::AddServer);
-                }
-            }
+        if let UiEvent::MouseDown {
+            x,
+            y,
+            button: MouseButton::Left,
+        } = event
+            && let Some(add_rect) = self.add_card_rect()
+            && add_rect.contains(*x, *y)
+        {
+            return EventResponse::Action(UiAction::AddServer);
         }
 
         // Route to individual cards based on cached position
@@ -228,24 +236,29 @@ impl Widget for CardGrid {
                 let translated = match event {
                     UiEvent::MouseMove { x, y } => {
                         // Always propagate MouseMove to all cards for hover tracking
-                        let resp = self.cards[i].handle_event(&UiEvent::MouseMove {
-                            x: *x,
-                            y: *y,
-                        });
+                        let resp = self.cards[i].handle_event(&UiEvent::MouseMove { x: *x, y: *y });
                         // We've already handled it inline, continue loop
                         let _ = resp;
                         continue;
                     }
                     UiEvent::MouseDown { x, y, button } => {
                         if pos.contains(*x, *y) {
-                            UiEvent::MouseDown { x: *x, y: *y, button: button.clone() }
+                            UiEvent::MouseDown {
+                                x: *x,
+                                y: *y,
+                                button: button.clone(),
+                            }
                         } else {
                             continue;
                         }
                     }
                     UiEvent::MouseUp { x, y, button } => {
                         if pos.contains(*x, *y) {
-                            UiEvent::MouseUp { x: *x, y: *y, button: button.clone() }
+                            UiEvent::MouseUp {
+                                x: *x,
+                                y: *y,
+                                button: button.clone(),
+                            }
                         } else {
                             continue;
                         }
@@ -304,7 +317,10 @@ mod tests {
         let mut ctx = PaintContext::new();
         grid.paint(&mut ctx);
 
-        assert!(ctx.glass_quads.len() >= 1, "expected at least 1 glass quad (the add card)");
+        assert!(
+            ctx.glass_quads.len() >= 1,
+            "expected at least 1 glass quad (the add card)"
+        );
     }
 
     #[test]
@@ -317,7 +333,11 @@ mod tests {
         // cards_per_row = floor((600 + 16) / (240 + 16)) = floor(616 / 256) = 2
         // total items = 5 cards + 1 add = 6
         // rows = ceil(6 / 2) = 3
-        assert_eq!(grid.positions.len(), 6, "expected 6 positions (5 cards + add)");
+        assert_eq!(
+            grid.positions.len(),
+            6,
+            "expected 6 positions (5 cards + add)"
+        );
 
         // Verify row wrapping: item at index 2 should be in row 1
         let row_1_item = grid.positions[2];

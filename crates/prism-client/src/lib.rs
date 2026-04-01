@@ -4,17 +4,17 @@
 // Commercial licensing available — see LICENSE-COMMERCIAL.md.
 
 pub mod app;
-pub mod session_bridge;
 pub mod audio_player;
 pub mod connector;
 pub mod cursor_renderer;
 pub mod frame_receiver;
 pub mod input_sender;
+pub mod session_bridge;
 
+pub mod config;
+pub mod input;
 pub mod renderer;
 pub mod ui;
-pub mod input;
-pub mod config;
 
 // Re-exports
 pub use audio_player::AdaptiveJitterBuffer;

@@ -2,12 +2,12 @@
 //! Add/Edit server form overlay.
 
 use crate::config::servers::SavedServer;
+use crate::ui::widgets::button::Button;
+use crate::ui::widgets::dropdown::Dropdown;
+use crate::ui::widgets::text_input::TextInput;
 use crate::ui::widgets::{
     EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
-use crate::ui::widgets::text_input::TextInput;
-use crate::ui::widgets::button::Button;
-use crate::ui::widgets::dropdown::Dropdown;
 
 // ---------------------------------------------------------------------------
 // ServerForm
@@ -31,10 +31,7 @@ impl ServerForm {
             name_input: TextInput::new("Server name"),
             address_input: TextInput::new("host:port"),
             noise_key_input: TextInput::new("Noise public key (optional)"),
-            profile_dropdown: Dropdown::new(
-                vec!["Gaming".into(), "Coding".into()],
-                0,
-            ),
+            profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0),
             save_button: Button::new("Save", UiAction::AddServer),
             cancel_button: Button::new("Cancel", UiAction::CloseOverlay),
             editing_id: None,
@@ -67,7 +64,10 @@ impl ServerForm {
         }
         // Set profile dropdown: find matching profile
         let profile_options = ["Gaming", "Coding"];
-        if let Some(idx) = profile_options.iter().position(|&p| p == server.default_profile) {
+        if let Some(idx) = profile_options
+            .iter()
+            .position(|&p| p == server.default_profile)
+        {
             self.profile_dropdown.set_selected(idx);
         }
     }
@@ -87,7 +87,11 @@ impl ServerForm {
         let address = self.address_input.text().to_string();
         let noise_key = {
             let t = self.noise_key_input.text();
-            if t.is_empty() { None } else { Some(t.to_string()) }
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.to_string())
+            }
         };
         let profile = self.profile_dropdown.selected_text().to_string();
         (name, address, noise_key, profile)
@@ -114,15 +118,20 @@ impl Widget for ServerForm {
         let w = panel_w - 24.0;
 
         // Name input at y+50
-        self.name_input.layout(Rect::new(x, available.y + 50.0, w, 36.0));
+        self.name_input
+            .layout(Rect::new(x, available.y + 50.0, w, 36.0));
         // Address at y+95
-        self.address_input.layout(Rect::new(x, available.y + 95.0, w, 36.0));
+        self.address_input
+            .layout(Rect::new(x, available.y + 95.0, w, 36.0));
         // Noise key at y+140
-        self.noise_key_input.layout(Rect::new(x, available.y + 140.0, w, 36.0));
+        self.noise_key_input
+            .layout(Rect::new(x, available.y + 140.0, w, 36.0));
         // Profile dropdown at y+185
-        self.profile_dropdown.layout(Rect::new(x, available.y + 185.0, w, 32.0));
+        self.profile_dropdown
+            .layout(Rect::new(x, available.y + 185.0, w, 32.0));
         // Save button at y+230
-        self.save_button.layout(Rect::new(x, available.y + 230.0, (w / 2.0) - 4.0, 36.0));
+        self.save_button
+            .layout(Rect::new(x, available.y + 230.0, (w / 2.0) - 4.0, 36.0));
         // Cancel beside save
         self.cancel_button.layout(Rect::new(
             x + (w / 2.0) + 4.0,
@@ -131,7 +140,10 @@ impl Widget for ServerForm {
             36.0,
         ));
 
-        Size { w: panel_w, h: panel_h }
+        Size {
+            w: panel_w,
+            h: panel_h,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
@@ -150,7 +162,11 @@ impl Widget for ServerForm {
         });
 
         // Title
-        let title = if self.editing_id.is_some() { "Edit Server" } else { "Add Server" };
+        let title = if self.editing_id.is_some() {
+            "Edit Server"
+        } else {
+            "Add Server"
+        };
         ctx.push_text_run(TextRun {
             x: self.rect.x + 12.0,
             y: self.rect.y + 16.0,
@@ -188,16 +204,24 @@ impl Widget for ServerForm {
 
         // Remaining sub-widgets
         let resp = self.name_input.handle_event(event);
-        if !matches!(resp, EventResponse::Ignored) { return resp; }
+        if !matches!(resp, EventResponse::Ignored) {
+            return resp;
+        }
 
         let resp = self.address_input.handle_event(event);
-        if !matches!(resp, EventResponse::Ignored) { return resp; }
+        if !matches!(resp, EventResponse::Ignored) {
+            return resp;
+        }
 
         let resp = self.noise_key_input.handle_event(event);
-        if !matches!(resp, EventResponse::Ignored) { return resp; }
+        if !matches!(resp, EventResponse::Ignored) {
+            return resp;
+        }
 
         let resp = self.profile_dropdown.handle_event(event);
-        if !matches!(resp, EventResponse::Ignored) { return resp; }
+        if !matches!(resp, EventResponse::Ignored) {
+            return resp;
+        }
 
         EventResponse::Ignored
     }
@@ -240,6 +264,9 @@ mod tests {
         let mut ctx = PaintContext::new();
         form.paint(&mut ctx);
 
-        assert!(ctx.glass_quads.len() > 0, "expected glass quads when form is visible");
+        assert!(
+            ctx.glass_quads.len() > 0,
+            "expected glass quads when form is visible"
+        );
     }
 }

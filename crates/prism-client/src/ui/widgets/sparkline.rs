@@ -50,7 +50,11 @@ impl Sparkline {
 
     /// Get value at logical index 0=oldest.
     pub fn get(&self, logical_index: usize) -> f32 {
-        let start = if self.count < self.capacity { 0 } else { self.head };
+        let start = if self.count < self.capacity {
+            0
+        } else {
+            self.head
+        };
         self.values[(start + logical_index) % self.capacity]
     }
 
@@ -141,9 +145,21 @@ mod tests {
         s.push(40.0);
         // Now oldest is 20, buffer is [40, 20, 30], head=1
         // get(0)=oldest=20, get(1)=30, get(2)=40
-        assert!((s.get(0) - 20.0).abs() < 0.001, "oldest should be 20, got {}", s.get(0));
-        assert!((s.get(1) - 30.0).abs() < 0.001, "middle should be 30, got {}", s.get(1));
-        assert!((s.get(2) - 40.0).abs() < 0.001, "newest should be 40, got {}", s.get(2));
+        assert!(
+            (s.get(0) - 20.0).abs() < 0.001,
+            "oldest should be 20, got {}",
+            s.get(0)
+        );
+        assert!(
+            (s.get(1) - 30.0).abs() < 0.001,
+            "middle should be 30, got {}",
+            s.get(1)
+        );
+        assert!(
+            (s.get(2) - 40.0).abs() < 0.001,
+            "newest should be 40, got {}",
+            s.get(2)
+        );
     }
 
     #[test]
@@ -155,6 +171,11 @@ mod tests {
         }
         let mut ctx = PaintContext::new();
         s.paint(&mut ctx);
-        assert_eq!(ctx.glow_rects.len(), 5, "expected 5 glow rects, got {}", ctx.glow_rects.len());
+        assert_eq!(
+            ctx.glow_rects.len(),
+            5,
+            "expected 5 glow rects, got {}",
+            ctx.glow_rects.len()
+        );
     }
 }

@@ -2,11 +2,11 @@
 //! Full-width stats bar — live session metrics at the top of the overlay.
 
 use crate::renderer::animation::{Animation, EaseCurve};
+use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::{
     EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
     Widget,
 };
-use crate::ui::widgets::dropdown::Dropdown;
 
 // ---------------------------------------------------------------------------
 // Data
@@ -68,10 +68,7 @@ impl StatsBar {
     pub fn new() -> Self {
         Self {
             stats: SessionStats::default(),
-            profile_dropdown: Dropdown::new(
-                vec!["Gaming".into(), "Coding".into()],
-                0,
-            ),
+            profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0),
             pinned: false,
             visible: false,
             fade_anim: Animation::new(EaseCurve::EaseOut, 200.0),
@@ -202,7 +199,12 @@ impl Widget for StatsBar {
             y: y_text,
             text: format!("FPS: {:.0}", self.stats.fps),
             font_size: 13.0,
-            color: [fps_color[0], fps_color[1], fps_color[2], fps_color[3] * alpha],
+            color: [
+                fps_color[0],
+                fps_color[1],
+                fps_color[2],
+                fps_color[3] * alpha,
+            ],
             monospace: true,
         });
         x_cursor += 90.0;
@@ -217,7 +219,12 @@ impl Widget for StatsBar {
             y: y_text,
             text: format!("Latency: {:.1}ms", self.stats.latency_ms),
             font_size: 13.0,
-            color: [lat_color[0], lat_color[1], lat_color[2], lat_color[3] * alpha],
+            color: [
+                lat_color[0],
+                lat_color[1],
+                lat_color[2],
+                lat_color[3] * alpha,
+            ],
             monospace: true,
         });
         x_cursor += 130.0;
@@ -226,7 +233,11 @@ impl Widget for StatsBar {
         x_cursor += 8.0;
 
         // Codec
-        let codec = if self.stats.codec.is_empty() { "—".to_owned() } else { self.stats.codec.clone() };
+        let codec = if self.stats.codec.is_empty() {
+            "—".to_owned()
+        } else {
+            self.stats.codec.clone()
+        };
         ctx.push_text_run(TextRun {
             x: x_cursor,
             y: y_text,
@@ -273,7 +284,11 @@ impl Widget for StatsBar {
         ctx.push_text_run(TextRun {
             x: pin_x,
             y: y_text,
-            text: if self.pinned { "[*]".into() } else { "[pin]".into() },
+            text: if self.pinned {
+                "[*]".into()
+            } else {
+                "[pin]".into()
+            },
             font_size: 12.0,
             color: [1.0, 1.0, 1.0, if self.pinned { 0.9 } else { 0.5 } * alpha],
             monospace: false,
@@ -308,7 +323,11 @@ impl Widget for StatsBar {
         }
 
         match event {
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 if self.close_rect().contains(*x, *y) {
                     return EventResponse::Action(UiAction::CloseOverlay);
                 }
@@ -376,9 +395,14 @@ mod tests {
         // Should have text runs containing fps and latency
         let texts: Vec<&str> = ctx.text_runs.iter().map(|t| t.text.as_str()).collect();
         let has_fps = texts.iter().any(|t| t.contains("FPS:") && t.contains("60"));
-        let has_latency = texts.iter().any(|t| t.contains("Latency:") && t.contains("12.5"));
+        let has_latency = texts
+            .iter()
+            .any(|t| t.contains("Latency:") && t.contains("12.5"));
         assert!(has_fps, "expected FPS metric in text runs, got: {texts:?}");
-        assert!(has_latency, "expected Latency metric in text runs, got: {texts:?}");
+        assert!(
+            has_latency,
+            "expected Latency metric in text runs, got: {texts:?}"
+        );
     }
 
     #[test]
@@ -417,7 +441,13 @@ mod tests {
         bar.layout(Rect::new(0.0, 0.0, 1920.0, 36.0));
         let mut ctx = PaintContext::new();
         bar.paint(&mut ctx);
-        assert!(ctx.text_runs.is_empty(), "hidden bar should emit no text runs");
-        assert!(ctx.glass_quads.is_empty(), "hidden bar should emit no glass quads");
+        assert!(
+            ctx.text_runs.is_empty(),
+            "hidden bar should emit no text runs"
+        );
+        assert!(
+            ctx.glass_quads.is_empty(),
+            "hidden bar should emit no glass quads"
+        );
     }
 }

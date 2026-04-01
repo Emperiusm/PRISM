@@ -15,14 +15,19 @@ impl Default for Separator {
 
 impl Separator {
     pub fn new() -> Self {
-        Self { rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
+        Self {
+            rect: Rect::new(0.0, 0.0, 0.0, 0.0),
+        }
     }
 }
 
 impl Widget for Separator {
     fn layout(&mut self, available: Rect) -> Size {
         self.rect = Rect::new(available.x, available.y, available.w, 2.0);
-        Size { w: available.w, h: 2.0 }
+        Size {
+            w: available.w,
+            h: 2.0,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {

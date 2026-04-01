@@ -48,7 +48,10 @@ impl Widget for SettingsPanel {
         let panel_w = 300.0;
         let panel_h = 200.0;
         self.rect = Rect::new(available.x, available.y, panel_w, panel_h);
-        Size { w: panel_w, h: panel_h }
+        Size {
+            w: panel_w,
+            h: panel_h,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
@@ -138,7 +141,10 @@ mod tests {
         let mut ctx = PaintContext::new();
         panel.paint(&mut ctx);
 
-        assert!(ctx.glass_quads.len() > 0, "expected glass quads when panel is visible");
+        assert!(
+            ctx.glass_quads.len() > 0,
+            "expected glass quads when panel is visible"
+        );
         // Should have title + 2 labels
         assert!(ctx.text_runs.len() >= 3, "expected at least 3 text runs");
     }

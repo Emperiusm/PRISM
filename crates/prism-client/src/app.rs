@@ -8,14 +8,15 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 
 use crate::config::ClientConfig;
-use crate::input::double_tap::DoubleTapDetector;
 use crate::input::InputCoalescer;
+use crate::input::double_tap::DoubleTapDetector;
 use crate::renderer::PrismRenderer;
 use crate::session_bridge::SessionBridge;
 use crate::ui::UiState;
 use crate::ui::widgets::PaintContext;
 
 /// Top-level PRISM application — owns the winit window, wgpu renderer, and UI state.
+#[allow(dead_code)]
 pub struct PrismApp {
     config: ClientConfig,
     window: Option<Arc<Window>>,
@@ -73,12 +74,11 @@ impl PrismApp {
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder =
-            renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Frame Encoder"),
-                });
+        let mut encoder = renderer
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Frame Encoder"),
+            });
 
         // Clear to the deep purple background
         {
@@ -122,9 +122,7 @@ impl ApplicationHandler for PrismApp {
         };
 
         let size = match self.ui_state {
-            UiState::Launcher | UiState::Connecting => {
-                winit::dpi::LogicalSize::new(960.0, 640.0)
-            }
+            UiState::Launcher | UiState::Connecting => winit::dpi::LogicalSize::new(960.0, 640.0),
             _ => winit::dpi::LogicalSize::new(1920.0, 1080.0),
         };
 
@@ -140,8 +138,8 @@ impl ApplicationHandler for PrismApp {
         );
 
         // Initialize renderer (blocking — we're in the event loop setup)
-        let renderer =
-            pollster::block_on(PrismRenderer::new(window.clone())).expect("Failed to create renderer");
+        let renderer = pollster::block_on(PrismRenderer::new(window.clone()))
+            .expect("Failed to create renderer");
 
         self.window = Some(window);
         self.renderer = Some(renderer);
