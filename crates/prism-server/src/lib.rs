@@ -24,6 +24,7 @@ pub mod negotiation_handler;
 pub mod cursor_sender;
 pub mod arbiter_task;
 pub mod overlay_sender;
+pub mod throughput_endpoint;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -95,3 +96,6 @@ pub use arbiter_task::{display_allocation_bps, update_arbiter_from_tracker};
 
 // overlay_sender
 pub use overlay_sender::{build_overlay_datagram, build_overlay_packet};
+
+// throughput_endpoint
+pub use throughput_endpoint::{ThroughputEndpointConfig, build_throughput_config, is_throughput_channel};
