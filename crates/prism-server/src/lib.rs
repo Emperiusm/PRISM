@@ -99,3 +99,16 @@ pub use overlay_sender::{build_overlay_datagram, build_overlay_packet};
 
 // throughput_endpoint
 pub use throughput_endpoint::{ThroughputEndpointConfig, build_throughput_config, is_throughput_channel};
+
+pub mod speculative_idr;
+pub mod encode_pool;
+pub mod static_cache;
+
+// speculative_idr
+pub use speculative_idr::SpeculativeIdrController;
+
+// encode_pool
+pub use encode_pool::{EncodePoolConfig, EncodePoolStats, should_accept_job};
+
+// static_cache
+pub use static_cache::{CacheInstruction, CacheSavingsTracker};
