@@ -50,8 +50,8 @@ impl ServerApp {
             );
         }
 
-        let config = ServerConfig::default();
-        tracing::info!(addr = %config.listen_addr, "server configuration loaded");
+        let config = ServerConfig::load_or_default(std::path::Path::new("prism-server.toml"));
+        tracing::info!(addr = %config.listen_addr(), "server configuration loaded");
 
         // TLS
         let _cert = SelfSignedCert::generate()?;
@@ -127,7 +127,7 @@ impl ServerApp {
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // QUIC endpoint — cert is created fresh here since it is consumed by bind.
         let cert = SelfSignedCert::generate()?;
-        let acceptor = ConnectionAcceptor::bind(self.config.listen_addr, cert)?;
+        let acceptor = ConnectionAcceptor::bind(self.config.listen_addr(), cert)?;
         tracing::info!(addr = %acceptor.local_addr(), "QUIC endpoint bound");
         tracing::info!("waiting for connections…");
 
