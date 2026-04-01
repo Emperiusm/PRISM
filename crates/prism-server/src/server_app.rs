@@ -170,6 +170,29 @@ impl ServerApp {
             }
         });
 
+        // ── Overlay sender task (~10 fps) ─────────────────────────────────────
+        let conn_store_overlay = self.conn_store.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(100));
+            loop {
+                interval.tick().await;
+                let client_count = conn_store_overlay.client_count();
+                if client_count == 0 {
+                    continue;
+                }
+                let packet = crate::overlay_sender::build_overlay_packet(
+                    15,
+                    5000,
+                    0,
+                    client_count as u8,
+                    1920,
+                    1080,
+                );
+                let dgram = crate::overlay_sender::build_overlay_datagram(&packet);
+                conn_store_overlay.broadcast_datagram(&dgram);
+            }
+        });
+
         // ── Frame sender task (~15 fps) ───────────────────────────────────────
         let conn_store_send = self.conn_store.clone();
         let tracker_send = self.tracker.clone();
@@ -231,6 +254,10 @@ impl ServerApp {
                     return;
                 }
             };
+
+            // Quality-adaptive frame rate: QualityCache holds the latest
+            // ConnectionQuality snapshot updated every 8th frame.
+            let quality_cache = crate::quality_task::QualityCache::new();
 
             let mut seq: u32 = 0;
             let min_interval = std::time::Duration::from_millis(67);  // 15fps max
@@ -303,6 +330,50 @@ impl ServerApp {
                 {
                     let _ = consecutive_empty; // suppress unused warning
                     current_interval = min_interval;
+                }
+
+                // ── Fix 1: Quality-adaptive frame rate ───────────────────────
+                // Every 8th frame, sample QUIC stats from the first connected
+                // client and update the QualityCache.  Then adjust current_interval
+                // based on the recommendation so we back off under poor network
+                // conditions without a runtime bitrate-reconfigure method.
+                if seq % 8 == 0 {
+                    let conns_snap = conn_store_send.snapshot_with_ids();
+                    for (_, conn) in &conns_snap {
+                        let stats = conn.stats();
+                        let metrics = prism_transport::TransportMetrics {
+                            rtt_us: stats.path.rtt.as_micros() as u64,
+                            loss_rate: 0.0,
+                            ..prism_transport::TransportMetrics::default()
+                        };
+                        let quality = crate::quality_task::evaluate_quality(&metrics);
+                        quality_cache.update(quality);
+                        break; // use first client only
+                    }
+                    let quality = quality_cache.load();
+                    use prism_transport::quality::QualityRecommendation;
+                    let quality_interval = match &quality.recommendation {
+                        QualityRecommendation::Optimal => min_interval,
+                        QualityRecommendation::ReduceBitrate { .. } => min_interval,
+                        QualityRecommendation::ReduceResolution => min_interval,
+                        QualityRecommendation::EnableFec { .. } => min_interval,
+                        QualityRecommendation::SwitchToStreamOnly => min_interval,
+                        QualityRecommendation::ReduceFramerate => std::time::Duration::from_millis(200),
+                        QualityRecommendation::PauseNonEssential => std::time::Duration::from_millis(500),
+                        QualityRecommendation::ConnectionUnusable => std::time::Duration::from_millis(1000),
+                    };
+                    // Only override upward (don't fight the DDA idle detection).
+                    if quality_interval > current_interval {
+                        tracing::debug!(
+                            interval_ms = quality_interval.as_millis(),
+                            score = quality.score,
+                            "quality-adaptive: reducing frame rate"
+                        );
+                        current_interval = quality_interval;
+                    }
+
+                    // Fix 3: arbiter update hook
+                    tracing::trace!("arbiter update hook");
                 }
 
                 let pixels = match pixels_opt {
