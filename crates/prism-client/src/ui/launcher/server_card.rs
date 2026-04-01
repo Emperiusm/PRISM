@@ -69,8 +69,8 @@ impl Widget for ServerCard {
         ctx.push_glass_quad(GlassQuad {
             rect: r,
             blur_rect: r,
-            tint: [0.1, 0.0, 0.2, 0.12],
-            border_color: [1.0, 1.0, 1.0, 0.15],
+            tint: [0.10, 0.05, 0.18, 0.20],
+            border_color: [1.0, 1.0, 1.0, 0.06],
             corner_radius: 10.0,
             noise_intensity: 0.03,
         });
@@ -111,7 +111,7 @@ impl Widget for ServerCard {
             y: r.y + 16.0,
             text: self.display_name.clone(),
             font_size: 15.0,
-            color: [1.0, 1.0, 1.0, 0.95],
+            color: [1.0, 1.0, 1.0, 0.92],
             monospace: false,
         });
 
@@ -121,7 +121,7 @@ impl Widget for ServerCard {
             y: r.y + 38.0,
             text: self.address.clone(),
             font_size: 12.0,
-            color: [1.0, 1.0, 1.0, 0.5],
+            color: [1.0, 1.0, 1.0, 0.55],
             monospace: false,
         });
 
@@ -131,7 +131,7 @@ impl Widget for ServerCard {
             y: r.y + 58.0,
             text: self.last_info.clone(),
             font_size: 11.0,
-            color: [1.0, 1.0, 1.0, 0.4],
+            color: [1.0, 1.0, 1.0, 0.55],
             monospace: false,
         });
 
@@ -145,7 +145,7 @@ impl Widget for ServerCard {
                 self.accent_color[0],
                 self.accent_color[1],
                 self.accent_color[2],
-                0.8,
+                0.85,
             ],
             monospace: false,
         });

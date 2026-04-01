@@ -26,8 +26,8 @@ use crate::ui::overlay::perf_panel::PerfPanel;
 use crate::ui::overlay::quality_panel::QualityPanel;
 use crate::ui::overlay::stats_bar::StatsBar;
 use crate::ui::widgets::{
-    EventResponse, MouseButton as UiMouseButton, PaintContext, Rect, TextRun, UiAction, UiEvent,
-    Widget,
+    EventResponse, GlassQuad, MouseButton as UiMouseButton, PaintContext, Rect, TextRun, UiAction,
+    UiEvent, Widget,
 };
 
 /// Top-level PRISM application — owns the winit window, wgpu renderer, and UI state.
@@ -535,9 +535,9 @@ impl PrismApp {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.08,
-                            g: 0.06,
-                            b: 0.16,
+                            r: 0.051,
+                            g: 0.043,
+                            b: 0.102,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -717,20 +717,20 @@ impl PrismApp {
             // Title text
             self.paint_ctx.push_text_run(TextRun {
                 x: padding,
-                y: 18.0,
+                y: 20.0,
                 text: "PRISM".to_string(),
-                font_size: 28.0,
-                color: [1.0, 1.0, 1.0, 0.9],
+                font_size: 32.0,
+                color: [1.0, 1.0, 1.0, 0.95],
                 monospace: false,
             });
 
             // Subtitle
             self.paint_ctx.push_text_run(TextRun {
-                x: padding + 100.0,
-                y: 28.0,
+                x: padding + 110.0,
+                y: 25.0,
                 text: "Remote Desktop".to_string(),
-                font_size: 13.0,
-                color: [0.6, 0.5, 0.8, 0.6],
+                font_size: 12.0,
+                color: [0.6, 0.5, 0.8, 0.5],
                 monospace: false,
             });
 
@@ -747,6 +747,17 @@ impl PrismApp {
             }
 
             self.quick_connect.paint(&mut self.paint_ctx);
+
+            // Separator line between quick connect bar and card grid
+            self.paint_ctx.push_glass_quad(GlassQuad {
+                rect: Rect::new(padding, 130.0, screen_w - padding * 2.0, 1.0),
+                blur_rect: Rect::new(padding, 130.0, screen_w - padding * 2.0, 1.0),
+                tint: [1.0, 1.0, 1.0, 0.04],
+                border_color: [0.0, 0.0, 0.0, 0.0],
+                corner_radius: 0.0,
+                noise_intensity: 0.0,
+            });
+
             self.card_grid.paint(&mut self.paint_ctx);
 
             // Render UI
