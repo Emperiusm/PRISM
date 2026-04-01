@@ -303,6 +303,31 @@ fn clipboard_message_json_roundtrip() {
     assert_eq!(decoded.content_hash, msg.content_hash);
 }
 
+/// Verify that `HeartbeatGenerator` produces a valid 16-byte control packet
+/// with the correct channel and message type.
+#[test]
+fn heartbeat_generator_produces_valid_control_packet() {
+    let hbg = prism_server::HeartbeatGenerator::new();
+    let packet = hbg.packet();
+    assert_eq!(packet.len(), prism_protocol::header::HEADER_SIZE);
+    let header = prism_protocol::header::PrismHeader::decode_from_slice(&packet).unwrap();
+    assert_eq!(header.channel_id, prism_protocol::channel::CHANNEL_CONTROL);
+    assert_eq!(header.msg_type, prism_session::control_msg::HEARTBEAT);
+}
+
+/// Verify the `ShutdownCoordinator` lifecycle: running → shutting down →
+/// notice accessible.
+#[test]
+fn shutdown_coordinator_lifecycle() {
+    let mut coord =
+        prism_server::ShutdownCoordinator::new(std::time::Duration::from_secs(30));
+    assert!(!coord.is_shutting_down());
+    coord.initiate("test shutdown".into(), false);
+    assert!(coord.is_shutting_down());
+    assert!(coord.notice().is_some());
+    assert_eq!(coord.notice().unwrap().reason, "test shutdown");
+}
+
 /// Pure-protocol test: `ClipboardEchoGuard` suppresses a hash it has already
 /// seen, but allows a different hash through.
 #[test]
