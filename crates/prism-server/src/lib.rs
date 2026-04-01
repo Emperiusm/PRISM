@@ -22,6 +22,7 @@ pub mod quality_task;
 pub mod clipboard_stream;
 pub mod negotiation_handler;
 pub mod cursor_sender;
+pub mod arbiter_task;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -87,3 +88,6 @@ pub use negotiation_handler::{build_server_negotiator, negotiate_on_stream};
 
 // cursor_sender
 pub use cursor_sender::{CursorSender, deserialize_cursor_shape, serialize_cursor_shape};
+
+// arbiter_task
+pub use arbiter_task::{display_allocation_bps, update_arbiter_from_tracker};
