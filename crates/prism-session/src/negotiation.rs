@@ -2,6 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use serde::{Deserialize, Serialize};
+
 use prism_protocol::channel::CHANNEL_DISPLAY;
 
 // ---------------------------------------------------------------------------
@@ -9,14 +11,14 @@ use prism_protocol::channel::CHANNEL_DISPLAY;
 // ---------------------------------------------------------------------------
 
 /// Performance-related capabilities advertised by the client.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClientPerformance {
     /// Video codecs the client can decode, e.g. "h264", "h265", "av1".
     pub supported_codecs: Vec<String>,
 }
 
 /// A single channel capability entry from the client.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientChannelCap {
     pub channel_id: u16,
     /// Maximum protocol version the client supports for this channel.
@@ -24,7 +26,7 @@ pub struct ClientChannelCap {
 }
 
 /// Full capability advertisement from a connecting client.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClientCapabilities {
     pub channels: Vec<ClientChannelCap>,
     pub performance: ClientPerformance,
@@ -62,14 +64,14 @@ pub struct ChannelCap {
 // ---------------------------------------------------------------------------
 
 /// A successfully negotiated channel and its agreed protocol version.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NegotiatedChannel {
     pub channel_id: u16,
     pub version: u16,
 }
 
 /// The full result of a capability negotiation handshake.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NegotiationResult {
     pub protocol_version: u16,
     /// Channels accepted by both sides with their negotiated version.

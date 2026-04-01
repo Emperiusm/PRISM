@@ -20,6 +20,8 @@ pub mod input_handler;
 pub mod audio_sender;
 pub mod quality_task;
 pub mod clipboard_stream;
+pub mod negotiation_handler;
+pub mod cursor_sender;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -79,3 +81,9 @@ pub use clipboard_stream::ClipboardSyncState;
 
 // rate_limiter
 pub use rate_limiter::ConnectionRateLimiter;
+
+// negotiation_handler
+pub use negotiation_handler::{build_server_negotiator, negotiate_on_stream};
+
+// cursor_sender
+pub use cursor_sender::{CursorSender, deserialize_cursor_shape, serialize_cursor_shape};
