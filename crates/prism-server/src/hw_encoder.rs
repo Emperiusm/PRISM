@@ -86,6 +86,8 @@ pub struct HwEncoder {
     backend: HwEncoderBackend,
     width: u32,
     height: u32,
+    /// Current target bitrate in bits per second.
+    bitrate_bps: u64,
     #[cfg(feature = "hwenc")]
     ffmpeg_encoder: Option<ffmpeg_encoder::FfmpegEncoder>,
     openh264_encoder: Option<openh264::encoder::Encoder>,
@@ -110,6 +112,7 @@ impl HwEncoder {
                         backend: preferred,
                         width,
                         height,
+                        bitrate_bps,
                         ffmpeg_encoder: Some(enc),
                         openh264_encoder: None,
                     }),
@@ -143,6 +146,7 @@ impl HwEncoder {
             backend: HwEncoderBackend::Software,
             width,
             height,
+            bitrate_bps,
             #[cfg(feature = "hwenc")]
             ffmpeg_encoder: None,
             openh264_encoder: Some(encoder),
@@ -212,6 +216,27 @@ impl HwEncoder {
     /// The frame height this encoder was configured for.
     pub fn height(&self) -> u32 {
         self.height
+    }
+
+    /// The current target bitrate in bits per second.
+    pub fn bitrate_bps(&self) -> u64 {
+        self.bitrate_bps
+    }
+
+    /// Reconfigure the encoder bitrate at runtime.
+    ///
+    /// openh264 does not expose a runtime set_bitrate API, so this method
+    /// recreates the encoder when the new bitrate differs by more than 20%.
+    /// Small adjustments are stored and applied on the next recreation.
+    pub fn set_bitrate(&mut self, bitrate_bps: u64) -> Result<(), Box<dyn std::error::Error>> {
+        let old = self.bitrate_bps;
+        self.bitrate_bps = bitrate_bps;
+        let ratio = if old > 0 { bitrate_bps as f64 / old as f64 } else { 2.0 };
+        if ratio < 0.8 || ratio > 1.2 {
+            tracing::info!(old_bps = old, new_bps = bitrate_bps, "encoder bitrate reconfigure");
+            *self = Self::create_software(self.width, self.height, bitrate_bps)?;
+        }
+        Ok(())
     }
 
     /// Encode a BGRA8 frame and return a raw H.264 bitstream.
@@ -445,5 +470,30 @@ mod tests {
             let result = encoder.encode_bgra(&bgra);
             assert!(result.is_ok(), "frame {} failed: {:?}", i, result.err());
         }
+    }
+
+    // ── bitrate reconfigure ───────────────────────────────────────────────────
+
+    #[test]
+    fn set_bitrate_small_change_no_recreate() {
+        let mut encoder = HwEncoder::new(160, 120, 1_000_000).unwrap();
+        // 1.1x change — within 20% threshold, no recreation.
+        assert!(encoder.set_bitrate(1_100_000).is_ok());
+        assert_eq!(encoder.bitrate_bps(), 1_100_000);
+        assert_eq!(encoder.width(), 160);
+        assert_eq!(encoder.height(), 120);
+    }
+
+    #[test]
+    fn set_bitrate_large_change_recreates() {
+        let mut encoder = HwEncoder::new(160, 120, 1_000_000).unwrap();
+        // 2x change — exceeds 20% threshold, encoder is recreated.
+        assert!(encoder.set_bitrate(2_000_000).is_ok());
+        assert_eq!(encoder.bitrate_bps(), 2_000_000);
+        assert_eq!(encoder.width(), 160);
+        assert_eq!(encoder.height(), 120);
+        // Encoder should still be functional after recreation.
+        let bgra = vec![0u8; 160 * 120 * 4];
+        assert!(encoder.encode_bgra(&bgra).is_ok());
     }
 }

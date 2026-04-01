@@ -372,6 +372,16 @@ impl ServerApp {
                         current_interval = quality_interval;
                     }
 
+                    // Bitrate reconfigure based on quality recommendation.
+                    let target_bps = match &quality.recommendation {
+                        QualityRecommendation::Optimal => 5_000_000u64,
+                        QualityRecommendation::ReduceBitrate { target_bps } => *target_bps,
+                        _ => 2_000_000u64,
+                    };
+                    if let Err(e) = encoder.set_bitrate(target_bps) {
+                        tracing::warn!(error = %e, "failed to reconfigure encoder bitrate");
+                    }
+
                     // Fix 3: arbiter update hook
                     tracing::trace!("arbiter update hook");
                 }
