@@ -678,6 +678,38 @@ async fn handle_connection(
                 );
             }
 
+            // ── Capability negotiation ────────────────────────────────────────
+            // Accept the bi stream the client opens immediately after connecting
+            // (or after Noise handshake), negotiate channels and codec, then
+            // proceed to session creation.
+            let _negotiation_result = {
+                let (mut cap_send, mut cap_recv) = match quinn_conn.accept_bi().await {
+                    Ok(streams) => streams,
+                    Err(e) => {
+                        tracing::warn!(remote = %remote, error = %e, "negotiation: failed to accept bi stream");
+                        return;
+                    }
+                };
+                let negotiator = crate::negotiation_handler::build_server_negotiator();
+                match crate::negotiation_handler::negotiate_on_stream(
+                    &mut cap_send, &mut cap_recv, &negotiator,
+                ).await {
+                    Ok(result) => {
+                        tracing::info!(
+                            remote = %remote,
+                            channels = result.channels.len(),
+                            codec = %result.display_codec,
+                            "capability negotiation complete"
+                        );
+                        result
+                    }
+                    Err(e) => {
+                        tracing::warn!(remote = %remote, error = %e, "negotiation failed");
+                        return;
+                    }
+                }
+            };
+
             // Clone quinn_conn before it is consumed by QuicConnection::new.
             let quinn_conn_for_store = quinn_conn.clone();
             let qc_recv = Arc::new(prism_transport::QuicConnection::new(quinn_conn.clone()));

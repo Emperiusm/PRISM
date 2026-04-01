@@ -133,6 +133,48 @@ impl ClientApp {
             tracing::info!("Noise IK handshake complete");
         }
 
+        // ── Capability negotiation ────────────────────────────────────────────
+        // Open a bi stream, send ClientCapabilities (prism_session format),
+        // read the NegotiationResult back. Must happen before frame tasks start.
+        {
+            use prism_session::{ClientCapabilities, ClientChannelCap, ClientPerformance};
+            use prism_protocol::channel::{CHANNEL_DISPLAY, CHANNEL_INPUT, CHANNEL_CONTROL};
+
+            let (mut cap_send, mut cap_recv) = connection
+                .open_bi()
+                .await
+                .map_err(|e| format!("cap negotiation: open_bi failed: {}", e))?;
+
+            let client_caps = ClientCapabilities {
+                channels: vec![
+                    ClientChannelCap { channel_id: CHANNEL_DISPLAY, max_version: 1 },
+                    ClientChannelCap { channel_id: CHANNEL_INPUT,   max_version: 1 },
+                    ClientChannelCap { channel_id: CHANNEL_CONTROL, max_version: 1 },
+                ],
+                performance: ClientPerformance {
+                    supported_codecs: vec!["h264".into(), "h265".into()],
+                },
+            };
+
+            let json = serde_json::to_vec(&client_caps)
+                .map_err(|e| format!("cap negotiation: serialize failed: {}", e))?;
+            cap_send.write_all(&(json.len() as u32).to_le_bytes()).await
+                .map_err(|e| format!("cap negotiation: write len failed: {}", e))?;
+            cap_send.write_all(&json).await
+                .map_err(|e| format!("cap negotiation: write body failed: {}", e))?;
+            let _ = cap_send.finish();
+
+            // Read server response.
+            let mut len_buf = [0u8; 4];
+            cap_recv.read_exact(&mut len_buf).await
+                .map_err(|e| format!("cap negotiation: read len failed: {}", e))?;
+            let resp_len = u32::from_le_bytes(len_buf) as usize;
+            let mut resp_data = vec![0u8; resp_len];
+            cap_recv.read_exact(&mut resp_data).await
+                .map_err(|e| format!("cap negotiation: read body failed: {}", e))?;
+            tracing::info!(bytes = resp_len, "capability negotiation complete");
+        }
+
         // ── Channel: async receiver → main-thread renderer ────────────────────
         // std::sync::mpsc allows the tokio task to send without async and the
         // main thread to poll without blocking the event loop.
