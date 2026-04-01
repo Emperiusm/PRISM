@@ -11,9 +11,11 @@ path = "src/main.rs"
 [features]
 default = []
 hwenc = ["dep:ffmpeg-next"]
+audio = ["dep:audiopus"]
 
 [dependencies]
 ffmpeg-next = { workspace = true, optional = true }
+audiopus = { workspace = true, optional = true }
 prism-protocol.workspace = true
 prism-metrics.workspace = true
 prism-security.workspace = true
