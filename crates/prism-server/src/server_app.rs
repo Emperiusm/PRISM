@@ -271,6 +271,12 @@ impl ServerApp {
             let encode_stats = std::sync::Arc::new(crate::encode_pool::EncodePoolStats::default());
             let encode_config = crate::encode_pool::EncodePoolConfig::default();
 
+            // Static region cache: tracks whether the current frame's H.264 output
+            // has been stable long enough to cache on the client.  30-frame threshold
+            // ≈ 2 seconds at 15fps before a region is considered static.
+            let mut atlas_tracker = prism_display::atlas::StaticAtlasTracker::new(30);
+            let mut cache_savings = crate::static_cache::CacheSavingsTracker::default();
+
             let mut seq: u32 = 0;
             let min_interval = std::time::Duration::from_millis(67);  // 15fps max
             let idle_interval = std::time::Duration::from_millis(500); // 2fps idle
@@ -447,6 +453,42 @@ impl ServerApp {
                     // Encoder buffering — try again next tick.
                     seq = seq.wrapping_add(1);
                     continue;
+                }
+
+                // ── Static region cache tracking ──────────────────────────────
+                // Hash the first 1024 bytes of the H.264 NAL stream as a fast
+                // content fingerprint (FNV-1a).  Feed it to the atlas tracker
+                // which decides whether the frame is newly static (SendAndCache),
+                // already cached on the client (Unchanged), or should be sent
+                // normally (EncodeNormally).
+                let frame_hash = {
+                    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                    for &b in h264_data.iter().take(1024) {
+                        h ^= b as u64;
+                        h = h.wrapping_mul(0x0000_0001_0000_01b3);
+                    }
+                    h
+                };
+                let region_key = prism_display::atlas::RegionKey(0x0001, 0);
+                let decision = atlas_tracker.check(region_key, frame_hash);
+                let cache_instr = crate::static_cache::CacheInstruction::from_decision(
+                    decision, region_key, frame_hash,
+                );
+                cache_savings.record(&cache_instr, h264_data.len() as u64);
+
+                if cache_instr.is_cached() {
+                    // Client would normally skip re-decode here; until the
+                    // cache protocol lands on the wire we only track savings.
+                    tracing::trace!("frame skipped (static region cached — tracking only)");
+                }
+
+                // Log cache savings every 15 frames (~1 second at 15fps).
+                if seq % 15 == 0 && cache_savings.bytes_saved() > 0 {
+                    tracing::debug!(
+                        hit_rate = cache_savings.cache_hit_rate(),
+                        saved_kb = cache_savings.bytes_saved() / 1024,
+                        "static cache savings"
+                    );
                 }
 
                 // Wire format (persistent stream, length-prefixed):
