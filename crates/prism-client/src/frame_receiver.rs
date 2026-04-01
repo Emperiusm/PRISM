@@ -61,11 +61,11 @@ impl FrameStats {
         self.last_frame_time = Some(now);
 
         // Gap detection
-        if let Some(last) = self.last_seq {
-            if seq > last.wrapping_add(1) {
-                // Number of missing frames is (seq - last - 1)
-                self.gaps += (seq - last - 1) as u64;
-            }
+        if let Some(last) = self.last_seq
+            && seq > last.wrapping_add(1)
+        {
+            // Number of missing frames is (seq - last - 1)
+            self.gaps += (seq - last - 1) as u64;
         }
         self.last_seq = Some(seq);
 

@@ -48,7 +48,7 @@ pub fn shannon_entropy(data: &[u8]) -> f64 {
 
 pub fn is_high_entropy(data: &[u8]) -> bool {
     let len = data.len();
-    if len < 8 || len > 128 { return false; }
+    if !(8..=128).contains(&len) { return false; }
     shannon_entropy(data) > 4.5
 }
 

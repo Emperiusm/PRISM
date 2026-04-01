@@ -112,25 +112,25 @@ pub struct UserConstraints {
 impl UserConstraints {
     /// Returns `true` if `level` satisfies all active constraints.
     pub fn allows(&self, level: &DegradationLevel) -> bool {
-        if let Some((min_w, min_h)) = self.min_resolution {
-            if level.resolution.0 < min_w || level.resolution.1 < min_h {
-                return false;
-            }
+        if let Some((min_w, min_h)) = self.min_resolution
+            && (level.resolution.0 < min_w || level.resolution.1 < min_h)
+        {
+            return false;
         }
-        if let Some(pin) = self.pin_resolution {
-            if level.resolution != pin {
-                return false;
-            }
+        if let Some(pin) = self.pin_resolution
+            && level.resolution != pin
+        {
+            return false;
         }
-        if let Some(pin_fps) = self.pin_fps {
-            if level.max_fps != pin_fps {
-                return false;
-            }
+        if let Some(pin_fps) = self.pin_fps
+            && level.max_fps != pin_fps
+        {
+            return false;
         }
-        if let Some(min_fps) = self.min_fps {
-            if level.max_fps < min_fps {
-                return false;
-            }
+        if let Some(min_fps) = self.min_fps
+            && level.max_fps < min_fps
+        {
+            return false;
         }
         true
     }
