@@ -101,6 +101,7 @@ pub use overlay_sender::{build_overlay_datagram, build_overlay_packet};
 pub use throughput_endpoint::{ThroughputEndpointConfig, build_throughput_config, is_throughput_channel};
 
 pub mod service;
+pub mod auto_update;
 pub mod speculative_idr;
 pub mod encode_pool;
 pub mod static_cache;
@@ -128,3 +129,6 @@ pub use metrics_collector::MetricsCollector;
 
 // service
 pub use service::{ServiceCommand, is_service_mode, sc_create_command, sc_delete_command};
+
+// auto_update
+pub use auto_update::{SemVer, UpdateStatus, check_version, CURRENT_VERSION};
