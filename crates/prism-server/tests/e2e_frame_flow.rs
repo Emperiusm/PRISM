@@ -340,6 +340,33 @@ fn clipboard_echo_guard_suppresses_echoes() {
     assert!(guard.should_send(msg2.content_hash));
 }
 
+/// QualityCache starts at Optimal and reflects a bad update immediately.
+#[test]
+fn quality_cache_starts_optimal_and_updates() {
+    let cache = prism_server::QualityCache::new();
+    let q = cache.load();
+    assert_eq!(q.recommendation, prism_transport::QualityRecommendation::Optimal);
+
+    let bad = prism_transport::ConnectionQuality::compute(
+        500_000, 100_000, 0.20, 1_000_000, 1_000_000,
+        prism_transport::DelayAsymmetry::Symmetric,
+    );
+    cache.update(bad);
+    let q2 = cache.load();
+    assert_ne!(q2.recommendation, prism_transport::QualityRecommendation::Optimal);
+}
+
+/// ClipboardSyncState deduplicates and suppresses echo content.
+#[test]
+fn clipboard_sync_state_dedup_and_echo() {
+    let state = prism_server::ClipboardSyncState::new();
+    assert!(state.should_send_text("hello"));
+    assert!(!state.should_send_text("hello"));
+    state.remember_set(b"remote");
+    assert!(!state.should_send_text("remote"));
+    assert!(state.should_send_text("new text"));
+}
+
 /// Unit-level smoke test: `build_display_datagram` produces a buffer whose
 /// decoded header has the correct channel, sequence, and message type.
 #[tokio::test]

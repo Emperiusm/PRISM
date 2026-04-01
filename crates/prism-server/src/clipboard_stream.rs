@@ -35,6 +35,10 @@ impl ClipboardSyncState {
     /// - `text` is empty,
     /// - the echo guard identifies it as content we sent ourselves, or
     /// - it hashes to the same value as the last text we sent (dedup).
+    ///
+    /// When `true` is returned the hash is stored as the new `last_text_hash`
+    /// so that a duplicate call for the same content is suppressed immediately.
+    /// This makes `should_send_text` a check-and-mark operation.
     pub fn should_send_text(&self, text: &str) -> bool {
         if text.is_empty() {
             return false;
@@ -51,6 +55,10 @@ impl ClipboardSyncState {
         if self.last_text_hash.load(Ordering::Relaxed) == hash {
             return false;
         }
+
+        // Mark this hash as the last-sent so a subsequent identical call is
+        // suppressed (check-and-mark semantics).
+        self.last_text_hash.store(hash, Ordering::Relaxed);
 
         true
     }
