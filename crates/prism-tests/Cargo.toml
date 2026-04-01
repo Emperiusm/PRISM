@@ -1,0 +1,21 @@
+[package]
+name = "prism-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+# No library dependencies — this crate is test-only.
+
+[dev-dependencies]
+prism-server = { path = "../prism-server" }
+prism-client = { path = "../prism-client" }
+prism-protocol = { path = "../prism-protocol" }
+prism-security = { path = "../prism-security" }
+prism-transport = { path = "../prism-transport" }
+tokio = { version = "1", features = ["sync", "time", "net", "macros", "rt-multi-thread"] }
+quinn = "0.11"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+bytes = "1"
+hex = "0.4"
