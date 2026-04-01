@@ -265,6 +265,12 @@ impl ServerApp {
             // Future: feed WindowEvent::ForegroundChanged from Win32 hooks.
             let mut idr_controller = crate::speculative_idr::SpeculativeIdrController::default();
 
+            // Encode pool pressure tracking.  Instruments the single-threaded encoder
+            // with submit/complete/drop metrics and admission control so that when
+            // actual worker threads are wired in later the same counters will apply.
+            let encode_stats = std::sync::Arc::new(crate::encode_pool::EncodePoolStats::default());
+            let encode_config = crate::encode_pool::EncodePoolConfig::default();
+
             let mut seq: u32 = 0;
             let min_interval = std::time::Duration::from_millis(67);  // 15fps max
             let idle_interval = std::time::Duration::from_millis(500); // 2fps idle
@@ -413,10 +419,24 @@ impl ServerApp {
                     }
                 };
 
+                // Encode pool admission control: drop frames when pending job
+                // count exceeds the pool's max_pending_jobs limit.
+                if !crate::encode_pool::should_accept_job(&encode_stats, &encode_config) {
+                    encode_stats.drop_job();
+                    tracing::debug!("encode job dropped (pool pressure)");
+                    seq = seq.wrapping_add(1);
+                    continue;
+                }
+                encode_stats.submit();
+
                 // Encode BGRA → H.264 bitstream (conversion happens inside HwEncoder).
                 let h264_data: Vec<u8> = match encoder.encode_bgra(&pixels) {
-                    Ok(data) => data,
+                    Ok(data) => {
+                        encode_stats.complete();
+                        data
+                    }
                     Err(e) => {
+                        encode_stats.complete(); // unblock pending count on error too
                         tracing::error!(error = %e, "frame sender: encode error");
                         seq = seq.wrapping_add(1);
                         continue;
@@ -547,6 +567,11 @@ impl ServerApp {
                             "frame sender stats"
                         );
                     }
+                    tracing::debug!(
+                        pending = encode_stats.pending(),
+                        completion_rate = encode_stats.completion_rate(),
+                        "encode pool stats"
+                    );
                     frames_sent = 0;
                     bytes_sent_total = 0;
                     last_log = std::time::Instant::now();
