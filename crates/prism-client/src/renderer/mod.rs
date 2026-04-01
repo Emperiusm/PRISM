@@ -7,6 +7,7 @@ pub mod glass_panel;
 pub mod shader_cache;
 pub mod stream_texture;
 pub mod text_renderer;
+pub mod ui_renderer;
 
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
