@@ -259,6 +259,12 @@ impl ServerApp {
             // ConnectionQuality snapshot updated every 8th frame.
             let quality_cache = crate::quality_task::QualityCache::new();
 
+            // Speculative IDR controller: triggers keyframe requests on scene changes.
+            // Currently wired to detect the idle→active transition (consecutive_empty
+            // drops to zero), which is a reliable proxy for a scene change on Windows.
+            // Future: feed WindowEvent::ForegroundChanged from Win32 hooks.
+            let mut idr_controller = crate::speculative_idr::SpeculativeIdrController::default();
+
             let mut seq: u32 = 0;
             let min_interval = std::time::Duration::from_millis(67);  // 15fps max
             let idle_interval = std::time::Duration::from_millis(500); // 2fps idle
@@ -321,6 +327,19 @@ impl ServerApp {
                             interval_ms = min_interval.as_millis(),
                             "frame sender: desktop active — switching to 15fps"
                         );
+                        // Idle→active transition: content just appeared after a
+                        // period of no desktop updates — highly likely to be a
+                        // scene change (window focus switch, app launch, etc.).
+                        // Signal the IDR controller so it can track IDR budget.
+                        let idr_event = prism_display::window_event::WindowEvent::ForegroundChanged {
+                            hwnd: 0xFFFF_DEAD, // synthetic hwnd — distinct from any real window
+                        };
+                        if idr_controller.process_event(&idr_event) {
+                            tracing::debug!(
+                                idrs_triggered = idr_controller.idrs_triggered(),
+                                "scene change detected (idle→active), speculative IDR signalled"
+                            );
+                        }
                     }
                     consecutive_empty = 0;
                     current_interval = min_interval;
