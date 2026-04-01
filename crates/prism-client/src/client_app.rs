@@ -193,6 +193,7 @@ impl ClientApp {
         //   [4 bytes: h264_len  u32 LE]
         //   [h264_len bytes: H.264 NAL bitstream]
         let conn_recv = connection.clone();
+        let conn_idr = connection.clone();
         tokio::spawn(async move {
             let mut decoder = match Decoder::new() {
                 Ok(d) => d,
@@ -201,6 +202,11 @@ impl ClientApp {
                     return;
                 }
             };
+
+            // IDR request support: detect frame gaps and ask server for a keyframe.
+            let mut gap_detector = prism_display::protocol::FrameGapDetector::with_cooldown(
+                std::time::Duration::from_secs(2),
+            );
 
             let mut frames_received: u64 = 0;
             let mut last_log = Instant::now();
@@ -264,6 +270,25 @@ impl ClientApp {
                 if let Err(e) = recv.read_exact(&mut h264_data).await {
                     tracing::error!(error = %e, "h264 read error");
                     break;
+                }
+
+                // Frame gap detection: if a gap is detected, send IDR_REQUEST.
+                gap_detector.receive_seq(seq);
+                if gap_detector.should_request_idr() {
+                    tracing::warn!(seq, "frame gap detected — sending IDR_REQUEST");
+                    // Build a 16-byte IDR_REQUEST datagram using the PRISM wire format.
+                    // ver_chan packs version (0) into top 4 bits and CHANNEL_DISPLAY into low 12.
+                    use prism_display::protocol::MSG_IDR_REQUEST;
+                    use prism_protocol::channel::CHANNEL_DISPLAY;
+                    let ver_chan: u16 = (0u16 << 12) | CHANNEL_DISPLAY;
+                    let mut idr_bytes = [0u8; 16];
+                    idr_bytes[0..2].copy_from_slice(&ver_chan.to_le_bytes());
+                    idr_bytes[2] = MSG_IDR_REQUEST;
+                    // flags, sequence, timestamp_us, payload_length all zero
+                    let idr_dgram = bytes::Bytes::copy_from_slice(&idr_bytes);
+                    if conn_idr.send_datagram(idr_dgram).is_err() {
+                        tracing::debug!("IDR_REQUEST send failed (connection closing?)");
+                    }
                 }
 
                 let yuv_frame = match decoder.decode(&h264_data) {
