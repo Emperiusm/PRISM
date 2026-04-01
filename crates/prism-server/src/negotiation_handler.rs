@@ -8,6 +8,12 @@
 // Protocol:
 //   Client → Server: [4B LE len][JSON ClientCapabilities]
 //   Server → Client: [4B LE len][JSON NegotiationResult]
+//
+// Stream identification (for parallel stream acceptance):
+//   Capability negotiation streams begin with a 4-byte LE length prefix followed
+//   immediately by the JSON '{' character (0x7B) at byte index 4.
+//   Noise IK handshake streams begin with raw cryptographic bytes; byte 4 will
+//   almost certainly not be 0x7B.
 
 use prism_protocol::channel::{CHANNEL_CONTROL, CHANNEL_DISPLAY, CHANNEL_INPUT};
 use prism_session::{
@@ -18,6 +24,100 @@ use std::collections::HashMap;
 
 /// Maximum number of bytes accepted for the client capabilities payload.
 const MAX_CAPS_LEN: usize = 64 * 1024;
+
+// ── Stream identification ─────────────────────────────────────────────────────
+
+/// Identifies the type of an incoming bi-directional stream by peeking at
+/// its initial bytes.
+///
+/// Capability negotiation starts with a 4-byte LE length prefix followed by
+/// `{` (the first character of a JSON object).  Noise handshake streams start
+/// with raw cryptographic bytes where byte 4 is statistically never `{`.
+#[derive(Debug, PartialEq)]
+pub enum StreamType {
+    CapabilityNegotiation,
+    NoiseHandshake,
+    Unknown,
+}
+
+/// Peek at the first 5 bytes of a stream to determine its type.
+///
+/// Returns the identified [`StreamType`] and the peeked bytes, which **must**
+/// be prepended to all subsequent reads from `recv` because they have already
+/// been consumed from the transport.
+pub async fn identify_stream(
+    recv: &mut quinn::RecvStream,
+) -> Result<(StreamType, Vec<u8>), Box<dyn std::error::Error + Send + Sync>> {
+    let mut peek = vec![0u8; 5];
+    let mut total = 0;
+
+    // Read until we have 5 bytes or the stream closes.
+    while total < 5 {
+        match recv.read(&mut peek[total..]).await? {
+            Some(n) => total += n,
+            None => {
+                // Stream closed before 5 bytes arrived.
+                return Ok((StreamType::Unknown, peek[..total].to_vec()));
+            }
+        }
+    }
+
+    // Byte 4 (0-indexed) is `{` → JSON capability message.
+    let stream_type = if peek[4] == b'{' {
+        StreamType::CapabilityNegotiation
+    } else {
+        StreamType::NoiseHandshake
+    };
+
+    Ok((stream_type, peek))
+}
+
+// ── Negotiation with pre-read prefix ─────────────────────────────────────────
+
+/// Negotiate capabilities on a stream where the first 5 bytes have already been
+/// read (by [`identify_stream`]).
+///
+/// `prefix` must be exactly the 5 bytes returned by `identify_stream`:
+/// bytes 0–3 are the LE u32 length prefix and byte 4 is the first character of
+/// the JSON body.
+pub async fn negotiate_on_stream_with_prefix(
+    send: &mut quinn::SendStream,
+    recv: &mut quinn::RecvStream,
+    negotiator: &CapabilityNegotiator,
+    prefix: Vec<u8>,
+) -> Result<NegotiationResult, Box<dyn std::error::Error + Send + Sync>> {
+    // Reconstruct the full JSON length from the first 4 bytes.
+    let len = u32::from_le_bytes([prefix[0], prefix[1], prefix[2], prefix[3]]) as usize;
+
+    if len > MAX_CAPS_LEN {
+        return Err(format!("capabilities payload too large: {len} bytes").into());
+    }
+
+    // We already hold prefix[4..] (1 byte of JSON body); read the rest.
+    let already_read = prefix.len() - 4; // number of JSON bytes in prefix
+    let remaining = len.saturating_sub(already_read);
+
+    let mut buf = Vec::with_capacity(len);
+    buf.extend_from_slice(&prefix[4..]);
+
+    if remaining > 0 {
+        let mut rest = vec![0u8; remaining];
+        recv.read_exact(&mut rest).await?;
+        buf.extend_from_slice(&rest);
+    }
+
+    let client_caps: ClientCapabilities = serde_json::from_slice(&buf)?;
+    let result = negotiator.negotiate(&client_caps);
+
+    // Serialise and send the result.
+    let response = serde_json::to_vec(&result)?;
+    send.write_all(&(response.len() as u32).to_le_bytes())
+        .await?;
+    send.write_all(&response).await?;
+    let _ = send.finish();
+
+    Ok(result)
+}
 
 /// Read client capabilities (length-prefixed JSON) from `recv`, negotiate with
 /// `negotiator`, and write the `NegotiationResult` (length-prefixed JSON) to
@@ -102,6 +202,50 @@ mod tests {
     use super::*;
     use prism_protocol::channel::CHANNEL_CLIPBOARD;
     use prism_session::{ClientCapabilities, ClientChannelCap, ClientPerformance};
+
+    // ── Stream identification tests ───────────────────────────────────────────
+
+    #[test]
+    fn identify_capability_message() {
+        // A capability negotiation message: 4-byte LE length prefix + JSON body.
+        let json = b"{\"channels\":[]}";
+        let len = (json.len() as u32).to_le_bytes();
+        let mut data = Vec::new();
+        data.extend_from_slice(&len);
+        data.extend_from_slice(json);
+
+        // Byte 4 must be '{' so the server recognises it as capability negotiation.
+        assert_eq!(data[4], b'{');
+    }
+
+    #[test]
+    fn identify_noise_message() {
+        // Noise IK initiator message: 32 bytes ephemeral key + encrypted payload.
+        // Random-looking bytes; byte 4 must not be '{'.
+        let noise_msg = vec![0xAAu8; 64];
+        assert_ne!(noise_msg[4], b'{');
+    }
+
+    #[test]
+    fn stream_type_from_bytes() {
+        // Capability: length prefix + '{' at byte 4.
+        let cap_bytes = vec![10u8, 0, 0, 0, b'{'];
+        let stream_type = if cap_bytes[4] == b'{' {
+            StreamType::CapabilityNegotiation
+        } else {
+            StreamType::NoiseHandshake
+        };
+        assert_eq!(stream_type, StreamType::CapabilityNegotiation);
+
+        // Noise: random bytes where byte 4 is not '{'.
+        let noise_bytes = vec![0xDEu8, 0xAD, 0xBE, 0xEF, 0x42];
+        let stream_type = if noise_bytes[4] == b'{' {
+            StreamType::CapabilityNegotiation
+        } else {
+            StreamType::NoiseHandshake
+        };
+        assert_eq!(stream_type, StreamType::NoiseHandshake);
+    }
 
     fn negotiator() -> CapabilityNegotiator {
         build_server_negotiator()
