@@ -69,8 +69,16 @@ impl ChannelHandler for ControlChannelHandler {
             HEARTBEAT => {
                 self.stats.heartbeats_received.fetch_add(1, Ordering::Relaxed);
             }
-            PROBE_REQUEST | PROBE_RESPONSE => {
+            PROBE_REQUEST => {
                 self.stats.probes_received.fetch_add(1, Ordering::Relaxed);
+                // Echo handled on the client side: client receives PROBE_REQUEST
+                // and is expected to reply with PROBE_RESPONSE.  The server
+                // simply counts inbound probe requests here; full echo logic
+                // requires a client-side ControlChannelHandler (not yet wired).
+            }
+            PROBE_RESPONSE => {
+                self.stats.probes_received.fetch_add(1, Ordering::Relaxed);
+                tracing::trace!("probe response received — RTT measurement pending");
             }
             _ => {
                 self.stats.unknown_messages.fetch_add(1, Ordering::Relaxed);
