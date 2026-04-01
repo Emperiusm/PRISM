@@ -36,6 +36,7 @@ pub struct ServerApp {
     tracker: Arc<prism_session::ChannelBandwidthTracker>,
     server_identity: Arc<prism_security::identity::LocalIdentity>,
     audit_log: Arc<AuditLog>,
+    bound_addr_tx: Option<tokio::sync::oneshot::Sender<std::net::SocketAddr>>,
 }
 
 impl ServerApp {
@@ -138,6 +139,7 @@ impl ServerApp {
             tracker,
             server_identity,
             audit_log,
+            bound_addr_tx: None,
         })
     }
 
@@ -155,6 +157,14 @@ impl ServerApp {
         self.cert.cert_der.clone()
     }
 
+    /// Register a oneshot sender that will be notified with the real bound
+    /// `SocketAddr` once the QUIC endpoint is successfully bound.
+    ///
+    /// Useful when binding to port 0 in tests.
+    pub fn set_bound_addr_notify(&mut self, tx: tokio::sync::oneshot::Sender<std::net::SocketAddr>) {
+        self.bound_addr_tx = Some(tx);
+    }
+
     /// Bind the QUIC endpoint and enter the main accept loop.
     ///
     /// Spawns the activity processor, frame sender, and heartbeat timeout tasks
@@ -164,6 +174,9 @@ impl ServerApp {
         let cert = self.cert.clone();
         let acceptor = ConnectionAcceptor::bind(self.config.listen_addr(), cert)?;
         tracing::info!(addr = %acceptor.local_addr(), "QUIC endpoint bound");
+        if let Some(tx) = self.bound_addr_tx.take() {
+            let _ = tx.send(acceptor.local_addr());
+        }
         tracing::info!("waiting for connections…");
 
         // ── Throughput endpoint (Cubic, AF11, large windows) ─────────────────
