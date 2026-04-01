@@ -23,6 +23,7 @@ pub mod clipboard_stream;
 pub mod negotiation_handler;
 pub mod cursor_sender;
 pub mod arbiter_task;
+pub mod overlay_sender;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -91,3 +92,6 @@ pub use cursor_sender::{CursorSender, deserialize_cursor_shape, serialize_cursor
 
 // arbiter_task
 pub use arbiter_task::{display_allocation_bps, update_arbiter_from_tracker};
+
+// overlay_sender
+pub use overlay_sender::{build_overlay_datagram, build_overlay_packet};
