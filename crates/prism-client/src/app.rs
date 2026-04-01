@@ -14,6 +14,7 @@ use crate::config::servers::ServerStore;
 use crate::input::InputCoalescer;
 use crate::input::double_tap::DoubleTapDetector;
 use crate::renderer::PrismRenderer;
+use crate::renderer::blur_pipeline::BlurPipeline;
 use crate::renderer::stream_texture::StreamTexture;
 use crate::renderer::ui_renderer::UiRenderer;
 use crate::session_bridge::SessionBridge;
@@ -59,6 +60,7 @@ pub struct PrismApp {
     connect_result_rx: Option<std::sync::mpsc::Receiver<ConnectTaskResult>>,
     /// Stream bind group for rendering the stream fullscreen quad.
     stream_bind_group: Option<wgpu::BindGroup>,
+    scene_target: Option<SceneTarget>,
     // Mouse position tracking
     mouse_x: f32,
     mouse_y: f32,
@@ -68,6 +70,15 @@ pub struct PrismApp {
 enum ConnectTaskResult {
     Connected { bridge: SessionBridge },
     Failed { error: String },
+}
+
+struct SceneTarget {
+    #[allow(dead_code)]
+    texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    bind_group: wgpu::BindGroup,
+    blur_pipeline: BlurPipeline,
+    blur_bind_group: wgpu::BindGroup,
 }
 
 impl PrismApp {
@@ -104,6 +115,7 @@ impl PrismApp {
             stream_texture: None,
             connect_result_rx: None,
             stream_bind_group: None,
+            scene_target: None,
             mouse_x: 0.0,
             mouse_y: 0.0,
         }
@@ -115,6 +127,74 @@ impl PrismApp {
         let mut app = self;
         event_loop.run_app(&mut app)?;
         Ok(())
+    }
+
+    fn make_sampled_bind_group(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        label: &'static str,
+        view: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some(label),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(label),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        })
+    }
+
+    fn ensure_scene_target(
+        scene_target: &mut Option<SceneTarget>,
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        width: u32,
+        height: u32,
+        format: wgpu::TextureFormat,
+    ) {
+        if scene_target.is_some() {
+            return;
+        }
+
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("scene-texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let bind_group = Self::make_sampled_bind_group(device, layout, "scene-bg", &view);
+        let blur_pipeline = BlurPipeline::new(device, width, height, format);
+        let blur_bind_group = blur_pipeline.make_input_bind_group(device, &view);
+
+        *scene_target = Some(SceneTarget {
+            texture,
+            view,
+            bind_group,
+            blur_pipeline,
+            blur_bind_group,
+        });
     }
 
     /// Initiate an async connection to the given server address on a background
@@ -495,58 +575,56 @@ impl PrismApp {
     }
 
     fn render(&mut self) {
-        // Poll for connection results before borrowing renderer
         self.poll_connection();
 
-        let renderer = match &self.renderer {
-            Some(r) => r,
-            None => return,
-        };
-
-        let output = match renderer.surface.get_current_texture() {
-            Ok(t) => t,
-            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                renderer
-                    .surface
-                    .configure(&renderer.device, &renderer.surface_config);
-                return;
-            }
-            Err(e) => {
-                tracing::error!("Surface error: {e}");
-                return;
+        let output = {
+            let renderer = match self.renderer.as_ref() {
+                Some(r) => r,
+                None => return,
+            };
+            match renderer.surface.get_current_texture() {
+                Ok(t) => t,
+                Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                    renderer
+                        .surface
+                        .configure(&renderer.device, &renderer.surface_config);
+                    return;
+                }
+                Err(e) => {
+                    tracing::error!("Surface error: {e}");
+                    return;
+                }
             }
         };
 
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = renderer
+        let mut encoder = self
+            .renderer
+            .as_ref()
+            .expect("renderer exists")
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Frame Encoder"),
             });
 
-        // Clear to the dark slate background
         {
-            let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Clear Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: theme::BACKDROP[0],
-                            g: theme::BACKDROP[1],
-                            b: theme::BACKDROP[2],
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                ..Default::default()
-            });
+            let renderer = self.renderer.as_ref().expect("renderer exists");
+            Self::ensure_scene_target(
+                &mut self.scene_target,
+                &renderer.device,
+                &renderer.stream_bind_group_layout,
+                renderer.width(),
+                renderer.height(),
+                renderer.surface_format(),
+            );
         }
+
+        let scene = match self.scene_target.as_ref() {
+            Some(scene) => scene,
+            None => return,
+        };
 
         // ── Stream rendering (Stream and Overlay states) ─────────────────
         if self.ui_state.shows_stream() {
@@ -564,58 +642,58 @@ impl PrismApp {
                 };
 
                 if needs_recreate {
-                    let st = StreamTexture::new(
+                    let renderer = self.renderer.as_ref().expect("renderer exists");
+                    let st =
+                        StreamTexture::new(&renderer.device, frame.width as u32, frame.height as u32);
+                    let bind_group = Self::make_sampled_bind_group(
                         &renderer.device,
-                        frame.width as u32,
-                        frame.height as u32,
+                        &renderer.stream_bind_group_layout,
+                        "stream-bg",
+                        st.output_view(),
                     );
-                    // Create bind group for the stream pipeline
-                    let sampler = renderer.device.create_sampler(&wgpu::SamplerDescriptor {
-                        label: Some("stream-sampler"),
-                        mag_filter: wgpu::FilterMode::Linear,
-                        min_filter: wgpu::FilterMode::Linear,
-                        ..Default::default()
-                    });
-                    let bind_group =
-                        renderer
-                            .device
-                            .create_bind_group(&wgpu::BindGroupDescriptor {
-                                label: Some("stream-bg"),
-                                layout: &renderer.stream_bind_group_layout,
-                                entries: &[
-                                    wgpu::BindGroupEntry {
-                                        binding: 0,
-                                        resource: wgpu::BindingResource::TextureView(
-                                            st.output_view(),
-                                        ),
-                                    },
-                                    wgpu::BindGroupEntry {
-                                        binding: 1,
-                                        resource: wgpu::BindingResource::Sampler(&sampler),
-                                    },
-                                ],
-                            });
                     self.stream_bind_group = Some(bind_group);
                     self.stream_texture = Some(st);
                 }
 
-                // Upload YUV planes
                 if let Some(st) = &mut self.stream_texture {
+                    let renderer = self.renderer.as_ref().expect("renderer exists");
                     st.upload_yuv(&renderer.queue, &frame.y_data, &frame.u_data, &frame.v_data);
                 }
             }
 
-            // Run YUV -> RGB compute conversion
             if let Some(st) = &mut self.stream_texture {
                 st.convert(&mut encoder);
             }
+        }
 
-            // Render the stream quad
+        {
+            let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scene Clear Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &scene.view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: theme::BACKDROP[0],
+                            g: theme::BACKDROP[1],
+                            b: theme::BACKDROP[2],
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                ..Default::default()
+            });
+        }
+
+        if self.ui_state.shows_stream() {
             if let Some(bg) = &self.stream_bind_group {
+                let renderer = self.renderer.as_ref().expect("renderer exists");
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Stream Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
+                        view: &scene.view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Load,
@@ -628,12 +706,43 @@ impl PrismApp {
                 pass.set_pipeline(&renderer.stream_pipeline);
                 pass.set_bind_group(0, &renderer.screen_bind_group, &[]);
                 pass.set_bind_group(1, bg, &[]);
-                pass.draw(0..3, 0..1); // fullscreen triangle
+                pass.draw(0..3, 0..1);
             }
+        }
+
+        scene
+            .blur_pipeline
+            .run(&mut encoder, &scene.blur_bind_group);
+
+        {
+            let renderer = self.renderer.as_ref().expect("renderer exists");
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scene Composite Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: theme::BACKDROP[0],
+                            g: theme::BACKDROP[1],
+                            b: theme::BACKDROP[2],
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                ..Default::default()
+            });
+            pass.set_pipeline(&renderer.stream_pipeline);
+            pass.set_bind_group(0, &renderer.screen_bind_group, &[]);
+            pass.set_bind_group(1, &scene.bind_group, &[]);
+            pass.draw(0..3, 0..1);
         }
 
         // ── Overlay rendering ────────────────────────────────────────────
         if self.ui_state.shows_overlay() {
+            let renderer = self.renderer.as_ref().expect("renderer exists");
             let screen_w = renderer.width() as f32;
 
             // Update stats from bridge
@@ -687,6 +796,7 @@ impl PrismApp {
                     &renderer.queue,
                     &mut encoder,
                     &view,
+                    scene.blur_pipeline.output_view(),
                     renderer.width(),
                     renderer.height(),
                     &self.paint_ctx,
@@ -696,6 +806,7 @@ impl PrismApp {
 
         // ── Launcher UI ──────────────────────────────────────────────────
         if self.ui_state.shows_launcher() {
+            let renderer = self.renderer.as_ref().expect("renderer exists");
             let screen_w = renderer.width() as f32;
             let screen_h = renderer.height() as f32;
 
@@ -780,6 +891,7 @@ impl PrismApp {
                     &renderer.queue,
                     &mut encoder,
                     &view,
+                    scene.blur_pipeline.output_view(),
                     renderer.width(),
                     renderer.height(),
                     &self.paint_ctx,
@@ -787,7 +899,11 @@ impl PrismApp {
             }
         }
 
-        renderer.queue.submit(std::iter::once(encoder.finish()));
+        self.renderer
+            .as_ref()
+            .expect("renderer exists")
+            .queue
+            .submit(std::iter::once(encoder.finish()));
         output.present();
     }
 }
@@ -863,6 +979,7 @@ impl ApplicationHandler for PrismApp {
             WindowEvent::Resized(size) => {
                 if let Some(renderer) = &mut self.renderer {
                     renderer.resize(size.width, size.height);
+                    self.scene_target = None;
                 }
             }
             WindowEvent::RedrawRequested => {
