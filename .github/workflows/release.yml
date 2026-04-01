@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release
+
+      - name: Build release binaries
+        run: cargo build --release -p prism-server -p prism-client
+
+      - name: Prepare artifacts
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $dir = "prism-$version-windows-x64"
+          New-Item -ItemType Directory -Path $dir
+          Copy-Item target/release/prism-server.exe $dir/
+          Copy-Item target/release/prism-client.exe $dir/
+          Copy-Item README.md $dir/
+          Copy-Item LICENSE $dir/
+          Compress-Archive -Path $dir/* -DestinationPath "$dir.zip"
+          echo "ARTIFACT=$dir.zip" >> $env:GITHUB_ENV
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Generate changelog
+        id: changelog
+        shell: pwsh
+        run: |
+          # Get commits since last tag
+          $prevTag = git describe --tags --abbrev=0 HEAD^ 2>$null
+          if ($prevTag) {
+            $log = git log --pretty=format:"- %s" "$prevTag..HEAD" -- ':!.github'
+          } else {
+            $log = git log --pretty=format:"- %s" -20
+          }
+          $body = @"
+          ## What's Changed
+
+          $($log -join "`n")
+
+          ## Downloads
+
+          | File | Description |
+          |------|-------------|
+          | ``prism-${{ github.ref_name }}-windows-x64.zip`` | Server + Client binaries (Windows x64) |
+
+          ### Quick Start
+
+          ```bash
+          # Extract and run
+          prism-server.exe --dda          # Start server (real desktop capture)
+          prism-client.exe                # Open launcher
+          prism-client.exe 192.168.1.100:7000  # Direct connect
+          ```
+          "@
+          # Write to file to avoid escaping issues
+          $body | Out-File -FilePath changelog.md -Encoding utf8
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: changelog.md
+          files: ${{ env.ARTIFACT }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
