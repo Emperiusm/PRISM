@@ -3,6 +3,7 @@
 // Licensed under the GNU Affero General Public License v3.0.
 // Commercial licensing available — see LICENSE-COMMERCIAL.md.
 
+pub mod session_bridge;
 pub mod audio_player;
 pub mod client_app;
 pub mod connector;
