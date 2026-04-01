@@ -367,6 +367,56 @@ fn clipboard_sync_state_dedup_and_echo() {
     assert!(state.should_send_text("new text"));
 }
 
+/// Verify that `ServerConfig` correctly parses a TOML string and that the
+/// accessor methods return the deserialized values — confirming the TOML
+/// wiring introduced in Task 4 integrates with the rest of the server.
+#[test]
+fn server_config_toml_wiring() {
+    use prism_server::ServerConfig;
+
+    let toml_str = r#"
+        listen_addr_str = "127.0.0.1:5555"
+        max_clients = 2
+        heartbeat_suspend_secs = 15
+        heartbeat_tombstone_secs = 90
+    "#;
+
+    let config: ServerConfig = toml::from_str(toml_str).unwrap();
+
+    // Address parsing via accessor method.
+    assert_eq!(config.listen_addr().port(), 5555);
+    assert_eq!(config.listen_addr().ip().to_string(), "127.0.0.1");
+
+    // Scalar fields.
+    assert_eq!(config.max_clients, 2);
+
+    // Duration accessors derived from u64-seconds fields.
+    assert_eq!(config.heartbeat_suspend(), std::time::Duration::from_secs(15));
+    assert_eq!(config.heartbeat_tombstone(), std::time::Duration::from_secs(90));
+
+    // Fields not set in the TOML should use serde defaults.
+    assert_eq!(config.throughput_addr().port(), 7001);
+    assert_eq!(config.tombstone_max_age(), std::time::Duration::from_secs(300));
+    assert_eq!(config.total_bandwidth_bps, 100_000_000);
+    assert_eq!(config.display_name, "PRISM Server");
+}
+
+/// Verify `load_or_default` silently returns defaults when the config file
+/// does not exist — confirming the fallback path in `ServerApp::new`.
+#[test]
+fn server_config_load_or_default_missing_file() {
+    use prism_server::ServerConfig;
+
+    // A path that will never exist on any CI machine.
+    let path = std::path::Path::new("/nonexistent/path/prism-server.toml");
+    let config = ServerConfig::load_or_default(path);
+
+    // All fields must reflect Default values.
+    assert_eq!(config.listen_addr().port(), 7000);
+    assert_eq!(config.max_clients, 4);
+    assert_eq!(config.heartbeat_suspend(), std::time::Duration::from_secs(10));
+}
+
 /// Unit-level smoke test: `build_display_datagram` produces a buffer whose
 /// decoded header has the correct channel, sequence, and message type.
 #[tokio::test]
