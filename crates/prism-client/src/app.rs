@@ -25,11 +25,11 @@ use crate::ui::overlay::display_panel::DisplayPanel;
 use crate::ui::overlay::perf_panel::PerfPanel;
 use crate::ui::overlay::quality_panel::QualityPanel;
 use crate::ui::overlay::stats_bar::StatsBar;
-use crate::ui::{UiState, theme};
 use crate::ui::widgets::{
     EventResponse, MouseButton as UiMouseButton, PaintContext, Rect, TextRun, UiAction, UiEvent,
     Widget,
 };
+use crate::ui::{UiState, theme};
 
 /// Top-level PRISM application — owns the winit window, wgpu renderer, and UI state.
 #[allow(dead_code)]
@@ -643,8 +643,11 @@ impl PrismApp {
 
                 if needs_recreate {
                     let renderer = self.renderer.as_ref().expect("renderer exists");
-                    let st =
-                        StreamTexture::new(&renderer.device, frame.width as u32, frame.height as u32);
+                    let st = StreamTexture::new(
+                        &renderer.device,
+                        frame.width as u32,
+                        frame.height as u32,
+                    );
                     let bind_group = Self::make_sampled_bind_group(
                         &renderer.device,
                         &renderer.stream_bind_group_layout,
@@ -687,27 +690,27 @@ impl PrismApp {
             });
         }
 
-        if self.ui_state.shows_stream() {
-            if let Some(bg) = &self.stream_bind_group {
-                let renderer = self.renderer.as_ref().expect("renderer exists");
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Stream Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &scene.view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    ..Default::default()
-                });
-                pass.set_pipeline(&renderer.stream_pipeline);
-                pass.set_bind_group(0, &renderer.screen_bind_group, &[]);
-                pass.set_bind_group(1, bg, &[]);
-                pass.draw(0..3, 0..1);
-            }
+        if self.ui_state.shows_stream()
+            && let Some(bg) = &self.stream_bind_group
+        {
+            let renderer = self.renderer.as_ref().expect("renderer exists");
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Stream Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &scene.view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                ..Default::default()
+            });
+            pass.set_pipeline(&renderer.stream_pipeline);
+            pass.set_bind_group(0, &renderer.screen_bind_group, &[]);
+            pass.set_bind_group(1, bg, &[]);
+            pass.draw(0..3, 0..1);
         }
 
         scene

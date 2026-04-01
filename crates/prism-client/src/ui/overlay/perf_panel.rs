@@ -5,9 +5,7 @@ use super::stats_bar::SessionStats;
 use crate::ui::theme;
 use crate::ui::widgets::label::Label;
 use crate::ui::widgets::sparkline::Sparkline;
-use crate::ui::widgets::{
-    EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
-};
+use crate::ui::widgets::{EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
 
 // ---------------------------------------------------------------------------
 // Panel

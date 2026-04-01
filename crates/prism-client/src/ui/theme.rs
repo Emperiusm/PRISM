@@ -23,7 +23,12 @@ pub const CARD_RADIUS: f32 = 20.0;
 pub const CONTROL_RADIUS: f32 = 14.0;
 pub const CHIP_RADIUS: f32 = 12.0;
 
-pub fn glass_quad(rect: Rect, tint: [f32; 4], border_color: [f32; 4], corner_radius: f32) -> GlassQuad {
+pub fn glass_quad(
+    rect: Rect,
+    tint: [f32; 4],
+    border_color: [f32; 4],
+    corner_radius: f32,
+) -> GlassQuad {
     GlassQuad {
         rect,
         blur_rect: rect,
