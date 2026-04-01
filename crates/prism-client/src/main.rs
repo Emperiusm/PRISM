@@ -31,6 +31,17 @@ EXAMPLES:
 ";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Custom panic hook: print the error and wait for Enter so the user can read it
+    // when launching from Explorer (double-click) where the terminal auto-closes.
+    std::panic::set_hook(Box::new(|info| {
+        eprintln!("\n========================================");
+        eprintln!("PRISM Client crashed!");
+        eprintln!("========================================\n");
+        eprintln!("{info}\n");
+        eprintln!("Press Enter to exit...");
+        let _ = std::io::Read::read(&mut std::io::stdin(), &mut [0u8]);
+    }));
+
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     // ── Immediate exit flags ─────────────────────────────────────────────
@@ -67,5 +78,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let app = prism_client::app::PrismApp::new(config);
-    app.run()
+    if let Err(e) = app.run() {
+        eprintln!("\n========================================");
+        eprintln!("PRISM Client error: {e}");
+        eprintln!("========================================\n");
+        eprintln!("Press Enter to exit...");
+        let _ = std::io::Read::read(&mut std::io::stdin(), &mut [0u8]);
+        return Err(e);
+    }
+    Ok(())
 }
