@@ -153,20 +153,24 @@ impl PrismRenderer {
         // ── Stream render pipeline ─────────────────────────────────────────────
         // Vertex shader: fullscreen triangle (no vertex buffer required).
         // Fragment shader: passthrough texture sample from stream_tex.
-        let stream_vs_src = r#"
+        // Single WGSL module with both vertex and fragment entry points.
+        // FragIn is defined once and shared by both stages.
+        let stream_shader_src = r#"
 struct ScreenUniforms { screen_size: vec2<f32> }
 @group(0) @binding(0) var<uniform> screen: ScreenUniforms;
 
+@group(1) @binding(0) var stream_tex:     texture_2d<f32>;
+@group(1) @binding(1) var stream_sampler: sampler;
+
 struct FragIn {
-    @builtin(position)            clip_pos:    vec4<f32>,
-    @location(0)                  uv:          vec2<f32>,
-    @location(1)                  screen_pos:  vec2<f32>,
+    @builtin(position)              clip_pos:    vec4<f32>,
+    @location(0)                    uv:          vec2<f32>,
+    @location(1)                    screen_pos:  vec2<f32>,
     @location(2) @interpolate(flat) instance_id: u32,
 }
 
 @vertex
 fn vs_main(@builtin(vertex_index) vid: u32) -> FragIn {
-    // Fullscreen triangle covering the entire viewport.
     let uv = vec2<f32>(
         f32((vid << 1u) & 2u),
         f32( vid        & 2u),
@@ -179,27 +183,12 @@ fn vs_main(@builtin(vertex_index) vid: u32) -> FragIn {
     out.instance_id = 0u;
     return out;
 }
-"#;
-
-        let stream_fs_src = r#"
-@group(1) @binding(0) var stream_tex:     texture_2d<f32>;
-@group(1) @binding(1) var stream_sampler: sampler;
-
-struct FragIn {
-    @builtin(position)              clip_pos:    vec4<f32>,
-    @location(0)                    uv:          vec2<f32>,
-    @location(1)                    screen_pos:  vec2<f32>,
-    @location(2) @interpolate(flat) instance_id: u32,
-}
 
 @fragment
 fn fs_stream(in: FragIn) -> @location(0) vec4<f32> {
     return textureSample(stream_tex, stream_sampler, in.uv);
 }
 "#;
-
-        // Combine into a single WGSL module so wgpu sees both entry points.
-        let stream_shader_src = format!("{}\n{}", stream_vs_src, stream_fs_src);
 
         let stream_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("stream-shader"),
