@@ -22,6 +22,7 @@ use crate::{
 pub struct ServerApp {
     use_dda: bool,
     noise_mode: bool,
+    monitor_index: u32,
     config: ServerConfig,
     session_manager: Arc<Mutex<SessionManager>>,
     conn_store: Arc<ClientConnectionStore>,
@@ -36,7 +37,9 @@ impl ServerApp {
     ///
     /// Generates a Noise IK identity, creates TLS cert, sets up session
     /// management, channel dispatch, and the connection store.
-    pub fn new(use_dda: bool, noise_mode: bool) -> Result<Self, Box<dyn std::error::Error>> {
+    ///
+    /// `monitor_index` selects which display output to capture (0 = primary).
+    pub fn new(use_dda: bool, noise_mode: bool, monitor_index: u32) -> Result<Self, Box<dyn std::error::Error>> {
         tracing::info!("=== PRISM Server v0.1.0 ===");
 
         // Generate Noise IK server identity (always, so the key is ready if needed).
@@ -64,21 +67,30 @@ impl ServerApp {
         // Audit log — ring buffer, capped at 4096 entries.
         let audit_log = Arc::new(AuditLog::new(4096));
 
+        // Log the selected monitor index. The frame sender task will use this
+        // when initialising DDA capture.
+        tracing::info!(monitor_index, "monitor selection: output index");
+
         // Capture backend selection — informational only here; the frame sender
         // task decides at runtime which backend to actually use.
         #[cfg(windows)]
         if use_dda {
             use crate::dda_capture::dda_capture::DdaDesktopCapture;
-            match DdaDesktopCapture::new() {
+            match DdaDesktopCapture::new_with_output(monitor_index) {
                 Ok(cap) => {
                     tracing::info!(
                         width = cap.width(),
                         height = cap.height(),
+                        monitor_index,
                         "capture: DDA desktop"
                     );
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "DDA capture init failed — falling back to TestPattern");
+                    tracing::warn!(
+                        error = %e,
+                        monitor_index,
+                        "DDA capture init failed — falling back to TestPattern"
+                    );
                 }
             }
         }
@@ -110,6 +122,7 @@ impl ServerApp {
         Ok(Self {
             use_dda,
             noise_mode,
+            monitor_index,
             config,
             session_manager,
             conn_store,
@@ -161,6 +174,7 @@ impl ServerApp {
         let conn_store_send = self.conn_store.clone();
         let tracker_send = self.tracker.clone();
         let use_dda = self.use_dda;
+        let monitor_index = self.monitor_index;
         tokio::spawn(async move {
             // Per-client persistent send streams, keyed by client UUID.
             // Opening one stream per client amortises QUIC stream-setup overhead
@@ -172,10 +186,13 @@ impl ServerApp {
             #[cfg(windows)]
             let dda = if use_dda {
                 use crate::dda_capture::dda_capture::DdaDesktopCapture;
-                match DdaDesktopCapture::new() {
-                    Ok(cap) => Some(cap),
+                match DdaDesktopCapture::new_with_output(monitor_index) {
+                    Ok(cap) => {
+                        tracing::info!(monitor_index, "frame sender: DDA capture on selected output");
+                        Some(cap)
+                    }
                     Err(e) => {
-                        tracing::warn!(error = %e, "frame sender: DDA init failed — using TestPattern");
+                        tracing::warn!(error = %e, monitor_index, "frame sender: DDA init failed — using TestPattern");
                         None
                     }
                 }

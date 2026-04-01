@@ -32,8 +32,17 @@ pub mod dda_capture {
     }
 
     impl DdaDesktopCapture {
-        /// Initialise DDA capture on the primary adapter / primary output.
+        /// Initialise DDA capture on the primary adapter / primary output (output 0).
         pub fn new() -> Result<Self> {
+            Self::new_with_output(0)
+        }
+
+        /// Initialise DDA capture on the primary adapter, selecting `output_index`.
+        ///
+        /// `output_index` is the zero-based index of the DXGI output (monitor) on
+        /// adapter 0.  If the index exceeds the number of connected outputs, the
+        /// underlying `EnumOutputs` call will return an error.
+        pub fn new_with_output(output_index: u32) -> Result<Self> {
             // 1. Create DXGI factory
             let factory: IDXGIFactory1 = unsafe { CreateDXGIFactory1()? };
 
@@ -59,8 +68,8 @@ pub mod dda_capture {
             let device = device.expect("D3D11CreateDevice succeeded but returned no device");
             let context = context.expect("D3D11CreateDevice succeeded but returned no context");
 
-            // 4. Get first output and cast to IDXGIOutput1
-            let output = unsafe { adapter.EnumOutputs(0)? };
+            // 4. Get the selected output and cast to IDXGIOutput1
+            let output = unsafe { adapter.EnumOutputs(output_index)? };
             let output1: IDXGIOutput1 = output.cast()?;
 
             // 5. Get output dimensions before duplicating
