@@ -67,7 +67,10 @@ impl Slider {
 impl Widget for Slider {
     fn layout(&mut self, available: Rect) -> Size {
         self.rect = Rect::new(available.x, available.y, available.w, 32.0);
-        Size { w: available.w, h: 32.0 }
+        Size {
+            w: available.w,
+            h: 32.0,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
@@ -132,7 +135,11 @@ impl Widget for Slider {
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
         match event {
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 let track = self.track_rect();
                 // Expand track hit area by ±8px vertically
                 let expanded = Rect::new(track.x, track.y - 8.0, track.w, track.h + 16.0);
@@ -152,7 +159,10 @@ impl Widget for Slider {
                     EventResponse::Ignored
                 }
             }
-            UiEvent::MouseUp { button: MouseButton::Left, .. } => {
+            UiEvent::MouseUp {
+                button: MouseButton::Left,
+                ..
+            } => {
                 if self.dragging {
                     self.dragging = false;
                     EventResponse::Consumed
@@ -206,10 +216,18 @@ mod tests {
         // Drag to x=200 (right edge) → should be 100
         let resp2 = s.handle_event(&UiEvent::MouseMove { x: 200.0, y: 24.0 });
         assert!(matches!(resp2, EventResponse::Consumed));
-        assert!((s.value() - 100.0).abs() < 0.01, "expected 100, got {}", s.value());
+        assert!(
+            (s.value() - 100.0).abs() < 0.01,
+            "expected 100, got {}",
+            s.value()
+        );
 
         // MouseUp stops dragging
-        let resp3 = s.handle_event(&UiEvent::MouseUp { x: 200.0, y: 24.0, button: MouseButton::Left });
+        let resp3 = s.handle_event(&UiEvent::MouseUp {
+            x: 200.0,
+            y: 24.0,
+            button: MouseButton::Left,
+        });
         assert!(matches!(resp3, EventResponse::Consumed));
     }
 }

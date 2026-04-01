@@ -85,7 +85,11 @@ impl Widget for TextInput {
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
         match event {
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 self.focused = self.rect.contains(*x, *y);
                 if self.focused {
                     EventResponse::Consumed
@@ -95,7 +99,8 @@ impl Widget for TextInput {
             }
             UiEvent::TextInput { ch } if self.focused => {
                 // Insert char at cursor position (byte-safe for ASCII; cursor tracks chars)
-                let byte_pos = self.text
+                let byte_pos = self
+                    .text
                     .char_indices()
                     .nth(self.cursor)
                     .map(|(i, _)| i)
@@ -104,56 +109,56 @@ impl Widget for TextInput {
                 self.cursor += 1;
                 EventResponse::Consumed
             }
-            UiEvent::KeyDown { key } if self.focused => {
-                match key {
-                    KeyCode::Backspace => {
-                        if self.cursor > 0 {
-                            let byte_pos = self.text
-                                .char_indices()
-                                .nth(self.cursor - 1)
-                                .map(|(i, _)| i)
-                                .unwrap_or(0);
-                            self.text.remove(byte_pos);
-                            self.cursor -= 1;
-                        }
-                        EventResponse::Consumed
+            UiEvent::KeyDown { key } if self.focused => match key {
+                KeyCode::Backspace => {
+                    if self.cursor > 0 {
+                        let byte_pos = self
+                            .text
+                            .char_indices()
+                            .nth(self.cursor - 1)
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
+                        self.text.remove(byte_pos);
+                        self.cursor -= 1;
                     }
-                    KeyCode::Delete => {
-                        let char_count = self.text.chars().count();
-                        if self.cursor < char_count {
-                            let byte_pos = self.text
-                                .char_indices()
-                                .nth(self.cursor)
-                                .map(|(i, _)| i)
-                                .unwrap_or(self.text.len());
-                            self.text.remove(byte_pos);
-                        }
-                        EventResponse::Consumed
-                    }
-                    KeyCode::Left => {
-                        if self.cursor > 0 {
-                            self.cursor -= 1;
-                        }
-                        EventResponse::Consumed
-                    }
-                    KeyCode::Right => {
-                        let char_count = self.text.chars().count();
-                        if self.cursor < char_count {
-                            self.cursor += 1;
-                        }
-                        EventResponse::Consumed
-                    }
-                    KeyCode::Home => {
-                        self.cursor = 0;
-                        EventResponse::Consumed
-                    }
-                    KeyCode::End => {
-                        self.cursor = self.text.chars().count();
-                        EventResponse::Consumed
-                    }
-                    _ => EventResponse::Ignored,
+                    EventResponse::Consumed
                 }
-            }
+                KeyCode::Delete => {
+                    let char_count = self.text.chars().count();
+                    if self.cursor < char_count {
+                        let byte_pos = self
+                            .text
+                            .char_indices()
+                            .nth(self.cursor)
+                            .map(|(i, _)| i)
+                            .unwrap_or(self.text.len());
+                        self.text.remove(byte_pos);
+                    }
+                    EventResponse::Consumed
+                }
+                KeyCode::Left => {
+                    if self.cursor > 0 {
+                        self.cursor -= 1;
+                    }
+                    EventResponse::Consumed
+                }
+                KeyCode::Right => {
+                    let char_count = self.text.chars().count();
+                    if self.cursor < char_count {
+                        self.cursor += 1;
+                    }
+                    EventResponse::Consumed
+                }
+                KeyCode::Home => {
+                    self.cursor = 0;
+                    EventResponse::Consumed
+                }
+                KeyCode::End => {
+                    self.cursor = self.text.chars().count();
+                    EventResponse::Consumed
+                }
+                _ => EventResponse::Ignored,
+            },
             _ => EventResponse::Ignored,
         }
     }
@@ -193,7 +198,9 @@ mod tests {
         input.set_text("abc");
         input.set_focused(true);
 
-        input.handle_event(&UiEvent::KeyDown { key: KeyCode::Backspace });
+        input.handle_event(&UiEvent::KeyDown {
+            key: KeyCode::Backspace,
+        });
 
         assert_eq!(input.text(), "ab");
     }

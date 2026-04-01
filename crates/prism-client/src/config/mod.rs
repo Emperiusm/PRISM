@@ -122,10 +122,7 @@ mod tests {
     fn address_arg_is_direct_connect() {
         let cfg = ClientConfig::from_args(&args("192.168.1.100:7000")).unwrap();
         assert_eq!(cfg.launch_mode, LaunchMode::DirectConnect);
-        assert_eq!(
-            cfg.server_addr,
-            Some("192.168.1.100:7000".parse().unwrap())
-        );
+        assert_eq!(cfg.server_addr, Some("192.168.1.100:7000".parse().unwrap()));
     }
 
     #[test]

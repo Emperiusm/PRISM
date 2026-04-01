@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Performance sub-panel — FPS, latency, decode time, bandwidth sparklines.
 
+use super::stats_bar::SessionStats;
+use crate::ui::widgets::label::Label;
+use crate::ui::widgets::sparkline::Sparkline;
 use crate::ui::widgets::{
     EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
 };
-use crate::ui::widgets::label::Label;
-use crate::ui::widgets::sparkline::Sparkline;
-use super::stats_bar::SessionStats;
 
 // ---------------------------------------------------------------------------
 // Panel
@@ -46,22 +46,33 @@ impl PerfPanel {
         self.fps_label.set_text(&format!("FPS: {:.0}", stats.fps));
         self.fps_sparkline.push(stats.fps);
 
-        self.latency_label.set_text(&format!("Latency: {:.1}ms", stats.latency_ms));
+        self.latency_label
+            .set_text(&format!("Latency: {:.1}ms", stats.latency_ms));
         self.latency_sparkline.push(stats.latency_ms);
 
-        self.decode_label.set_text(&format!("Decode: {:.1}ms", stats.decode_time_ms));
+        self.decode_label
+            .set_text(&format!("Decode: {:.1}ms", stats.decode_time_ms));
 
         let mbps = stats.bandwidth_bps as f32 / 1_000_000.0;
-        self.bandwidth_label.set_text(&format!("BW: {mbps:.1} Mbps"));
+        self.bandwidth_label
+            .set_text(&format!("BW: {mbps:.1} Mbps"));
     }
 
-    pub fn show(&mut self) { self.visible = true; }
-    pub fn hide(&mut self) { self.visible = false; }
-    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn show(&mut self) {
+        self.visible = true;
+    }
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 }
 
 impl Default for PerfPanel {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Widget for PerfPanel {
@@ -78,27 +89,39 @@ impl Widget for PerfPanel {
         let inner_w = PANEL_W - pad * 2.0;
         let mut cur_y = y + 28.0; // leave room for title
 
-        self.fps_label.layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
+        self.fps_label
+            .layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
         cur_y += 16.0 + 2.0;
-        self.fps_sparkline.layout(Rect::new(x + pad, cur_y, inner_w, 24.0));
+        self.fps_sparkline
+            .layout(Rect::new(x + pad, cur_y, inner_w, 24.0));
         cur_y += 24.0 + 4.0;
 
-        self.latency_label.layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
+        self.latency_label
+            .layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
         cur_y += 16.0 + 2.0;
-        self.latency_sparkline.layout(Rect::new(x + pad, cur_y, inner_w, 24.0));
+        self.latency_sparkline
+            .layout(Rect::new(x + pad, cur_y, inner_w, 24.0));
         cur_y += 24.0 + 4.0;
 
-        self.decode_label.layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
+        self.decode_label
+            .layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
         cur_y += 16.0 + 4.0;
-        self.bandwidth_label.layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
+        self.bandwidth_label
+            .layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
         cur_y += 16.0 + 4.0;
-        self.gaps_label.layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
+        self.gaps_label
+            .layout(Rect::new(x + pad, cur_y, inner_w, 16.0));
 
-        Size { w: PANEL_W, h: PANEL_H }
+        Size {
+            w: PANEL_W,
+            h: PANEL_H,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        if !self.visible { return; }
+        if !self.visible {
+            return;
+        }
 
         // Panel background
         ctx.push_glass_quad(GlassQuad {
@@ -172,7 +195,9 @@ mod tests {
             "expected FPS label in text runs, got: {texts:?}"
         );
         assert!(
-            texts.iter().any(|t| t.contains("Latency:") && t.contains("8.3")),
+            texts
+                .iter()
+                .any(|t| t.contains("Latency:") && t.contains("8.3")),
             "expected Latency label in text runs, got: {texts:?}"
         );
     }
@@ -182,11 +207,17 @@ mod tests {
         let mut panel = PerfPanel::new();
         // Not shown — layout returns zero size
         let size = panel.layout(Rect::new(0.0, 0.0, 400.0, 400.0));
-        assert!((size.w).abs() < 0.01 && (size.h).abs() < 0.01, "hidden panel should have zero size");
+        assert!(
+            (size.w).abs() < 0.01 && (size.h).abs() < 0.01,
+            "hidden panel should have zero size"
+        );
 
         let mut ctx = PaintContext::new();
         panel.paint(&mut ctx);
-        assert!(ctx.glass_quads.is_empty(), "hidden panel should emit nothing");
+        assert!(
+            ctx.glass_quads.is_empty(),
+            "hidden panel should emit nothing"
+        );
         assert!(ctx.text_runs.is_empty(), "hidden panel should emit nothing");
     }
 }

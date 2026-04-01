@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Drop-down selection widget.
 
-use crate::renderer::animation::{Animation, EaseCurve};
 use super::{
     EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
 };
+use crate::renderer::animation::{Animation, EaseCurve};
 
 pub struct Dropdown {
     options: Vec<String>,
@@ -30,7 +30,10 @@ impl Dropdown {
     }
 
     pub fn selected_text(&self) -> &str {
-        self.options.get(self.selected).map(|s| s.as_str()).unwrap_or("")
+        self.options
+            .get(self.selected)
+            .map(|s| s.as_str())
+            .unwrap_or("")
     }
 
     pub fn set_selected(&mut self, index: usize) {
@@ -115,7 +118,11 @@ impl Widget for Dropdown {
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
         match event {
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 if self.rect.contains(*x, *y) {
                     self.open = !self.open;
                     self.open_anim.set_target(if self.open { 1.0 } else { 0.0 });
@@ -157,7 +164,10 @@ mod tests {
     use super::*;
 
     fn make_dropdown() -> Dropdown {
-        Dropdown::new(vec!["Option A".into(), "Option B".into(), "Option C".into()], 0)
+        Dropdown::new(
+            vec!["Option A".into(), "Option B".into(), "Option C".into()],
+            0,
+        )
     }
 
     fn available() -> Rect {
@@ -190,7 +200,10 @@ mod tests {
             y: 16.0,
             button: MouseButton::Left,
         });
-        assert!(!dd.is_open(), "dropdown should be closed after second click");
+        assert!(
+            !dd.is_open(),
+            "dropdown should be closed after second click"
+        );
     }
 
     #[test]

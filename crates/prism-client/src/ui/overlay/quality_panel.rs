@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Quality settings sub-panel — codec, FPS, bandwidth, lossless.
 
+use crate::ui::widgets::checkbox::Checkbox;
+use crate::ui::widgets::dropdown::Dropdown;
+use crate::ui::widgets::slider::Slider;
 use crate::ui::widgets::{
     EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
-use crate::ui::widgets::dropdown::Dropdown;
-use crate::ui::widgets::checkbox::Checkbox;
-use crate::ui::widgets::slider::Slider;
 
 // ---------------------------------------------------------------------------
 // Panel
@@ -29,18 +29,12 @@ const PANEL_H: f32 = 280.0;
 impl QualityPanel {
     pub fn new() -> Self {
         Self {
-            profile_dropdown: Dropdown::new(
-                vec!["Gaming".into(), "Coding".into()],
-                0,
-            ),
+            profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0),
             encoder_dropdown: Dropdown::new(
                 vec!["Ultra Low".into(), "Balanced".into(), "Quality".into()],
                 1,
             ),
-            fps_dropdown: Dropdown::new(
-                vec!["30".into(), "60".into(), "120".into()],
-                1,
-            ),
+            fps_dropdown: Dropdown::new(vec!["30".into(), "60".into(), "120".into()], 1),
             lossless_checkbox: Checkbox::new("Lossless text", false),
             region_checkbox: Checkbox::new("Region detection", false),
             bandwidth_slider: Slider::new("BW limit", 1.0, 100.0, 100.0)
@@ -50,9 +44,15 @@ impl QualityPanel {
         }
     }
 
-    pub fn show(&mut self) { self.visible = true; }
-    pub fn hide(&mut self) { self.visible = false; }
-    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn show(&mut self) {
+        self.visible = true;
+    }
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 
     fn layout_children(&mut self) {
         let pad = 8.0;
@@ -60,22 +60,29 @@ impl QualityPanel {
         let x = self.rect.x + pad;
         let mut cur_y = self.rect.y + 28.0;
 
-        self.profile_dropdown.layout(Rect::new(x, cur_y, inner_w, 32.0));
+        self.profile_dropdown
+            .layout(Rect::new(x, cur_y, inner_w, 32.0));
         cur_y += 36.0;
-        self.encoder_dropdown.layout(Rect::new(x, cur_y, inner_w, 32.0));
+        self.encoder_dropdown
+            .layout(Rect::new(x, cur_y, inner_w, 32.0));
         cur_y += 36.0;
         self.fps_dropdown.layout(Rect::new(x, cur_y, inner_w, 32.0));
         cur_y += 36.0;
-        self.lossless_checkbox.layout(Rect::new(x, cur_y, inner_w, 24.0));
+        self.lossless_checkbox
+            .layout(Rect::new(x, cur_y, inner_w, 24.0));
         cur_y += 28.0;
-        self.region_checkbox.layout(Rect::new(x, cur_y, inner_w, 24.0));
+        self.region_checkbox
+            .layout(Rect::new(x, cur_y, inner_w, 24.0));
         cur_y += 28.0;
-        self.bandwidth_slider.layout(Rect::new(x, cur_y, inner_w, 32.0));
+        self.bandwidth_slider
+            .layout(Rect::new(x, cur_y, inner_w, 32.0));
     }
 }
 
 impl Default for QualityPanel {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Widget for QualityPanel {
@@ -85,11 +92,16 @@ impl Widget for QualityPanel {
         }
         self.rect = Rect::new(available.x, available.y, PANEL_W, PANEL_H);
         self.layout_children();
-        Size { w: PANEL_W, h: PANEL_H }
+        Size {
+            w: PANEL_W,
+            h: PANEL_H,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        if !self.visible { return; }
+        if !self.visible {
+            return;
+        }
 
         ctx.push_glass_quad(GlassQuad {
             rect: self.rect,
@@ -130,7 +142,9 @@ impl Widget for QualityPanel {
                 region_detection: None,
             });
         }
-        if matches!(r, EventResponse::Consumed) { return r; }
+        if matches!(r, EventResponse::Consumed) {
+            return r;
+        }
 
         // Encoder dropdown (maps to preset)
         let old_enc = self.encoder_dropdown.selected_index();
@@ -144,7 +158,9 @@ impl Widget for QualityPanel {
                 region_detection: None,
             });
         }
-        if matches!(r, EventResponse::Consumed) { return r; }
+        if matches!(r, EventResponse::Consumed) {
+            return r;
+        }
 
         // FPS dropdown
         let old_fps = self.fps_dropdown.selected_index();
@@ -159,7 +175,9 @@ impl Widget for QualityPanel {
                 region_detection: None,
             });
         }
-        if matches!(r, EventResponse::Consumed) { return r; }
+        if matches!(r, EventResponse::Consumed) {
+            return r;
+        }
 
         // Lossless checkbox
         let old_lossless = self.lossless_checkbox.is_checked();
@@ -172,7 +190,9 @@ impl Widget for QualityPanel {
                 region_detection: None,
             });
         }
-        if matches!(r, EventResponse::Consumed) { return r; }
+        if matches!(r, EventResponse::Consumed) {
+            return r;
+        }
 
         // Region checkbox
         let old_region = self.region_checkbox.is_checked();
@@ -185,7 +205,9 @@ impl Widget for QualityPanel {
                 region_detection: Some(self.region_checkbox.is_checked()),
             });
         }
-        if matches!(r, EventResponse::Consumed) { return r; }
+        if matches!(r, EventResponse::Consumed) {
+            return r;
+        }
 
         // Bandwidth slider
         let old_bw = self.bandwidth_slider.value();
@@ -194,7 +216,9 @@ impl Widget for QualityPanel {
             let bps = (self.bandwidth_slider.value() * 1_000_000.0) as u64;
             return EventResponse::Action(UiAction::SetBandwidthLimit(bps));
         }
-        if matches!(r, EventResponse::Consumed) { return r; }
+        if matches!(r, EventResponse::Consumed) {
+            return r;
+        }
 
         EventResponse::Ignored
     }
@@ -226,7 +250,10 @@ mod tests {
         let mut ctx = PaintContext::new();
         panel.paint(&mut ctx);
 
-        assert!(!ctx.glass_quads.is_empty(), "expected at least one glass quad");
+        assert!(
+            !ctx.glass_quads.is_empty(),
+            "expected at least one glass quad"
+        );
         let texts: Vec<&str> = ctx.text_runs.iter().map(|t| t.text.as_str()).collect();
         assert!(
             texts.iter().any(|t| t.contains("Quality")),

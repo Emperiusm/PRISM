@@ -79,7 +79,12 @@ impl Widget for ServerCard {
         let stripe = Rect::new(r.x, r.y, 4.0, r.h);
         ctx.push_glow_rect(GlowRect {
             rect: stripe,
-            color: [self.accent_color[0], self.accent_color[1], self.accent_color[2], 0.7],
+            color: [
+                self.accent_color[0],
+                self.accent_color[1],
+                self.accent_color[2],
+                0.7,
+            ],
             spread: 0.0,
             intensity: 1.0,
         });
@@ -136,7 +141,12 @@ impl Widget for ServerCard {
             y: r.y + 110.0,
             text: self.last_profile.clone(),
             font_size: 11.0,
-            color: [self.accent_color[0], self.accent_color[1], self.accent_color[2], 0.8],
+            color: [
+                self.accent_color[0],
+                self.accent_color[1],
+                self.accent_color[2],
+                0.8,
+            ],
             monospace: false,
         });
     }
@@ -147,7 +157,8 @@ impl Widget for ServerCard {
                 let was = self.hovered;
                 self.hovered = self.rect.contains(*x, *y);
                 if self.hovered != was {
-                    self.hover_anim.set_target(if self.hovered { 1.0 } else { 0.0 });
+                    self.hover_anim
+                        .set_target(if self.hovered { 1.0 } else { 0.0 });
                 }
                 EventResponse::Ignored
             }

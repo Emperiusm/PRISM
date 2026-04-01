@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Clickable button widget with hover/press animation.
 
-use crate::renderer::animation::{Animation, EaseCurve};
 use super::{
     EventResponse, GlassQuad, GlowRect, MouseButton, PaintContext, Rect, Size, TextRun, UiAction,
     UiEvent, Widget,
 };
+use crate::renderer::animation::{Animation, EaseCurve};
 
 pub struct Button {
     label: String,
@@ -74,11 +74,16 @@ impl Widget for Button {
                 let now_hovered = self.rect.contains(*x, *y);
                 if now_hovered != self.hovered {
                     self.hovered = now_hovered;
-                    self.hover_anim.set_target(if now_hovered { 1.0 } else { 0.0 });
+                    self.hover_anim
+                        .set_target(if now_hovered { 1.0 } else { 0.0 });
                 }
                 EventResponse::Ignored
             }
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 if self.rect.contains(*x, *y) {
                     EventResponse::Action(self.action.clone())
                 } else {
@@ -133,7 +138,10 @@ mod tests {
 
         let mut ctx = PaintContext::new();
         btn.paint(&mut ctx);
-        assert!(!ctx.glow_rects.is_empty(), "expected a glow rect after hovering");
+        assert!(
+            !ctx.glow_rects.is_empty(),
+            "expected a glow rect after hovering"
+        );
     }
 
     #[test]

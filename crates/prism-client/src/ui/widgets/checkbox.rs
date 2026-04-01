@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Toggle checkbox widget.
 
-use crate::renderer::animation::{Animation, EaseCurve};
 use super::{
     EventResponse, GlassQuad, GlowRect, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent,
     Widget,
 };
+use crate::renderer::animation::{Animation, EaseCurve};
 
 pub struct Checkbox {
     label: String,
@@ -43,7 +43,10 @@ impl Checkbox {
 impl Widget for Checkbox {
     fn layout(&mut self, available: Rect) -> Size {
         self.rect = Rect::new(available.x, available.y, available.w, 24.0);
-        Size { w: available.w, h: 24.0 }
+        Size {
+            w: available.w,
+            h: 24.0,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
@@ -88,10 +91,15 @@ impl Widget for Checkbox {
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
         match event {
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 if self.rect.contains(*x, *y) {
                     self.checked = !self.checked;
-                    self.fill_anim.set_target(if self.checked { 1.0 } else { 0.0 });
+                    self.fill_anim
+                        .set_target(if self.checked { 1.0 } else { 0.0 });
                     EventResponse::Consumed
                 } else {
                     EventResponse::Ignored

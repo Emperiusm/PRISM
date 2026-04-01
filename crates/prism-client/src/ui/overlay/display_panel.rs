@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Display sub-panel — monitor selection, resolution, refresh rate.
 
-use crate::ui::widgets::{
-    EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
-};
 use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::label::Label;
 use crate::ui::widgets::monitor_map::{MonitorInfo, MonitorMap};
+use crate::ui::widgets::{
+    EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+};
 
 // ---------------------------------------------------------------------------
 // Panel
@@ -38,21 +38,28 @@ impl DisplayPanel {
 
     pub fn set_monitors(&mut self, monitors: Vec<MonitorInfo>) {
         // Update dropdown options
-        let options: Vec<String> = monitors.iter().map(|m| {
-            if m.is_primary {
-                format!("{}: Primary", m.index)
-            } else {
-                format!("{}: Monitor", m.index)
-            }
-        }).collect();
+        let options: Vec<String> = monitors
+            .iter()
+            .map(|m| {
+                if m.is_primary {
+                    format!("{}: Primary", m.index)
+                } else {
+                    format!("{}: Monitor", m.index)
+                }
+            })
+            .collect();
 
         // Preserve or reset selection
-        let selected = self.monitor_dropdown.selected_index().min(options.len().saturating_sub(1));
+        let selected = self
+            .monitor_dropdown
+            .selected_index()
+            .min(options.len().saturating_sub(1));
         self.monitor_dropdown = Dropdown::new(options, selected);
 
         // Update resolution/refresh labels from the selected monitor (if any)
         if let Some(mon) = monitors.get(selected) {
-            self.resolution_label.set_text(&format!("{}×{}", mon.width, mon.height));
+            self.resolution_label
+                .set_text(&format!("{}×{}", mon.width, mon.height));
             // Refresh not in MonitorInfo — placeholder
             self.refresh_label.set_text("Refresh: —");
         }
@@ -60,9 +67,15 @@ impl DisplayPanel {
         self.monitor_map.set_monitors(monitors);
     }
 
-    pub fn show(&mut self) { self.visible = true; }
-    pub fn hide(&mut self) { self.visible = false; }
-    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn show(&mut self) {
+        self.visible = true;
+    }
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 
     fn layout_children(&mut self) {
         let pad = 8.0;
@@ -70,18 +83,23 @@ impl DisplayPanel {
         let x = self.rect.x + pad;
         let mut cur_y = self.rect.y + 28.0;
 
-        self.monitor_dropdown.layout(Rect::new(x, cur_y, inner_w, 32.0));
+        self.monitor_dropdown
+            .layout(Rect::new(x, cur_y, inner_w, 32.0));
         cur_y += 36.0;
-        self.resolution_label.layout(Rect::new(x, cur_y, inner_w, 16.0));
+        self.resolution_label
+            .layout(Rect::new(x, cur_y, inner_w, 16.0));
         cur_y += 20.0;
-        self.refresh_label.layout(Rect::new(x, cur_y, inner_w, 16.0));
+        self.refresh_label
+            .layout(Rect::new(x, cur_y, inner_w, 16.0));
         cur_y += 20.0;
         self.monitor_map.layout(Rect::new(x, cur_y, inner_w, 80.0));
     }
 }
 
 impl Default for DisplayPanel {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Widget for DisplayPanel {
@@ -91,11 +109,16 @@ impl Widget for DisplayPanel {
         }
         self.rect = Rect::new(available.x, available.y, PANEL_W, PANEL_H);
         self.layout_children();
-        Size { w: PANEL_W, h: PANEL_H }
+        Size {
+            w: PANEL_W,
+            h: PANEL_H,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        if !self.visible { return; }
+        if !self.visible {
+            return;
+        }
 
         ctx.push_glass_quad(GlassQuad {
             rect: self.rect,
@@ -128,17 +151,21 @@ impl Widget for DisplayPanel {
         if self.monitor_map.selected() != old_map_selected {
             return EventResponse::Action(UiAction::SelectMonitor(self.monitor_map.selected()));
         }
-        if matches!(r, EventResponse::Consumed) { return r; }
+        if matches!(r, EventResponse::Consumed) {
+            return r;
+        }
 
         // Dropdown selection
         let old_dd = self.monitor_dropdown.selected_index();
         let r = self.monitor_dropdown.handle_event(event);
         if self.monitor_dropdown.selected_index() != old_dd {
-            return EventResponse::Action(
-                UiAction::SelectMonitor(self.monitor_dropdown.selected_index() as u8),
-            );
+            return EventResponse::Action(UiAction::SelectMonitor(
+                self.monitor_dropdown.selected_index() as u8,
+            ));
         }
-        if matches!(r, EventResponse::Consumed) { return r; }
+        if matches!(r, EventResponse::Consumed) {
+            return r;
+        }
 
         EventResponse::Ignored
     }
@@ -159,8 +186,22 @@ mod tests {
 
     fn two_monitors() -> Vec<MonitorInfo> {
         vec![
-            MonitorInfo { index: 0, x: 0, y: 0, width: 1920, height: 1080, is_primary: true },
-            MonitorInfo { index: 1, x: 1920, y: 0, width: 1920, height: 1080, is_primary: false },
+            MonitorInfo {
+                index: 0,
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+                is_primary: true,
+            },
+            MonitorInfo {
+                index: 1,
+                x: 1920,
+                y: 0,
+                width: 1920,
+                height: 1080,
+                is_primary: false,
+            },
         ]
     }
 

@@ -178,7 +178,9 @@ impl ServerStore {
     }
 
     pub fn add(&mut self, server: SavedServer) -> Result<(), io::Error> {
-        let entry = LogEntry::Add { server: server.clone() };
+        let entry = LogEntry::Add {
+            server: server.clone(),
+        };
         self.append_log(&entry)?;
         self.servers.push(server);
         Ok(())
@@ -187,7 +189,9 @@ impl ServerStore {
     pub fn update(&mut self, id: Uuid, f: impl FnOnce(&mut SavedServer)) -> Result<(), io::Error> {
         if let Some(server) = self.servers.iter_mut().find(|s| s.id == id) {
             f(server);
-            let entry = LogEntry::Update { server: server.clone() };
+            let entry = LogEntry::Update {
+                server: server.clone(),
+            };
             self.append_log(&entry)?;
         }
         Ok(())
@@ -203,8 +207,7 @@ impl ServerStore {
     /// Write current state to `servers.json` and truncate `servers.log`.
     pub fn compact(&mut self) -> Result<(), io::Error> {
         let snapshot_path = self.dir.join("servers.json");
-        let data = serde_json::to_vec_pretty(&self.servers)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let data = serde_json::to_vec_pretty(&self.servers).map_err(io::Error::other)?;
         fs::write(&snapshot_path, data)?;
 
         // Truncate (empty) the log
@@ -229,8 +232,7 @@ impl ServerStore {
             .create(true)
             .open(&log_path)?;
 
-        let mut line = serde_json::to_string(entry)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let mut line = serde_json::to_string(entry).map_err(io::Error::other)?;
         line.push('\n');
         file.write_all(line.as_bytes())?;
         Ok(())

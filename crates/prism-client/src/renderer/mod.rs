@@ -2,11 +2,11 @@
 //! wgpu-based renderer for PRISM client — stream texture, blur, glass panels, text.
 
 pub mod animation;
-pub mod stream_texture;
 pub mod blur_pipeline;
 pub mod glass_panel;
-pub mod text_renderer;
 pub mod shader_cache;
+pub mod stream_texture;
+pub mod text_renderer;
 
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
@@ -20,6 +20,7 @@ struct ScreenUniforms {
 }
 
 /// Core wgpu renderer — owns the GPU device, surface, and stream render pipeline.
+#[allow(dead_code)]
 pub struct PrismRenderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -264,8 +265,11 @@ fn fs_stream(in: FragIn) -> @location(0) vec4<f32> {
         let uniforms = ScreenUniforms {
             screen_size: [width as f32, height as f32],
         };
-        self.queue
-            .write_buffer(&self.screen_uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+        self.queue.write_buffer(
+            &self.screen_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&uniforms),
+        );
     }
 
     /// Current surface width in pixels.

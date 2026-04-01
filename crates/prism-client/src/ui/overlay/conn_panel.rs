@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Connection info sub-panel — server address, encryption, session duration.
 
+use crate::ui::widgets::button::Button;
+use crate::ui::widgets::label::Label;
 use crate::ui::widgets::{
     EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
     Widget,
 };
-use crate::ui::widgets::label::Label;
-use crate::ui::widgets::button::Button;
 
 // ---------------------------------------------------------------------------
 // Panel
@@ -55,13 +55,21 @@ impl ConnPanel {
         } else {
             "Encryption: None"
         });
-        self.session_label.set_text(&format!("Session: {session_duration}"));
-        self.client_id_label.set_text(&format!("Client ID: {client_id}"));
+        self.session_label
+            .set_text(&format!("Session: {session_duration}"));
+        self.client_id_label
+            .set_text(&format!("Client ID: {client_id}"));
     }
 
-    pub fn show(&mut self) { self.visible = true; }
-    pub fn hide(&mut self) { self.visible = false; }
-    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn show(&mut self) {
+        self.visible = true;
+    }
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 
     fn layout_children(&mut self) {
         let pad = 8.0;
@@ -71,20 +79,27 @@ impl ConnPanel {
 
         self.server_label.layout(Rect::new(x, cur_y, inner_w, 16.0));
         cur_y += 20.0;
-        self.address_label.layout(Rect::new(x, cur_y, inner_w, 16.0));
+        self.address_label
+            .layout(Rect::new(x, cur_y, inner_w, 16.0));
         cur_y += 20.0;
-        self.encryption_label.layout(Rect::new(x, cur_y, inner_w, 16.0));
+        self.encryption_label
+            .layout(Rect::new(x, cur_y, inner_w, 16.0));
         cur_y += 20.0;
-        self.session_label.layout(Rect::new(x, cur_y, inner_w, 16.0));
+        self.session_label
+            .layout(Rect::new(x, cur_y, inner_w, 16.0));
         cur_y += 20.0;
-        self.client_id_label.layout(Rect::new(x, cur_y, inner_w, 16.0));
+        self.client_id_label
+            .layout(Rect::new(x, cur_y, inner_w, 16.0));
         cur_y += 24.0;
-        self.disconnect_button.layout(Rect::new(x, cur_y, inner_w, 36.0));
+        self.disconnect_button
+            .layout(Rect::new(x, cur_y, inner_w, 36.0));
     }
 }
 
 impl Default for ConnPanel {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Widget for ConnPanel {
@@ -94,11 +109,16 @@ impl Widget for ConnPanel {
         }
         self.rect = Rect::new(available.x, available.y, PANEL_W, PANEL_H);
         self.layout_children();
-        Size { w: PANEL_W, h: PANEL_H }
+        Size {
+            w: PANEL_W,
+            h: PANEL_H,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        if !self.visible { return; }
+        if !self.visible {
+            return;
+        }
 
         ctx.push_glass_quad(GlassQuad {
             rect: self.rect,
@@ -135,11 +155,11 @@ impl Widget for ConnPanel {
 
         // Swallow clicks inside the panel
         match event {
-            UiEvent::MouseDown { x, y, button: MouseButton::Left }
-                if self.rect.contains(*x, *y) =>
-            {
-                EventResponse::Consumed
-            }
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } if self.rect.contains(*x, *y) => EventResponse::Consumed,
             _ => EventResponse::Ignored,
         }
     }
@@ -161,7 +181,13 @@ mod tests {
     fn conn_panel_paints() {
         let mut panel = ConnPanel::new();
         panel.show();
-        panel.update("prism.local", "192.168.1.10:7272", true, "00:05:32", "c0ffee");
+        panel.update(
+            "prism.local",
+            "192.168.1.10:7272",
+            true,
+            "00:05:32",
+            "c0ffee",
+        );
         panel.layout(Rect::new(0.0, 0.0, 400.0, 400.0));
 
         let mut ctx = PaintContext::new();

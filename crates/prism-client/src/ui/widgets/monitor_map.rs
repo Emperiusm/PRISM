@@ -48,8 +48,18 @@ impl MonitorMap {
         // Compute bounding box of all monitors
         let min_x = self.monitors.iter().map(|m| m.x).min().unwrap_or(0);
         let min_y = self.monitors.iter().map(|m| m.y).min().unwrap_or(0);
-        let max_x = self.monitors.iter().map(|m| m.x + m.width as i32).max().unwrap_or(1);
-        let max_y = self.monitors.iter().map(|m| m.y + m.height as i32).max().unwrap_or(1);
+        let max_x = self
+            .monitors
+            .iter()
+            .map(|m| m.x + m.width as i32)
+            .max()
+            .unwrap_or(1);
+        let max_y = self
+            .monitors
+            .iter()
+            .map(|m| m.y + m.height as i32)
+            .max()
+            .unwrap_or(1);
 
         let total_w = (max_x - min_x) as f32;
         let total_h = (max_y - min_y) as f32;
@@ -130,7 +140,11 @@ impl Widget for MonitorMap {
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
         match event {
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 for mon in &self.monitors {
                     if self.scaled_rect(mon).contains(*x, *y) {
                         self.selected = mon.index;
@@ -156,8 +170,22 @@ mod tests {
 
     fn two_monitors() -> Vec<MonitorInfo> {
         vec![
-            MonitorInfo { index: 0, x: 0, y: 0, width: 1920, height: 1080, is_primary: true },
-            MonitorInfo { index: 1, x: 1920, y: 0, width: 1920, height: 1080, is_primary: false },
+            MonitorInfo {
+                index: 0,
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+                is_primary: true,
+            },
+            MonitorInfo {
+                index: 1,
+                x: 1920,
+                y: 0,
+                width: 1920,
+                height: 1080,
+                is_primary: false,
+            },
         ]
     }
 
@@ -193,7 +221,15 @@ mod tests {
         let mut ctx = PaintContext::new();
         map.paint(&mut ctx);
 
-        assert_eq!(ctx.glass_quads.len(), 2, "expected 2 glass quads for 2 monitors");
-        assert_eq!(ctx.text_runs.len(), 2, "expected 2 text runs for monitor indices");
+        assert_eq!(
+            ctx.glass_quads.len(),
+            2,
+            "expected 2 glass quads for 2 monitors"
+        );
+        assert_eq!(
+            ctx.text_runs.len(),
+            2,
+            "expected 2 text runs for monitor indices"
+        );
     }
 }

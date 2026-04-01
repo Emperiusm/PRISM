@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hero quick-connect bar: address input + connect button in a glass panel.
 
+use crate::ui::widgets::button::Button;
+use crate::ui::widgets::text_input::TextInput;
 use crate::ui::widgets::{
     EventResponse, GlassQuad, KeyCode, PaintContext, Rect, Size, UiAction, UiEvent, Widget,
 };
-use crate::ui::widgets::text_input::TextInput;
-use crate::ui::widgets::button::Button;
 
 // ---------------------------------------------------------------------------
 // QuickConnect
@@ -23,7 +23,10 @@ impl QuickConnect {
             address_input: TextInput::new("Enter server address..."),
             connect_button: Button::new(
                 "Connect",
-                UiAction::Connect { address: String::new(), noise_key: None },
+                UiAction::Connect {
+                    address: String::new(),
+                    noise_key: None,
+                },
             ),
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
         }
@@ -57,7 +60,10 @@ impl Widget for QuickConnect {
             36.0,
         ));
 
-        Size { w: available.w, h: panel_h }
+        Size {
+            w: available.w,
+            h: panel_h,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
@@ -77,13 +83,16 @@ impl Widget for QuickConnect {
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
         // Enter key when input is focused and non-empty → Connect action
-        if let UiEvent::KeyDown { key: KeyCode::Enter } = event {
-            if self.address_input.is_focused() && !self.address_input.text().is_empty() {
-                return EventResponse::Action(UiAction::Connect {
-                    address: self.address_input.text().to_string(),
-                    noise_key: None,
-                });
-            }
+        if let UiEvent::KeyDown {
+            key: KeyCode::Enter,
+        } = event
+            && self.address_input.is_focused()
+            && !self.address_input.text().is_empty()
+        {
+            return EventResponse::Action(UiAction::Connect {
+                address: self.address_input.text().to_string(),
+                noise_key: None,
+            });
         }
 
         // Delegate to address input first
@@ -129,7 +138,9 @@ mod tests {
         qc.address_input.set_text("10.0.0.5:7000");
         qc.address_input.set_focused(true);
 
-        let resp = qc.handle_event(&UiEvent::KeyDown { key: KeyCode::Enter });
+        let resp = qc.handle_event(&UiEvent::KeyDown {
+            key: KeyCode::Enter,
+        });
 
         match resp {
             EventResponse::Action(UiAction::Connect { address, .. }) => {
