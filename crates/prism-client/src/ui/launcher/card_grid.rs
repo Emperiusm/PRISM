@@ -186,8 +186,8 @@ impl Widget for CardGrid {
             ctx.push_glass_quad(GlassQuad {
                 rect: add_rect,
                 blur_rect: add_rect,
-                tint: [0.05, 0.05, 0.1, 0.08],
-                border_color: [1.0, 1.0, 1.0, 0.1],
+                tint: [0.08, 0.04, 0.15, 0.10],
+                border_color: [1.0, 1.0, 1.0, 0.12],
                 corner_radius: 10.0,
                 noise_intensity: 0.02,
             });

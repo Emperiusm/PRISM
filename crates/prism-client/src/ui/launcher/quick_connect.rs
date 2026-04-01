@@ -71,8 +71,8 @@ impl Widget for QuickConnect {
         ctx.push_glass_quad(GlassQuad {
             rect: self.rect,
             blur_rect: self.rect,
-            tint: [0.08, 0.0, 0.15, 0.15],
-            border_color: [1.0, 1.0, 1.0, 0.2],
+            tint: [0.12, 0.06, 0.20, 0.25],
+            border_color: [1.0, 1.0, 1.0, 0.08],
             corner_radius: 10.0,
             noise_intensity: 0.03,
         });

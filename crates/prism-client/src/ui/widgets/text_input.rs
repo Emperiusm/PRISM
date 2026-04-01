@@ -57,20 +57,19 @@ impl Widget for TextInput {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        let border_alpha = if self.focused { 0.4 } else { 0.2 };
         ctx.push_glass_quad(GlassQuad {
             rect: self.rect,
             blur_rect: self.rect,
-            tint: [0.05, 0.0, 0.1, 0.15],
-            border_color: [1.0, 1.0, 1.0, border_alpha],
+            tint: [0.06, 0.03, 0.12, 0.30],
+            border_color: [1.0, 1.0, 1.0, if self.focused { 0.15 } else { 0.06 }],
             corner_radius: 6.0,
             noise_intensity: 0.0,
         });
 
         let (display_text, color) = if self.text.is_empty() {
-            (self.placeholder.clone(), [1.0, 1.0, 1.0, 0.4_f32])
+            (self.placeholder.clone(), [1.0, 1.0, 1.0, 0.35_f32])
         } else {
-            (self.text.clone(), [1.0, 1.0, 1.0, 0.9_f32])
+            (self.text.clone(), [1.0, 1.0, 1.0, 0.92_f32])
         };
 
         ctx.push_text_run(TextRun {
