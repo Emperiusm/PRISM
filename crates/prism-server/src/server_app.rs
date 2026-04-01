@@ -159,6 +159,7 @@ impl ServerApp {
 
         // ── Frame sender task (~15 fps) ───────────────────────────────────────
         let conn_store_send = self.conn_store.clone();
+        let tracker_send = self.tracker.clone();
         let use_dda = self.use_dda;
         tokio::spawn(async move {
             // Decide capture source: DDA on Windows when --dda, else test pattern.
@@ -303,6 +304,11 @@ impl ServerApp {
 
                 if sent > 0 {
                     frames_sent += 1;
+                    // Record outbound bandwidth for the display channel.
+                    tracker_send.record_send(
+                        prism_protocol::channel::CHANNEL_DISPLAY,
+                        h264_data.len() as u32,
+                    );
                 }
                 seq = seq.wrapping_add(1);
 
