@@ -58,25 +58,163 @@ impl InputChannelHandler {
 
     /// Inject a parsed input event. Returns `true` when injection succeeded.
     fn inject(&self, event: InputEvent) -> bool {
-        // Translate normalised mouse coordinates to screen pixels when needed
-        // so the compiler doesn't complain about unused fields.
-        let _ = match event {
-            InputEvent::MouseMove { x, y } => (
-                normalized_to_screen(x, self.screen_width),
-                normalized_to_screen(y, self.screen_height),
-            ),
-            _ => (0, 0),
-        };
-
         #[cfg(target_os = "windows")]
         {
-            // Win32 SendInput FFI will be wired up in a later task.
-            // For now, treat every event as successfully queued.
+            use windows::Win32::UI::Input::KeyboardAndMouse::{
+                SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE,
+                KEYBDINPUT, MOUSEINPUT,
+                KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
+                MOUSEEVENTF_MOVE, MOUSEEVENTF_ABSOLUTE,
+                MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
+                MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
+                MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
+                MOUSEEVENTF_WHEEL,
+                VIRTUAL_KEY,
+            };
+            use prism_protocol::input::MouseButton;
+
+            let input: INPUT = match event {
+                InputEvent::KeyDown { vk, .. } => INPUT {
+                    r#type: INPUT_KEYBOARD,
+                    Anonymous: INPUT_0 {
+                        ki: KEYBDINPUT {
+                            wVk: VIRTUAL_KEY(vk),
+                            wScan: 0,
+                            dwFlags: Default::default(),
+                            time: 0,
+                            dwExtraInfo: 0,
+                        },
+                    },
+                },
+                InputEvent::KeyUp { vk, .. } => INPUT {
+                    r#type: INPUT_KEYBOARD,
+                    Anonymous: INPUT_0 {
+                        ki: KEYBDINPUT {
+                            wVk: VIRTUAL_KEY(vk),
+                            wScan: 0,
+                            dwFlags: KEYEVENTF_KEYUP,
+                            time: 0,
+                            dwExtraInfo: 0,
+                        },
+                    },
+                },
+                InputEvent::TextInput { codepoint } => INPUT {
+                    r#type: INPUT_KEYBOARD,
+                    Anonymous: INPUT_0 {
+                        ki: KEYBDINPUT {
+                            wVk: VIRTUAL_KEY(0),
+                            wScan: codepoint as u16,
+                            dwFlags: KEYEVENTF_UNICODE,
+                            time: 0,
+                            dwExtraInfo: 0,
+                        },
+                    },
+                },
+                InputEvent::MouseMove { x, y } => {
+                    let dx = normalized_to_screen(x, self.screen_width);
+                    let dy = normalized_to_screen(y, self.screen_height);
+                    INPUT {
+                        r#type: INPUT_MOUSE,
+                        Anonymous: INPUT_0 {
+                            mi: MOUSEINPUT {
+                                dx,
+                                dy,
+                                mouseData: 0,
+                                dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
+                                time: 0,
+                                dwExtraInfo: 0,
+                            },
+                        },
+                    }
+                }
+                InputEvent::MouseMoveRelative { dx, dy } => INPUT {
+                    r#type: INPUT_MOUSE,
+                    Anonymous: INPUT_0 {
+                        mi: MOUSEINPUT {
+                            dx: dx as i32,
+                            dy: dy as i32,
+                            mouseData: 0,
+                            dwFlags: MOUSEEVENTF_MOVE,
+                            time: 0,
+                            dwExtraInfo: 0,
+                        },
+                    },
+                },
+                InputEvent::MouseDown { button } => {
+                    let flags = match button {
+                        MouseButton::Left   => MOUSEEVENTF_LEFTDOWN,
+                        MouseButton::Right  => MOUSEEVENTF_RIGHTDOWN,
+                        MouseButton::Middle => MOUSEEVENTF_MIDDLEDOWN,
+                        // X1/X2 not wired — treat as no-op (return true, no send)
+                        _ => return true,
+                    };
+                    INPUT {
+                        r#type: INPUT_MOUSE,
+                        Anonymous: INPUT_0 {
+                            mi: MOUSEINPUT {
+                                dx: 0,
+                                dy: 0,
+                                mouseData: 0,
+                                dwFlags: flags,
+                                time: 0,
+                                dwExtraInfo: 0,
+                            },
+                        },
+                    }
+                }
+                InputEvent::MouseUp { button } => {
+                    let flags = match button {
+                        MouseButton::Left   => MOUSEEVENTF_LEFTUP,
+                        MouseButton::Right  => MOUSEEVENTF_RIGHTUP,
+                        MouseButton::Middle => MOUSEEVENTF_MIDDLEUP,
+                        _ => return true,
+                    };
+                    INPUT {
+                        r#type: INPUT_MOUSE,
+                        Anonymous: INPUT_0 {
+                            mi: MOUSEINPUT {
+                                dx: 0,
+                                dy: 0,
+                                mouseData: 0,
+                                dwFlags: flags,
+                                time: 0,
+                                dwExtraInfo: 0,
+                            },
+                        },
+                    }
+                }
+                InputEvent::MouseScroll { delta_y, .. } => INPUT {
+                    r#type: INPUT_MOUSE,
+                    Anonymous: INPUT_0 {
+                        mi: MOUSEINPUT {
+                            dx: 0,
+                            dy: 0,
+                            mouseData: delta_y as u32,
+                            dwFlags: MOUSEEVENTF_WHEEL,
+                            time: 0,
+                            dwExtraInfo: 0,
+                        },
+                    },
+                },
+                // SetMouseMode has no direct Win32 SendInput equivalent.
+                InputEvent::SetMouseMode { .. } => return true,
+            };
+
+            // SAFETY: `input` is fully initialised above; the slice lasts for
+            // the duration of the call; SendInput is documented to be safe when
+            // called from a desktop process.
+            let sent = unsafe { SendInput(&[input], std::mem::size_of::<INPUT>() as i32) };
+            if sent == 0 {
+                tracing::warn!(event = ?event, "SendInput returned 0 (event may have been blocked)");
+                return false;
+            }
             true
         }
 
         #[cfg(not(target_os = "windows"))]
         {
+            // Suppress unused-variable warning for the event on non-Windows.
+            let _ = event;
             // Mock injection on non-Windows platforms.
             true
         }
