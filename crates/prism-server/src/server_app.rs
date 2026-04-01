@@ -29,6 +29,7 @@ pub struct ServerApp {
     noise_mode: bool,
     monitor_index: u32,
     config: ServerConfig,
+    cert: SelfSignedCert,
     session_manager: Arc<Mutex<SessionManager>>,
     conn_store: Arc<ClientConnectionStore>,
     dispatcher: Arc<prism_session::ChannelDispatcher>,
@@ -63,7 +64,7 @@ impl ServerApp {
         tracing::info!(addr = %config.listen_addr(), "server configuration loaded");
 
         // TLS
-        let _cert = SelfSignedCert::generate()?;
+        let cert = SelfSignedCert::generate()?;
         tracing::info!("generated self-signed TLS certificate");
 
         // Security (dev mode)
@@ -130,6 +131,7 @@ impl ServerApp {
             noise_mode,
             monitor_index,
             config,
+            cert,
             session_manager,
             conn_store,
             dispatcher,
@@ -146,13 +148,20 @@ impl ServerApp {
         Self::with_config(use_dda, noise_mode, monitor_index, config)
     }
 
+    /// Return the DER-encoded certificate generated at construction time.
+    ///
+    /// Tests can add this to a `RootCertStore` to trust the server's TLS cert.
+    pub fn cert_der(&self) -> rustls::pki_types::CertificateDer<'static> {
+        self.cert.cert_der.clone()
+    }
+
     /// Bind the QUIC endpoint and enter the main accept loop.
     ///
     /// Spawns the activity processor, frame sender, and heartbeat timeout tasks
     /// before blocking on `accept()`.  Returns when the endpoint is closed.
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // QUIC endpoint — cert is created fresh here since it is consumed by bind.
-        let cert = SelfSignedCert::generate()?;
+        // QUIC endpoint — reuse the cert generated at construction time.
+        let cert = self.cert.clone();
         let acceptor = ConnectionAcceptor::bind(self.config.listen_addr(), cert)?;
         tracing::info!(addr = %acceptor.local_addr(), "QUIC endpoint bound");
         tracing::info!("waiting for connections…");
