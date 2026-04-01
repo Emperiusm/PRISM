@@ -476,8 +476,11 @@ async fn handle_connection(
                         "session established"
                     );
 
-                    // Clone before consuming: heartbeat sender needs its own handle.
+                    // Clone before consuming: heartbeat sender and probe task each
+                    // need their own handle before quinn_conn_for_store is moved
+                    // into the connection store.
                     let hb_conn = quinn_conn_for_store.clone();
+                    let probe_conn = quinn_conn_for_store.clone();
 
                     // Store connection for frame sending.
                     conn_store.add(client_id, quinn_conn_for_store);
@@ -511,6 +514,28 @@ async fn handle_connection(
                             interval.tick().await;
                             if hb_conn.send_datagram(hb_gen.packet()).is_err() {
                                 break;
+                            }
+                        }
+                    });
+
+                    // Quality probe sender (every 2 seconds).
+                    //
+                    // Generates a PROBE_REQUEST datagram with an incrementing
+                    // sequence number and the current timestamp.  The client is
+                    // expected to echo it back as PROBE_RESPONSE; until full
+                    // client-side control handling lands, this task just sends
+                    // and logs each probe.
+                    tokio::spawn(async move {
+                        let mut prober = prism_transport::quality::prober::ConnectionProber::new();
+                        let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
+                        loop {
+                            interval.tick().await;
+                            if let Some(payload) = prober.generate_probe() {
+                                let dgram = crate::quality_task::build_probe_datagram(&payload);
+                                tracing::trace!(seq = payload.seq, "quality probe sent");
+                                if probe_conn.send_datagram(dgram).is_err() {
+                                    break;
+                                }
                             }
                         }
                     });
