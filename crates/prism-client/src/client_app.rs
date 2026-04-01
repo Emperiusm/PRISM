@@ -189,7 +189,7 @@ impl ClientApp {
             // CHANNEL_CONTROL = 0x006, HEARTBEAT msg_type = 0x01
             // PrismHeader: ver_chan LE u16, msg_type u8, flags u8,
             //              sequence LE u32, timestamp_us LE u32, payload_length LE u32
-            let ver_chan: u16 = (0u16 << 12) | 0x006u16;
+            let ver_chan: u16 = 0x006u16;
             let mut header_bytes = [0u8; 16];
             header_bytes[0..2].copy_from_slice(&ver_chan.to_le_bytes());
             header_bytes[2] = 0x01; // HEARTBEAT
@@ -276,7 +276,7 @@ impl ClientApp {
                 let inner_len = u32::from_le_bytes(len_buf) as usize;
 
                 // Sanity check: max ~4 MiB header + payload.
-                if inner_len < 16 || inner_len > 4 * 1024 * 1024 + 16 {
+                if !(16..=4 * 1024 * 1024 + 16).contains(&inner_len) {
                     tracing::error!(inner_len, "invalid frame length prefix — stream corrupt");
                     break;
                 }
@@ -322,7 +322,7 @@ impl ClientApp {
                     // ver_chan packs version (0) into top 4 bits and CHANNEL_DISPLAY into low 12.
                     use prism_display::protocol::MSG_IDR_REQUEST;
                     use prism_protocol::channel::CHANNEL_DISPLAY;
-                    let ver_chan: u16 = (0u16 << 12) | CHANNEL_DISPLAY;
+                    let ver_chan: u16 = CHANNEL_DISPLAY;
                     let mut idr_bytes = [0u8; 16];
                     idr_bytes[0..2].copy_from_slice(&ver_chan.to_le_bytes());
                     idr_bytes[2] = MSG_IDR_REQUEST;
@@ -376,25 +376,18 @@ impl ClientApp {
             use prism_protocol::channel::CHANNEL_CONTROL;
             use prism_session::control_msg::{PROBE_REQUEST, PROBE_RESPONSE};
 
-            loop {
-                match dgram_conn.read_datagram().await {
-                    Ok(data) => {
-                        if data.len() >= HEADER_SIZE {
-                            if let Ok(header) = PrismHeader::decode_from_slice(&data) {
-                                if header.channel_id == CHANNEL_CONTROL
-                                    && header.msg_type == PROBE_REQUEST
-                                {
-                                    // Echo back with msg_type changed to PROBE_RESPONSE.
-                                    // msg_type is at byte offset 2 in the wire format.
-                                    let mut response = BytesMut::from(&data[..]);
-                                    response[2] = PROBE_RESPONSE;
-                                    let _ = dgram_conn.send_datagram(response.freeze());
-                                    tracing::trace!("probe echo sent");
-                                }
-                            }
-                        }
-                    }
-                    Err(_) => break,
+            while let Ok(data) = dgram_conn.read_datagram().await {
+                if data.len() >= HEADER_SIZE
+                    && let Ok(header) = PrismHeader::decode_from_slice(&data)
+                    && header.channel_id == CHANNEL_CONTROL
+                    && header.msg_type == PROBE_REQUEST
+                {
+                    // Echo back with msg_type changed to PROBE_RESPONSE.
+                    // msg_type is at byte offset 2 in the wire format.
+                    let mut response = BytesMut::from(&data[..]);
+                    response[2] = PROBE_RESPONSE;
+                    let _ = dgram_conn.send_datagram(response.freeze());
+                    tracing::trace!("probe echo sent");
                 }
             }
         });
@@ -473,10 +466,10 @@ impl ClientApp {
                     for dx in 0..8usize {
                         let px = cx + dx;
                         let py = cy + dy;
-                        if px < width && py < height {
-                            if dx == 3 || dx == 4 || dy == 3 || dy == 4 {
-                                current_buffer[py * width + px] = 0x00FFFFFF; // white
-                            }
+                        if px < width && py < height
+                            && (dx == 3 || dx == 4 || dy == 3 || dy == 4)
+                        {
+                            current_buffer[py * width + px] = 0x00FFFFFF; // white
                         }
                     }
                 }
@@ -571,39 +564,39 @@ impl ClientApp {
             if last_clipboard_check.elapsed() >= Duration::from_millis(500) {
                 last_clipboard_check = Instant::now();
 
-                if let Some(ref mut cb) = clipboard {
-                    if let Ok(text) = cb.get_text() {
-                        let msg =
-                            prism_protocol::clipboard::ClipboardMessage::text(&text);
-                        if msg.content_hash != last_clipboard_hash
-                            && clipboard_echo_guard.should_send(msg.content_hash)
-                        {
-                            last_clipboard_hash = msg.content_hash;
-                            clipboard_echo_guard.remember(msg.content_hash);
-                            tracing::debug!(
-                                bytes = msg.data.len(),
-                                hash = format_args!("{:#x}", msg.content_hash),
-                                "clipboard: sending to server"
-                            );
-                            // Build a PRISM clipboard datagram and enqueue it on
-                            // the input channel (reuses the existing sender task).
-                            let json = msg.to_json();
-                            let header = prism_protocol::header::PrismHeader {
-                                version: prism_protocol::header::PROTOCOL_VERSION,
-                                channel_id: prism_protocol::channel::CHANNEL_CLIPBOARD,
-                                msg_type: 0x01,
-                                flags: 0,
-                                sequence: 0,
-                                timestamp_us: 0,
-                                payload_length: json.len() as u32,
-                            };
-                            let mut buf = BytesMut::with_capacity(
-                                prism_protocol::header::HEADER_SIZE + json.len(),
-                            );
-                            header.encode(&mut buf);
-                            buf.extend_from_slice(&json);
-                            input_tx.send(buf.freeze()).ok();
-                        }
+                if let Some(ref mut cb) = clipboard
+                    && let Ok(text) = cb.get_text()
+                {
+                    let msg =
+                        prism_protocol::clipboard::ClipboardMessage::text(&text);
+                    if msg.content_hash != last_clipboard_hash
+                        && clipboard_echo_guard.should_send(msg.content_hash)
+                    {
+                        last_clipboard_hash = msg.content_hash;
+                        clipboard_echo_guard.remember(msg.content_hash);
+                        tracing::debug!(
+                            bytes = msg.data.len(),
+                            hash = format_args!("{:#x}", msg.content_hash),
+                            "clipboard: sending to server"
+                        );
+                        // Build a PRISM clipboard datagram and enqueue it on
+                        // the input channel (reuses the existing sender task).
+                        let json = msg.to_json();
+                        let header = prism_protocol::header::PrismHeader {
+                            version: prism_protocol::header::PROTOCOL_VERSION,
+                            channel_id: prism_protocol::channel::CHANNEL_CLIPBOARD,
+                            msg_type: 0x01,
+                            flags: 0,
+                            sequence: 0,
+                            timestamp_us: 0,
+                            payload_length: json.len() as u32,
+                        };
+                        let mut buf = BytesMut::with_capacity(
+                            prism_protocol::header::HEADER_SIZE + json.len(),
+                        );
+                        header.encode(&mut buf);
+                        buf.extend_from_slice(&json);
+                        input_tx.send(buf.freeze()).ok();
                     }
                 }
             }

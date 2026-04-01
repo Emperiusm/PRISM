@@ -36,6 +36,12 @@ pub struct RoutingTable {
     inner: ArcSwap<RoutingSnapshot>,
 }
 
+impl Default for RoutingTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RoutingTable {
     /// Create an empty routing table at generation 0.
     pub fn new() -> Self {

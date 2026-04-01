@@ -135,12 +135,11 @@ impl CapabilityNegotiator {
                 _ => None,
             });
         for codec in ["h265", "h264", "av1"] {
-            if client_codecs.contains(codec) {
-                if let Some(server) = server_codecs {
-                    if server.iter().any(|c| c == codec) {
-                        return codec.to_string();
-                    }
-                }
+            if client_codecs.contains(codec)
+                && let Some(server) = server_codecs
+                && server.iter().any(|c| c == codec)
+            {
+                return codec.to_string();
             }
         }
         "h264".to_string()

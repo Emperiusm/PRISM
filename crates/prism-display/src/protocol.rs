@@ -45,10 +45,10 @@ impl FrameGapDetector {
     /// Sets the gap flag when `seq > last_seq + 1`.  The very first frame never
     /// triggers a gap regardless of its sequence number.
     pub fn receive_seq(&mut self, seq: u32) {
-        if let Some(last) = self.last_received_seq {
-            if seq > last.wrapping_add(1) {
-                self.has_gap = true;
-            }
+        if let Some(last) = self.last_received_seq
+            && seq > last.wrapping_add(1)
+        {
+            self.has_gap = true;
         }
         self.last_received_seq = Some(seq);
     }

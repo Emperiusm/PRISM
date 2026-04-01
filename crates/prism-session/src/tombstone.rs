@@ -130,7 +130,7 @@ impl TombstoneStore {
     /// Persist the store to a file as JSON.
     pub fn persist(&self, path: &std::path::Path) -> std::io::Result<()> {
         let bytes = serde_json::to_vec(&self.entries)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(std::io::Error::other)?;
         std::fs::write(path, bytes)
     }
 
@@ -141,7 +141,7 @@ impl TombstoneStore {
     ) -> std::io::Result<Self> {
         let bytes = std::fs::read(path)?;
         let entries: HashMap<Uuid, Tombstone> = serde_json::from_slice(&bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(std::io::Error::other)?;
         let mut store = Self { entries, max_age_secs };
         store.gc();
         Ok(store)
