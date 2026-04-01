@@ -1,5 +1,6 @@
 pub mod config;
 pub mod acceptor;
+pub mod rate_limiter;
 pub mod allow_all_gate;
 pub mod server_app;
 pub mod pairing_gate;
@@ -75,3 +76,6 @@ pub use quality_task::{QualityCache, build_probe_datagram, evaluate_quality};
 
 // clipboard_stream
 pub use clipboard_stream::ClipboardSyncState;
+
+// rate_limiter
+pub use rate_limiter::ConnectionRateLimiter;

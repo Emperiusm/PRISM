@@ -12,9 +12,9 @@ use crate::hw_encoder::HwEncoder;
 use prism_security::audit::{AuditEvent, AuditLog};
 
 use crate::{
-    AllowAllGate, ClientConnectionStore, ConnectionAcceptor, ControlChannelHandler,
-    HeartbeatGenerator, InputChannelHandler, SelfSignedCert, ServerConfig, SessionManager,
-    TestPatternCapture, spawn_recv_loop,
+    AllowAllGate, ClientConnectionStore, ConnectionAcceptor, ConnectionRateLimiter,
+    ControlChannelHandler, HeartbeatGenerator, InputChannelHandler, SelfSignedCert, ServerConfig,
+    SessionManager, TestPatternCapture, spawn_recv_loop,
 };
 
 /// Top-level server state. Construct with [`ServerApp::new`], then call
@@ -437,6 +437,19 @@ impl ServerApp {
             }
         });
 
+        // ── Connection rate limiter (10 connections/minute per IP) ───────────
+        let rate_limiter = Arc::new(Mutex::new(ConnectionRateLimiter::default()));
+
+        // Periodic GC: evict rate-limiter entries inactive for >5 minutes.
+        let rl_gc = rate_limiter.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                rl_gc.lock().await.gc();
+            }
+        });
+
         // ── Accept loop ───────────────────────────────────────────────────────
         loop {
             let incoming = match acceptor.accept().await {
@@ -446,6 +459,20 @@ impl ServerApp {
                     break;
                 }
             };
+
+            // Rate-limit check: extract remote IP before consuming `incoming`.
+            // `quinn::Incoming::remote_address()` is available before `.await`.
+            let remote_ip = incoming.remote_address().ip();
+            if !rate_limiter.lock().await.check(remote_ip) {
+                tracing::warn!(
+                    ip = %remote_ip,
+                    "rate limiter: connection rejected (too many connections from this IP)"
+                );
+                // Refuse the connection without spawning a handler task — let
+                // QUIC idle-timeout clean up the pending incoming on its own.
+                drop(incoming);
+                continue;
+            }
 
             let sm = self.session_manager.clone();
             let disp = self.dispatcher.clone();
