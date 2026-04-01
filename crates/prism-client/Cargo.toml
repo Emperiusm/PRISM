@@ -34,6 +34,11 @@ tracing-subscriber = { workspace = true }
 dirs = { workspace = true }
 prism-session = { workspace = true }
 serde_json = { workspace = true }
+serde = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [[bin]]
 name = "prism-client"
