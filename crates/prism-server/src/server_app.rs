@@ -9,6 +9,8 @@ use tokio::sync::{mpsc, Mutex};
 use prism_display::capture::PlatformCapture;
 use crate::hw_encoder::HwEncoder;
 
+use prism_security::audit::{AuditEvent, AuditLog};
+
 use crate::{
     AllowAllGate, ClientConnectionStore, ConnectionAcceptor, ControlChannelHandler,
     HeartbeatGenerator, InputChannelHandler, SelfSignedCert, ServerConfig, SessionManager,
@@ -26,6 +28,7 @@ pub struct ServerApp {
     dispatcher: Arc<prism_session::ChannelDispatcher>,
     tracker: Arc<prism_session::ChannelBandwidthTracker>,
     server_identity: Arc<prism_security::identity::LocalIdentity>,
+    audit_log: Arc<AuditLog>,
 }
 
 impl ServerApp {
@@ -57,6 +60,9 @@ impl ServerApp {
         // Security (dev mode)
         let _gate = Arc::new(AllowAllGate::new());
         tracing::info!("security: AllowAllGate (dev mode)");
+
+        // Audit log — ring buffer, capped at 4096 entries.
+        let audit_log = Arc::new(AuditLog::new(4096));
 
         // Capture backend selection — informational only here; the frame sender
         // task decides at runtime which backend to actually use.
@@ -110,6 +116,7 @@ impl ServerApp {
             dispatcher,
             tracker,
             server_identity,
+            audit_log,
         })
     }
 
@@ -335,6 +342,7 @@ impl ServerApp {
             let conn_store_clone = self.conn_store.clone();
             let server_identity_task = self.server_identity.clone();
             let noise_mode = self.noise_mode;
+            let audit_log_task = self.audit_log.clone();
 
             tokio::spawn(async move {
                 handle_connection(
@@ -346,6 +354,7 @@ impl ServerApp {
                     conn_store_clone,
                     server_identity_task,
                     noise_mode,
+                    audit_log_task,
                 )
                 .await;
             });
@@ -379,6 +388,7 @@ async fn handle_connection(
     conn_store: Arc<ClientConnectionStore>,
     server_identity: Arc<prism_security::identity::LocalIdentity>,
     noise_mode: bool,
+    audit_log: Arc<AuditLog>,
 ) {
     match incoming.await {
         Ok(quinn_conn) => {
@@ -476,6 +486,12 @@ async fn handle_connection(
                         "session established"
                     );
 
+                    // Audit: record successful client authentication / session open.
+                    audit_log.record(AuditEvent::ClientAuthenticated {
+                        device_id,
+                        device_name: remote.to_string(),
+                    });
+
                     // Clone before consuming: heartbeat sender and probe task each
                     // need their own handle before quinn_conn_for_store is moved
                     // into the connection store.
@@ -547,6 +563,8 @@ async fn handle_connection(
                     // ── Cleanup (NEW: fixes the connection store / session leak) ──
                     conn_store.remove(&client_id);
                     sm.lock().await.disconnect(client_id, "connection closed".to_string());
+                    // Audit: record client disconnect.
+                    audit_log.record(AuditEvent::ClientDisconnected { device_id });
                     tracing::info!(remote = %remote, "client disconnected and cleaned up");
                 }
                 Err(e) => {
