@@ -6,7 +6,7 @@
 use std::sync::mpsc as std_mpsc;
 use std::time::{Duration, Instant};
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use minifb::{Window, WindowOptions};
 use openh264::decoder::Decoder;
 use openh264::formats::YUVSource;
@@ -323,6 +323,40 @@ impl ClientApp {
             }
         });
 
+        // ── Spawn datagram reader (probe echo + overlay) ──────────────────────
+        // The frame receive task above only reads from the uni stream. This task
+        // reads incoming datagrams (heartbeats, probes, overlay packets) and
+        // responds to PROBE_REQUEST with PROBE_RESPONSE so the server can
+        // measure round-trip time.
+        let dgram_conn = connection.clone();
+        tokio::spawn(async move {
+            use prism_protocol::header::{PrismHeader, HEADER_SIZE};
+            use prism_protocol::channel::CHANNEL_CONTROL;
+            use prism_session::control_msg::{PROBE_REQUEST, PROBE_RESPONSE};
+
+            loop {
+                match dgram_conn.read_datagram().await {
+                    Ok(data) => {
+                        if data.len() >= HEADER_SIZE {
+                            if let Ok(header) = PrismHeader::decode_from_slice(&data) {
+                                if header.channel_id == CHANNEL_CONTROL
+                                    && header.msg_type == PROBE_REQUEST
+                                {
+                                    // Echo back with msg_type changed to PROBE_RESPONSE.
+                                    // msg_type is at byte offset 2 in the wire format.
+                                    let mut response = BytesMut::from(&data[..]);
+                                    response[2] = PROBE_RESPONSE;
+                                    let _ = dgram_conn.send_datagram(response.freeze());
+                                    tracing::trace!("probe echo sent");
+                                }
+                            }
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+
         // ── Clipboard setup ───────────────────────────────────────────────────
         let mut clipboard: Option<arboard::Clipboard> =
             arboard::Clipboard::new().ok();
@@ -350,6 +384,10 @@ impl ClientApp {
         let mut current_buffer: Vec<u32> = vec![0u32; initial_w * initial_h];
         let mut current_w = initial_w;
         let mut current_h = initial_h;
+
+        // Fix 7: CursorPredictor — feeds local mouse positions for zero-latency
+        // cursor feel; server corrections applied when positions diverge > 5 px.
+        let mut cursor_predictor = crate::CursorPredictor::new(5.0);
 
         let mut input_sender = crate::InputSender::new();
         let mut last_mx: u16 = 0;
@@ -399,6 +437,14 @@ impl ClientApp {
             if let Some((mx, my)) =
                 window.get_mouse_pos(minifb::MouseMode::Clamp)
             {
+                // Update predictor with raw pixel position for zero-latency feel.
+                cursor_predictor.update_local(mx, my);
+                tracing::trace!(
+                    x = cursor_predictor.display_position().0,
+                    y = cursor_predictor.display_position().1,
+                    "cursor prediction"
+                );
+
                 let (nx, ny) = crate::normalize_mouse(
                     mx,
                     my,
@@ -471,11 +517,30 @@ impl ClientApp {
                             && clipboard_echo_guard.should_send(msg.content_hash)
                         {
                             last_clipboard_hash = msg.content_hash;
+                            clipboard_echo_guard.remember(msg.content_hash);
                             tracing::debug!(
                                 bytes = msg.data.len(),
                                 hash = format_args!("{:#x}", msg.content_hash),
-                                "clipboard: new content detected"
+                                "clipboard: sending to server"
                             );
+                            // Build a PRISM clipboard datagram and enqueue it on
+                            // the input channel (reuses the existing sender task).
+                            let json = msg.to_json();
+                            let header = prism_protocol::header::PrismHeader {
+                                version: prism_protocol::header::PROTOCOL_VERSION,
+                                channel_id: prism_protocol::channel::CHANNEL_CLIPBOARD,
+                                msg_type: 0x01,
+                                flags: 0,
+                                sequence: 0,
+                                timestamp_us: 0,
+                                payload_length: json.len() as u32,
+                            };
+                            let mut buf = BytesMut::with_capacity(
+                                prism_protocol::header::HEADER_SIZE + json.len(),
+                            );
+                            header.encode(&mut buf);
+                            buf.extend_from_slice(&json);
+                            input_tx.send(buf.freeze()).ok();
                         }
                     }
                 }
