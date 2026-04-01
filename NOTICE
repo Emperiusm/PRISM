@@ -1,0 +1,58 @@
+PRISM — Protocol for Remote Interactive Streaming & Multiplexing
+Copyright 2025-2026 Ehsan Khalid. All rights reserved.
+
+Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
+with a separate commercial license available. See LICENSE and
+LICENSE-COMMERCIAL.md for details.
+
+This software includes the following third-party dependencies:
+
+--- Cryptography & Security ---
+snow (0.9)              — Noise protocol framework          — Apache-2.0/MIT
+x25519-dalek (2)        — X25519 key exchange               — BSD-3-Clause
+ed25519-dalek (2)       — Ed25519 signatures                — BSD-3-Clause
+aes-gcm (0.10)          — AES-GCM authenticated encryption  — Apache-2.0/MIT
+hkdf (0.12)             — HKDF key derivation               — Apache-2.0/MIT
+sha2 (0.10)             — SHA-2 hash functions              — Apache-2.0/MIT
+hmac (0.12)             — HMAC message authentication       — Apache-2.0/MIT
+rustls (0.23)           — TLS implementation                — Apache-2.0/ISC/MIT
+rcgen (0.13)            — X.509 certificate generation      — Apache-2.0/MIT
+
+--- Networking & Transport ---
+quinn (0.11)            — QUIC transport                    — Apache-2.0/MIT
+tokio (1)               — Async runtime                     — MIT
+socket2 (0.5)           — Low-level socket control          — Apache-2.0/MIT
+
+--- Media & Display ---
+openh264 (0.9)          — H.264 codec (OpenH264 bindings)   — BSD-2-Clause
+ffmpeg-next (8)         — FFmpeg bindings                   — WTFPL
+minifb (0.28)           — Framebuffer display               — Apache-2.0/MIT
+audiopus (0.3.0-rc.0)   — Opus codec bindings              — Apache-2.0/MIT
+cpal (0.17)             — Cross-platform audio              — Apache-2.0
+
+--- Serialization & Data ---
+serde (1)               — Serialization framework           — Apache-2.0/MIT
+serde_json (1)          — JSON serialization                — Apache-2.0/MIT
+toml (0.8)              — TOML configuration parsing        — Apache-2.0/MIT
+bytes (1)               — Byte buffer utilities             — MIT
+uuid (1)                — UUID generation (v7)              — Apache-2.0/MIT
+hex (0.4)               — Hex encoding/decoding             — Apache-2.0/MIT
+
+--- Utilities ---
+thiserror (2)           — Error derive macros               — Apache-2.0/MIT
+arc-swap (1)            — Atomic Arc swapping               — Apache-2.0/MIT
+rand (0.8)              — Random number generation          — Apache-2.0/MIT
+async-trait (0.1)       — Async fn in traits                — Apache-2.0/MIT
+tracing (0.1)           — Structured diagnostics            — MIT
+tracing-subscriber (0.3)— Tracing output formatting         — MIT
+dirs (6)                — Platform directory paths          — Apache-2.0/MIT
+arboard (3)             — Clipboard access                  — Apache-2.0/MIT
+tempfile (3)            — Temporary file management         — Apache-2.0/MIT
+
+--- Platform (Windows) ---
+windows (via windows-sys) — Win32 API bindings             — Apache-2.0/MIT
+
+Note: OpenH264 links to Cisco's OpenH264 library which carries a BSD-2-Clause
+license and is subject to Cisco's royalty-free patent grant for H.264.
+FFmpeg (via ffmpeg-next) may link against libraries with additional licensing
+requirements depending on build configuration.

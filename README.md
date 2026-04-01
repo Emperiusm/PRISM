@@ -18,7 +18,7 @@
   <img alt="Tests" src="https://img.shields.io/badge/tests-648%20passing-brightgreen">
   <img alt="Crates" src="https://img.shields.io/badge/crates-10-blue">
   <img alt="Lines" src="https://img.shields.io/badge/lines-23K%20Rust-orange">
-  <img alt="License" src="https://img.shields.io/badge/license-CC0--1.0-lightgrey">
+  <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
 </p>
 
@@ -412,7 +412,12 @@ PRISM was built with these excellent Rust crates:
 
 ## License
 
-CC0 1.0 Universal — Public Domain
+PRISM is dual-licensed:
+
+- **Open Source:** [GNU Affero General Public License v3.0](LICENSE) — free for open-source use. Any network-accessible deployment of modified PRISM code must release the source.
+- **Commercial:** A proprietary license is available for organizations that cannot comply with the AGPL. See [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) for details.
+
+Copyright 2025-2026 Ehsan Khalid. All rights reserved.
 
 ---
 
