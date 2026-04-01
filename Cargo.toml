@@ -11,6 +11,7 @@ members = [
     "crates/prism-server",
     "crates/prism-client",
     "crates/prism-platform-windows",
+    "crates/prism-tests",
 ]
 
 [workspace.package]
