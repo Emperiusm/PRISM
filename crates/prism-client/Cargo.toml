@@ -18,6 +18,10 @@ minifb = { workspace = true }
 openh264 = { workspace = true }
 hex = { workspace = true }
 arboard = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dirs = { workspace = true }
+prism-session = { workspace = true }
 
 [[bin]]
 name = "prism-client"
