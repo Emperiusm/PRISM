@@ -216,8 +216,10 @@ impl ServerApp {
             };
 
             let mut seq: u32 = 0;
-            let frame_interval = std::time::Duration::from_millis(67); // ~15fps
-            let mut interval = tokio::time::interval(frame_interval);
+            let min_interval = std::time::Duration::from_millis(67);  // 15fps max
+            let idle_interval = std::time::Duration::from_millis(500); // 2fps idle
+            let mut current_interval = min_interval;
+            let mut consecutive_empty = 0u32;
             let mut last_log = std::time::Instant::now();
             let mut frames_sent = 0u32;
             let mut bytes_sent_total: u64 = 0;
@@ -228,7 +230,7 @@ impl ServerApp {
             let mut frames_dropped_total: u64 = 0;
 
             loop {
-                interval.tick().await;
+                tokio::time::sleep(current_interval).await;
 
                 if conn_store_send.client_count() == 0 {
                     continue; // no clients, skip
@@ -240,7 +242,17 @@ impl ServerApp {
                     match cap.capture_frame() {
                         Ok(Some(p)) => Some(p),
                         Ok(None) => {
-                            // No new desktop frame yet — skip this tick.
+                            // No new desktop frame yet — adapt to idle rate and skip.
+                            consecutive_empty += 1;
+                            if consecutive_empty == 11 {
+                                tracing::debug!(
+                                    interval_ms = idle_interval.as_millis(),
+                                    "frame sender: desktop idle — switching to 2fps"
+                                );
+                            }
+                            if consecutive_empty > 10 {
+                                current_interval = idle_interval;
+                            }
                             seq = seq.wrapping_add(1);
                             continue;
                         }
@@ -256,6 +268,25 @@ impl ServerApp {
 
                 #[cfg(not(windows))]
                 let pixels_opt: Option<Vec<u8>> = Some(pattern_capture.generate_pattern(seq));
+
+                // Update adaptive interval based on capture result.
+                #[cfg(windows)]
+                if pixels_opt.is_some() {
+                    if consecutive_empty > 10 {
+                        tracing::debug!(
+                            interval_ms = min_interval.as_millis(),
+                            "frame sender: desktop active — switching to 15fps"
+                        );
+                    }
+                    consecutive_empty = 0;
+                    current_interval = min_interval;
+                }
+                // On non-Windows (test pattern always returns Some), keep at min_interval.
+                #[cfg(not(windows))]
+                {
+                    let _ = consecutive_empty; // suppress unused warning
+                    current_interval = min_interval;
+                }
 
                 let pixels = match pixels_opt {
                     Some(p) => p,
@@ -353,7 +384,7 @@ impl ServerApp {
                             // interval, the send buffer is backing up.  Mark this
                             // client for a skip on the next tick.
                             let write_time = write_start.elapsed();
-                            if write_time > frame_interval * 2 {
+                            if write_time > min_interval * 2 {
                                 skip_next.insert(*client_id);
                                 tracing::debug!(
                                     client = %&client_id.to_string()[..8],
