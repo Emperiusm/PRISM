@@ -54,7 +54,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 
 wgpu = "24"
 winit = "0.30"
-glyphon = "0.6"
+glyphon = "0.8"
 bytemuck = { version = "1", features = ["derive"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 

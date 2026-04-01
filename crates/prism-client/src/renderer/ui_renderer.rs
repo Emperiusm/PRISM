@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Renders PaintContext draw commands (glass quads, glow rects) to the screen.
-//!
-//! Text rendering via glyphon is deferred until glyphon is upgraded to match the
-//! workspace wgpu version. For now, quads and glow rects are rendered as colored
-//! rounded rectangles.
+//! Renders PaintContext draw commands (glass quads, glow rects, text) to the screen.
 
+use crate::renderer::text_renderer::TextPipeline;
 use crate::ui::widgets::PaintContext;
 use wgpu::util::DeviceExt;
 
@@ -118,8 +115,7 @@ const MAX_QUADS: usize = 512;
 
 /// Renders PaintContext draw commands to the screen using wgpu.
 ///
-/// Currently renders glass quads and glow rects as colored rounded rectangles.
-/// Text rendering will be added once glyphon is upgraded to match wgpu 24.
+/// Renders glass quads, glow rects, and text (via glyphon).
 pub struct UiRenderer {
     quad_pipeline: wgpu::RenderPipeline,
     quad_instance_buffer: wgpu::Buffer,
@@ -128,13 +124,14 @@ pub struct UiRenderer {
     #[allow(dead_code)]
     instance_bind_group_layout: wgpu::BindGroupLayout,
     instance_bind_group: wgpu::BindGroup,
+    text_pipeline: TextPipeline,
 }
 
 impl UiRenderer {
     /// Create a new `UiRenderer` for the given device and surface format.
     pub fn new(
         device: &wgpu::Device,
-        _queue: &wgpu::Queue,
+        queue: &wgpu::Queue,
         surface_format: wgpu::TextureFormat,
     ) -> Self {
         // ── Screen uniform buffer ─────────────────────────────────────────
@@ -242,6 +239,9 @@ impl UiRenderer {
             cache: None,
         });
 
+        // ── Text pipeline (glyphon) ───────────────────────────────────────
+        let text_pipeline = TextPipeline::new(device, queue, surface_format);
+
         Self {
             quad_pipeline,
             quad_instance_buffer,
@@ -249,6 +249,7 @@ impl UiRenderer {
             screen_bind_group,
             instance_bind_group_layout: instance_bgl,
             instance_bind_group,
+            text_pipeline,
         }
     }
 
@@ -257,7 +258,7 @@ impl UiRenderer {
     #[allow(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
-        _device: &wgpu::Device,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         target_view: &wgpu::TextureView,
@@ -339,6 +340,10 @@ impl UiRenderer {
             );
         }
 
+        // ── Prepare text for rendering ───────────────────────────────────
+        self.text_pipeline
+            .prepare(device, queue, screen_width, screen_height, paint_ctx);
+
         // ── Render pass ───────────────────────────────────────────────────
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -363,7 +368,12 @@ impl UiRenderer {
                 pass.draw(0..6, 0..num_quads as u32);
             }
 
-            // TODO: text rendering — upgrade glyphon to 0.10+ (wgpu 24 compatible)
+            // Draw text (glyphon)
+            if !paint_ctx.text_runs.is_empty()
+                && let Err(e) = self.text_pipeline.render(&mut pass)
+            {
+                tracing::warn!("glyphon render error: {e:?}");
+            }
         }
     }
 }
