@@ -89,9 +89,9 @@ impl PrismApp {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.051, // #0d = 13/255
-                            g: 0.043, // #0b = 11/255
-                            b: 0.102, // #1a = 26/255
+                            r: 0.08, // #14 — slightly brighter than #0d for visibility
+                            g: 0.06, // #0f
+                            b: 0.16, // #29 — deep purple, visibly distinct from black
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -117,8 +117,8 @@ impl ApplicationHandler for PrismApp {
         }
 
         let title = match self.ui_state {
-            UiState::Launcher | UiState::Connecting => "PRISM",
-            _ => "PRISM Client",
+            UiState::Launcher | UiState::Connecting => "PRISM — Launcher",
+            _ => "PRISM — Connected",
         };
 
         let size = match self.ui_state {
