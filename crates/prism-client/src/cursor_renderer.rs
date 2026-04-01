@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2025-2026 Ehsan Khalid. All rights reserved.
+// Licensed under the GNU Affero General Public License v3.0.
+// Commercial licensing available — see LICENSE-COMMERCIAL.md.
+
 /// Client-side cursor prediction.
 /// Renders cursor at local position for zero-latency feel.
 /// Accepts server corrections when positions diverge.

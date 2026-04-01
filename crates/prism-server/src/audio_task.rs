@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2025-2026 Ehsan Khalid. All rights reserved.
+// Licensed under the GNU Affero General Public License v3.0.
+// Commercial licensing available — see LICENSE-COMMERCIAL.md.
+
 /// Synthetic audio source — generates a 440 Hz sine wave as a stand-in for
 /// real WASAPI capture.  Proves the audio pipeline (frame generation, silence
 /// detection, future Opus encoding) without requiring COM/FFI integration.

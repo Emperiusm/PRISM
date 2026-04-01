@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2025-2026 Ehsan Khalid. All rights reserved.
+// Licensed under the GNU Affero General Public License v3.0.
+// Commercial licensing available — see LICENSE-COMMERCIAL.md.
+
 //! DXGI damage rect extraction and conversion to PRISM `Rect`.
 //!
 //! DXGI reports dirty regions in `DXGI_OUTDUPL_MOVE_RECT` / dirty rect arrays
