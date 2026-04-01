@@ -5,12 +5,14 @@
 </p>
 
 <p align="center">
+  <a href="#why-prism">Why PRISM?</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#features">Features</a> &bull;
   <a href="#architecture">Architecture</a> &bull;
   <a href="#performance">Performance</a> &bull;
   <a href="#security">Security</a> &bull;
   <a href="#configuration">Configuration</a> &bull;
+  <a href="#development">Development</a> &bull;
   <a href="#roadmap">Roadmap</a>
 </p>
 
