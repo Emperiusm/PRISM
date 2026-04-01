@@ -36,6 +36,9 @@ arc-swap = "1"
 tempfile = "3"
 minifb = "0.28"
 arboard = "3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+dirs = "6"
 openh264 = "0.9"
 ffmpeg-next = "8"
 
