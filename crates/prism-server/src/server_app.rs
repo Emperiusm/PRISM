@@ -216,10 +216,16 @@ impl ServerApp {
             };
 
             let mut seq: u32 = 0;
-            let mut interval = tokio::time::interval(std::time::Duration::from_millis(67)); // ~15fps
+            let frame_interval = std::time::Duration::from_millis(67); // ~15fps
+            let mut interval = tokio::time::interval(frame_interval);
             let mut last_log = std::time::Instant::now();
             let mut frames_sent = 0u32;
             let mut bytes_sent_total: u64 = 0;
+            // Backpressure state: clients whose send buffer was congested last
+            // tick get their next frame skipped to let the buffer drain.
+            let mut skip_next: std::collections::HashSet<uuid::Uuid> =
+                std::collections::HashSet::new();
+            let mut frames_dropped_total: u64 = 0;
 
             loop {
                 interval.tick().await;
@@ -299,11 +305,24 @@ impl ServerApp {
                 // mutex across await points.
                 let conns = conn_store_send.snapshot_with_ids();
 
-                // Remove stale stream entries for clients that have gone away.
+                // Remove stale stream/backpressure entries for gone clients.
                 streams.retain(|id, _| conns.iter().any(|(cid, _)| cid == id));
+                skip_next.retain(|id| conns.iter().any(|(cid, _)| cid == id));
 
                 let mut sent = 0u32;
+                let mut frames_dropped_this_tick = 0u32;
                 for (client_id, conn) in &conns {
+                    // Backpressure: if this client's send buffer was congested
+                    // last tick, skip this frame to let it drain.
+                    if skip_next.remove(client_id) {
+                        frames_dropped_this_tick += 1;
+                        tracing::trace!(
+                            client = %&client_id.to_string()[..8],
+                            "frame sender: skipping frame (backpressure)"
+                        );
+                        continue;
+                    }
+
                     // Get or lazily open a persistent uni stream for this client.
                     if !streams.contains_key(client_id) {
                         match conn.open_uni().await {
@@ -325,10 +344,23 @@ impl ServerApp {
                         }
                     }
 
+                    let write_start = std::time::Instant::now();
                     let stream = streams.get_mut(client_id).unwrap();
                     match stream.write_all(&frame_data).await {
                         Ok(()) => {
                             sent += 1;
+                            // If writing this frame took more than 2× the frame
+                            // interval, the send buffer is backing up.  Mark this
+                            // client for a skip on the next tick.
+                            let write_time = write_start.elapsed();
+                            if write_time > frame_interval * 2 {
+                                skip_next.insert(*client_id);
+                                tracing::debug!(
+                                    client = %&client_id.to_string()[..8],
+                                    write_ms = write_time.as_millis(),
+                                    "frame sender: send buffer congested — skipping next frame"
+                                );
+                            }
                         }
                         Err(e) => {
                             tracing::warn!(
@@ -341,6 +373,8 @@ impl ServerApp {
                         }
                     }
                 }
+
+                frames_dropped_total += frames_dropped_this_tick as u64;
 
                 if sent > 0 {
                     frames_sent += 1;
@@ -361,6 +395,7 @@ impl ServerApp {
                             width,
                             height,
                             kb_per_frame = bytes_sent_total / (frames_sent as u64) / 1024,
+                            dropped_total = frames_dropped_total,
                             "frame sender stats"
                         );
                     }
