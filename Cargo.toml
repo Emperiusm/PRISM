@@ -64,3 +64,17 @@ prism-display = { path = "crates/prism-display" }
 prism-server = { path = "crates/prism-server" }
 prism-client = { path = "crates/prism-client" }
 prism-platform-windows = { path = "crates/prism-platform-windows" }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+opt-level = 3
+
+[profile.release.package.openh264-sys2]
+opt-level = 3
+
+[profile.bench]
+lto = "thin"
+codegen-units = 1
