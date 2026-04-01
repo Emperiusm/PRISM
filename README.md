@@ -44,66 +44,103 @@ RDP was designed in 1998. It uses TCP, GDI rendering, and a protocol that predat
 
 ## Quick Start
 
-### Prerequisites
+### How It Works
 
-- **Rust 1.85+** (edition 2024) — [install](https://rustup.rs)
-- **Windows 10+** (server requires DXGI for desktop capture)
-- **GPU drivers** up to date (for hardware H.264 encoding)
+PRISM has two parts:
 
-### 1. Build
+| | **Server** (`prism-server.exe`) | **Client** (`prism-client.exe`) |
+|---|---|---|
+| **What it does** | Captures the screen, encodes video, sends it | Receives video, decodes it, shows it in a window |
+| **Where to run** | On the computer you want to **control remotely** | On the computer you're **sitting at** |
+| **Required?** | Yes — one per remote machine | Yes — one per viewer |
+
+Both computers need Windows 10+. Both run the same download — just launch different `.exe` files.
+
+### Option A: Download (Recommended)
+
+1. Go to [Releases](https://github.com/Emperiusm/PRISM/releases/latest)
+2. Download `prism-vX.X.X-windows-x64.zip`
+3. Extract it — you get `prism-server.exe` and `prism-client.exe`
+
+> **SmartScreen warning:** Windows may show "Windows protected your PC" because the exe is unsigned. Click **More info** → **Run anyway**. This is safe — you can verify the source code yourself.
+
+### Option B: Build from Source
 
 ```bash
+# Requires Rust 1.85+ — https://rustup.rs
 git clone https://github.com/Emperiusm/PRISM.git
 cd PRISM
 cargo build --release -p prism-server -p prism-client
+# Binaries are in target/release/
 ```
 
-### 2. Start the Server
+### Step 1: Start the Server (on the remote computer)
 
 ```bash
-# Test pattern mode (works anywhere, no desktop capture)
-cargo run --release -p prism-server
+# Share your real desktop
+prism-server.exe --dda
 
-# Real desktop capture
-cargo run --release -p prism-server -- --dda
-
-# See all options
-cargo run --release -p prism-server -- --help
+# Or test locally with a synthetic test pattern (no desktop capture)
+prism-server.exe
 ```
 
-### 3. Connect the Client
+The server starts listening on port **7000**. Note the computer's IP address (run `ipconfig` to find it, e.g. `192.168.1.100`).
+
+### Step 2: Connect the Client (on your computer)
 
 ```bash
-# Open the launcher (connection manager with saved servers)
-cargo run --release -p prism-client
-
-# Direct connect (skips launcher)
-cargo run --release -p prism-client -- 192.168.1.100:7000
-
-# See all options
-cargo run --release -p prism-client -- --help
+# Direct connect — replace with the server's IP
+prism-client.exe 192.168.1.100:7000
 ```
 
-The launcher opens with a quick-connect bar and saved server card grid. Click a card or type an address to connect. A stream window opens showing the server's display with H.264 decoding. Double-tap Left Ctrl to open the in-session overlay for performance stats and quality controls.
+A window opens showing the remote desktop. Your mouse and keyboard are forwarded — you're controlling the remote machine.
 
-### 4. Enable Encryption (Recommended)
+**To test on a single machine** (both server and client on the same PC):
 
 ```bash
-# Server — prints a 64-character hex public key on startup
-cargo run --release -p prism-server -- --dda --noise
+# Terminal 1: start server
+prism-server.exe --dda
 
-# Client — paste the server's public key
-cargo run --release -p prism-client -- 192.168.1.100:7000 --noise <server-public-key>
+# Terminal 2: connect client to localhost
+prism-client.exe 127.0.0.1:7000
+```
+
+### Step 3: Enable Encryption (Recommended)
+
+Without encryption, video and input travel unencrypted over the network. To enable end-to-end encryption:
+
+```bash
+# Server — add --noise flag. It prints a 64-character hex public key on startup.
+prism-server.exe --dda --noise
+# Output: Server public key: a3f1...beef
+
+# Client — paste the server's public key after --noise
+prism-client.exe 192.168.1.100:7000 --noise a3f1...beef
 ```
 
 First connection is auto-paired (SSH-style TOFU). Subsequent connections are recognized instantly.
 
-### 5. Multi-Monitor
+### Firewall / Network Notes
+
+- The server listens on **UDP port 7000** (QUIC protocol)
+- If connecting over a local network (same Wi-Fi/Ethernet), it should work immediately
+- If connecting over the internet, you need to **port-forward UDP 7000** on the server's router, or use a VPN
+- Windows Firewall may prompt to allow `prism-server.exe` through — click **Allow**
+
+### Multi-Monitor
 
 ```bash
 # Capture the second monitor (0-indexed)
-cargo run --release -p prism-server -- --dda --monitor 1
+prism-server.exe --dda --monitor 1
 ```
+
+### Controls
+
+| Action | How |
+|--------|-----|
+| Move mouse / type | Just use your mouse and keyboard — input is forwarded |
+| Copy/paste | Clipboard syncs automatically between machines |
+| Disconnect | Close the client window or press Escape |
 
 ---
 
