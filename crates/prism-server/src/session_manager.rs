@@ -33,9 +33,9 @@ impl SessionManager {
     /// Initialise all subsystems with the provided server configuration.
     pub fn new(config: ServerConfig) -> Self {
         let (event_tx, _) = broadcast::channel(64);
-        let tombstone_max = config.tombstone_max_age.as_secs();
-        let suspend = config.heartbeat_suspend;
-        let tombstone_dur = config.heartbeat_tombstone;
+        let tombstone_max = config.tombstone_max_age().as_secs();
+        let suspend = config.heartbeat_suspend();
+        let tombstone_dur = config.heartbeat_tombstone();
         let total_bps = config.total_bandwidth_bps;
         Self {
             clients: HashMap::new(),
@@ -265,10 +265,12 @@ mod tests {
     }
 
     fn make_manager() -> SessionManager {
+        // Use large values so heartbeat expiry only triggers when explicitly
+        // tested; precise sub-second timing is not needed here.
         let config = ServerConfig {
-            heartbeat_suspend: std::time::Duration::from_millis(10),
-            heartbeat_tombstone: std::time::Duration::from_millis(20),
-            tombstone_max_age: std::time::Duration::from_secs(300),
+            heartbeat_suspend_secs: 3600,
+            heartbeat_tombstone_secs: 7200,
+            tombstone_max_age_secs: 300,
             ..ServerConfig::default()
         };
         SessionManager::new(config)
