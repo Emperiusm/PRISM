@@ -269,20 +269,19 @@ impl UiRenderer {
             mapped_at_creation: false,
         });
 
-        let flat_instance_bgl =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("ui-flat-instance-bgl"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            });
+        let flat_instance_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("ui-flat-instance-bgl"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
 
         let glass_instance_bgl =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -367,7 +366,11 @@ impl UiRenderer {
         });
         let glass_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("ui-glass-pipeline-layout"),
-            bind_group_layouts: &[&screen_bgl, &glass_instance_bgl, &backdrop_bind_group_layout],
+            bind_group_layouts: &[
+                &screen_bgl,
+                &glass_instance_bgl,
+                &backdrop_bind_group_layout,
+            ],
             push_constant_ranges: &[],
         });
 
@@ -472,7 +475,12 @@ impl UiRenderer {
             .take(MAX_GLASS_QUADS)
             .map(|gq| GlassInstance {
                 rect: [gq.rect.x, gq.rect.y, gq.rect.w, gq.rect.h],
-                blur_rect: [gq.blur_rect.x, gq.blur_rect.y, gq.blur_rect.w, gq.blur_rect.h],
+                blur_rect: [
+                    gq.blur_rect.x,
+                    gq.blur_rect.y,
+                    gq.blur_rect.w,
+                    gq.blur_rect.h,
+                ],
                 tint: gq.tint,
                 border_color: gq.border_color,
                 corner_radius: gq.corner_radius,

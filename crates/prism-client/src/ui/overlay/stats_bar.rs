@@ -92,11 +92,21 @@ impl StatsBar {
     }
 
     fn fps_rect(&self) -> Rect {
-        Rect::new(self.rect.x + 18.0, self.rect.y + 6.0, 92.0, self.rect.h - 12.0)
+        Rect::new(
+            self.rect.x + 18.0,
+            self.rect.y + 6.0,
+            92.0,
+            self.rect.h - 12.0,
+        )
     }
 
     fn codec_rect(&self) -> Rect {
-        Rect::new(self.rect.x + 252.0, self.rect.y + 6.0, 220.0, self.rect.h - 12.0)
+        Rect::new(
+            self.rect.x + 252.0,
+            self.rect.y + 6.0,
+            220.0,
+            self.rect.h - 12.0,
+        )
     }
 
     fn pin_rect(&self) -> Rect {
@@ -156,7 +166,12 @@ impl Widget for StatsBar {
             self.rect,
             [0.12, 0.16, 0.22, 0.80 * alpha],
             if self.pinned {
-                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.20 * alpha]
+                [
+                    theme::ACCENT[0],
+                    theme::ACCENT[1],
+                    theme::ACCENT[2],
+                    0.20 * alpha,
+                ]
             } else {
                 [1.0, 1.0, 1.0, 0.16 * alpha]
             },
@@ -256,12 +271,22 @@ impl Widget for StatsBar {
         ctx.push_glass_quad(theme::glass_quad(
             pin_rect,
             if self.pinned {
-                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.14 * alpha]
+                [
+                    theme::ACCENT[0],
+                    theme::ACCENT[1],
+                    theme::ACCENT[2],
+                    0.14 * alpha,
+                ]
             } else {
                 [1.0, 1.0, 1.0, 0.05 * alpha]
             },
             if self.pinned {
-                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.22 * alpha]
+                [
+                    theme::ACCENT[0],
+                    theme::ACCENT[1],
+                    theme::ACCENT[2],
+                    0.22 * alpha,
+                ]
             } else {
                 [1.0, 1.0, 1.0, 0.08 * alpha]
             },
@@ -418,7 +443,10 @@ mod tests {
         bar.layout(Rect::new(0.0, 0.0, 960.0, 48.0));
         let mut ctx = PaintContext::new();
         bar.paint(&mut ctx);
-        assert!(ctx.text_runs.is_empty(), "hidden bar should emit no text runs");
+        assert!(
+            ctx.text_runs.is_empty(),
+            "hidden bar should emit no text runs"
+        );
         assert!(
             ctx.glass_quads.is_empty(),
             "hidden bar should emit no glass quads"

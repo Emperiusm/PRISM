@@ -52,7 +52,12 @@ impl Widget for Button {
         let hover = self.hover_anim.value();
         let (tint, border, text_color) = match self.style {
             ButtonStyle::Primary => (
-                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.86 + hover * 0.10],
+                [
+                    theme::ACCENT[0],
+                    theme::ACCENT[1],
+                    theme::ACCENT[2],
+                    0.86 + hover * 0.10,
+                ],
                 [1.0, 1.0, 1.0, 0.18 + hover * 0.10],
                 theme::TEXT_PRIMARY,
             ),

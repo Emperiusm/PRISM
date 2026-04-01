@@ -208,7 +208,10 @@ mod tests {
         let mut ctx = PaintContext::new();
         card.paint(&mut ctx);
 
-        assert!(ctx.glass_quads.len() >= 2, "expected card body and profile chip");
+        assert!(
+            ctx.glass_quads.len() >= 2,
+            "expected card body and profile chip"
+        );
         assert!(ctx.text_runs.len() >= 4, "expected primary card labels");
     }
 

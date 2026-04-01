@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Single-line text input widget.
 
-use super::{EventResponse, KeyCode, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use super::{
+    EventResponse, KeyCode, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+};
 use crate::ui::theme;
 
 pub struct TextInput {

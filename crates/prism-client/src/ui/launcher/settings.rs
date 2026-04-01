@@ -2,9 +2,7 @@
 //! Minimal settings panel showing identity path and version.
 
 use crate::ui::theme;
-use crate::ui::widgets::{
-    EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
-};
+use crate::ui::widgets::{EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
 
 // ---------------------------------------------------------------------------
 // SettingsPanel
