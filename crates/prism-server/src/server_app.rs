@@ -37,6 +37,8 @@ pub struct ServerApp {
     server_identity: Arc<prism_security::identity::LocalIdentity>,
     audit_log: Arc<AuditLog>,
     bound_addr_tx: Option<tokio::sync::oneshot::Sender<std::net::SocketAddr>>,
+    shutdown_rx: tokio::sync::watch::Receiver<bool>,
+    shutdown_tx: tokio::sync::watch::Sender<bool>,
 }
 
 impl ServerApp {
@@ -127,6 +129,9 @@ impl ServerApp {
         // Shared connection store for broadcasting frames
         let conn_store = Arc::new(ClientConnectionStore::new());
 
+        // Shutdown watch channel
+        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
         Ok(Self {
             use_dda,
             noise_mode,
@@ -140,6 +145,8 @@ impl ServerApp {
             server_identity,
             audit_log,
             bound_addr_tx: None,
+            shutdown_tx,
+            shutdown_rx,
         })
     }
 
@@ -163,6 +170,13 @@ impl ServerApp {
     /// Useful when binding to port 0 in tests.
     pub fn set_bound_addr_notify(&mut self, tx: tokio::sync::oneshot::Sender<std::net::SocketAddr>) {
         self.bound_addr_tx = Some(tx);
+    }
+
+    /// Return a clone of the shutdown sender.
+    ///
+    /// Send `true` through it to trigger graceful shutdown of the accept loop.
+    pub fn shutdown_tx(&self) -> tokio::sync::watch::Sender<bool> {
+        self.shutdown_tx.clone()
     }
 
     /// Bind the QUIC endpoint and enter the main accept loop.
@@ -714,11 +728,21 @@ impl ServerApp {
         });
 
         // ── Accept loop ───────────────────────────────────────────────────────
+        let mut shutdown_rx = self.shutdown_rx.clone();
         loop {
-            let incoming = match acceptor.accept().await {
-                Some(i) => i,
-                None => {
-                    tracing::info!("QUIC endpoint closed");
+            let incoming = tokio::select! {
+                incoming = acceptor.accept() => {
+                    match incoming {
+                        Some(i) => i,
+                        None => {
+                            tracing::info!("QUIC endpoint closed");
+                            break;
+                        }
+                    }
+                }
+                _ = shutdown_rx.changed() => {
+                    tracing::info!("shutdown signal received");
+                    acceptor.close();
                     break;
                 }
             };
