@@ -103,6 +103,9 @@ pub use throughput_endpoint::{ThroughputEndpointConfig, build_throughput_config,
 pub mod speculative_idr;
 pub mod encode_pool;
 pub mod static_cache;
+pub mod frame_tracer_task;
+pub mod client_metrics;
+pub mod metrics_collector;
 
 // speculative_idr
 pub use speculative_idr::SpeculativeIdrController;
@@ -112,3 +115,12 @@ pub use encode_pool::{EncodePoolConfig, EncodePoolStats, should_accept_job};
 
 // static_cache
 pub use static_cache::{CacheInstruction, CacheSavingsTracker};
+
+// frame_tracer_task
+pub use frame_tracer_task::PipelineTracer;
+
+// client_metrics
+pub use client_metrics::ClientMetrics;
+
+// metrics_collector
+pub use metrics_collector::MetricsCollector;
