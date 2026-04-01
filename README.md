@@ -15,9 +15,9 @@
 </p>
 
 <p align="center">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-657%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-754%20passing-brightgreen">
   <img alt="Crates" src="https://img.shields.io/badge/crates-11-blue">
-  <img alt="Lines" src="https://img.shields.io/badge/lines-23K%20Rust-orange">
+  <img alt="Lines" src="https://img.shields.io/badge/lines-33K%20Rust-orange">
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
 </p>
@@ -74,17 +74,17 @@ cargo run --release -p prism-server -- --help
 ### 3. Connect the Client
 
 ```bash
-# Same machine
+# Open the launcher (connection manager with saved servers)
 cargo run --release -p prism-client
 
-# Remote machine
+# Direct connect (skips launcher)
 cargo run --release -p prism-client -- 192.168.1.100:7000
 
 # See all options
 cargo run --release -p prism-client -- --help
 ```
 
-A window opens showing the server's display, streamed over QUIC with H.264 encoding. Mouse and keyboard input is forwarded back to the server. Clipboard syncs bidirectionally.
+The launcher opens with a quick-connect bar and saved server card grid. Click a card or type an address to connect. A stream window opens showing the server's display with H.264 decoding. Double-tap Left Ctrl to open the in-session overlay for performance stats and quality controls.
 
 ### 4. Enable Encryption (Recommended)
 
@@ -108,6 +108,15 @@ cargo run --release -p prism-server -- --dda --monitor 1
 ---
 
 ## Features
+
+### Interactive Client (Glassmorphism UI)
+
+- **GPU-accelerated renderer** — custom wgpu pipeline replacing minifb. Compute shader YUV→RGB conversion (<0.1ms vs ~3ms CPU), ring-buffered texture upload, two-pass Gaussian blur for frosted glass.
+- **Launcher window** — quick-connect hero bar with autocomplete, saved server card grid with hover animations, accent color stripes, add/edit/delete. Servers persisted via crash-safe append-only log with compaction (`~/.prism/servers.json`).
+- **In-session overlay** — double-tap Left Ctrl to toggle. Stats bar with color-coded metrics (FPS, latency, codec, bandwidth), profile switcher. Four floating sub-panels: Performance (sparkline graphs), Quality (encoder/FPS/bandwidth controls), Connection (info + disconnect), Display (monitor selector map).
+- **Glassmorphism design** — deep purple/indigo palette (#0d0b1a → #1a1035), frosted glass panels with noise texture, gradient borders, spring animations with elastic overshoot. 3 GPU draw calls for the entire UI via instanced batching.
+- **10 purpose-built widgets** — Label, Button, Separator, Checkbox, Slider, Sparkline, TextInput, Dropdown, MonitorMap. Spatial hash hit testing, arena-friendly draw commands, dirty rect tracking.
+- **Zero-latency overlay toggle** — 3-state double-tap detector (300ms window). Input routed to overlay when visible, forwarded to remote when hidden. Event coalescing reduces per-frame work.
 
 ### Display Streaming
 
@@ -207,9 +216,14 @@ cargo run --release -p prism-server -- --dda --monitor 1
 │                     PRISM Client                         │
 │                                                          │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
-│  │ H.264    │  │ Window   │  │ Input    │  │ Cursor  │ │
-│  │ Decoder  │→ │ Renderer │  │ Capture  │  │ Predict │ │
+│  │ H.264    │  │ wgpu     │  │ Input    │  │ Cursor  │ │
+│  │ Decoder  │→ │ Renderer │  │ Router   │  │ Predict │ │
 │  └──────────┘  └──────────┘  └──────────┘  └─────────┘ │
+│        ↓            ↑ ↓            ↑                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐               │
+│  │ Stream   │  │ Glass UI │  │ Session  │               │
+│  │ Texture  │  │ Overlay  │  │ Bridge   │               │
+│  └──────────┘  └──────────┘  └──────────┘               │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -226,7 +240,7 @@ cargo run --release -p prism-server -- --dda --monitor 1
 | `prism-display` | Pipeline types, FrameRing, classification, degradation | `prism-protocol` |
 | `prism-platform-windows` | DDA capture, NVENC config, texture pool, D3D11 | `windows` |
 | `prism-server` | ServerApp, handlers, quality, frame sender, overlay | all above |
-| `prism-client` | ClientApp, decoder, input, cursor, jitter buffer | `minifb`, `openh264` |
+| `prism-client` | Interactive client, wgpu renderer, glassmorphism UI, launcher, overlay | `wgpu`, `winit`, `glyphon`, `openh264` |
 
 ---
 
@@ -357,8 +371,11 @@ CLI flags override config file values.
 
 | Flag | Description |
 |---|---|
-| `HOST:PORT` | Server address (default: `127.0.0.1:7000`) |
+| *(no args)* | Open launcher (connection manager) |
+| `HOST:PORT` | Direct connect (skips launcher, exits on disconnect) |
 | `--noise <KEY>` | Server's Noise IK public key (64-char hex) |
+| `--config <PATH>` | Custom config directory (default: `~/.prism`) |
+| `--init` | Generate default `servers.json` and exit |
 | `--help` | Print help and exit |
 | `--version` | Print version and exit |
 
@@ -383,6 +400,8 @@ The encoder auto-detects: NVENC > QSV > AMF > software fallback.
 | Paired devices | `./pairing.json` | Automatic on first pairing |
 | Session tombstones | `./tombstones.json` | Automatic |
 | Client identity | `~/.prism/client_identity.json` | Automatic on first run |
+| Saved servers | `~/.prism/servers.json` | `--init` or automatic |
+| Shader cache | `~/.prism/shader_cache/` | Automatic on first run |
 
 ---
 
@@ -395,14 +414,14 @@ git clone https://github.com/Emperiusm/PRISM.git
 cd PRISM
 cargo build                    # Debug build
 cargo build --release          # Optimized (LTO, strip)
-cargo test --workspace         # Run all 657 tests
+cargo test --workspace         # Run all 754 tests
 cargo clippy --workspace       # Zero warnings
 ```
 
 ### Project Stats
 
 ```
-11 crates | 657 tests | 23K lines of Rust | 137 source files | 0 clippy warnings
+11 crates | 754 tests | 33K lines of Rust | 184 source files | 0 clippy warnings
 ```
 
 ### Release Build Profile
@@ -436,6 +455,18 @@ opt-level = 3
 - [x] TOML configuration
 - [x] Structured logging (tracing)
 - [x] Performance overlay HUD
+
+### Phase 1.5 (Current)
+
+- [x] Interactive client with glassmorphism UI (wgpu renderer)
+- [x] Launcher window with saved server management
+- [x] In-session overlay (stats, quality, connection, display panels)
+- [x] Custom widget system (10 widgets, GPU-batched rendering)
+- [x] SessionBridge channel architecture (UI↔Network)
+- [x] Server parallel stream acceptance (Noise + capability concurrent)
+- [ ] Wire launcher → connection → stream full lifecycle
+- [ ] Live server thumbnail previews on launcher cards
+- [ ] mDNS/DNS-SD server auto-discovery
 
 ### Phase 2
 
@@ -471,7 +502,9 @@ PRISM was built with these excellent Rust crates:
 - [quinn](https://github.com/quinn-rs/quinn) — QUIC protocol implementation
 - [snow](https://github.com/mcginty/snow) — Noise protocol framework
 - [openh264](https://github.com/ralfbiedert/openh264-rs) — H.264 codec
-- [minifb](https://github.com/emoon/rust_minifb) — Framebuffer window
+- [wgpu](https://github.com/gfx-rs/wgpu) — GPU-accelerated rendering
+- [winit](https://github.com/rust-windowing/winit) — Cross-platform windowing
+- [glyphon](https://github.com/grovesNL/glyphon) — GPU text rendering
 - [windows-rs](https://github.com/microsoft/windows-rs) — Win32 API bindings
 
 ---
