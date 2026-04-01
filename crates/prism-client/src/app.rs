@@ -17,7 +17,6 @@ use crate::renderer::PrismRenderer;
 use crate::renderer::stream_texture::StreamTexture;
 use crate::renderer::ui_renderer::UiRenderer;
 use crate::session_bridge::SessionBridge;
-use crate::ui::UiState;
 use crate::ui::launcher::card_grid::CardGrid;
 use crate::ui::launcher::quick_connect::QuickConnect;
 use crate::ui::overlay::conn_panel::ConnPanel;
@@ -25,9 +24,10 @@ use crate::ui::overlay::display_panel::DisplayPanel;
 use crate::ui::overlay::perf_panel::PerfPanel;
 use crate::ui::overlay::quality_panel::QualityPanel;
 use crate::ui::overlay::stats_bar::StatsBar;
+use crate::ui::{UiState, theme};
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, MouseButton as UiMouseButton, PaintContext, Rect, TextRun, UiAction,
-    UiEvent, Widget,
+    EventResponse, MouseButton as UiMouseButton, PaintContext, Rect, TextRun, UiAction, UiEvent,
+    Widget,
 };
 
 /// Top-level PRISM application — owns the winit window, wgpu renderer, and UI state.
@@ -526,7 +526,7 @@ impl PrismApp {
                 label: Some("Frame Encoder"),
             });
 
-        // Clear to the deep purple background
+        // Clear to the dark slate background
         {
             let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Clear Pass"),
@@ -535,9 +535,9 @@ impl PrismApp {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.051,
-                            g: 0.043,
-                            b: 0.102,
+                            r: theme::BACKDROP[0],
+                            g: theme::BACKDROP[1],
+                            b: theme::BACKDROP[2],
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -646,30 +646,33 @@ impl PrismApp {
 
             // Layout and paint stats bar
             self.stats_bar.show();
-            self.stats_bar.layout(Rect::new(0.0, 0.0, screen_w, 36.0));
+            let bar_w = (screen_w - 40.0).min(960.0);
+            let bar_x = (screen_w - bar_w) * 0.5;
+            self.stats_bar.layout(Rect::new(bar_x, 18.0, bar_w, 48.0));
             self.stats_bar.paint(&mut self.paint_ctx);
 
             // Layout and paint visible sub-panels below the stats bar
-            let mut panel_x = 8.0;
-            let panel_y = 44.0;
+            let mut panel_x = bar_x;
+            let panel_y = 84.0;
+            let panel_gap = 16.0;
 
             if self.perf_panel.is_visible() {
                 self.perf_panel
                     .layout(Rect::new(panel_x, panel_y, 260.0, 220.0));
                 self.perf_panel.paint(&mut self.paint_ctx);
-                panel_x += 268.0;
+                panel_x += 260.0 + panel_gap;
             }
             if self.quality_panel.is_visible() {
                 self.quality_panel
                     .layout(Rect::new(panel_x, panel_y, 260.0, 280.0));
                 self.quality_panel.paint(&mut self.paint_ctx);
-                panel_x += 268.0;
+                panel_x += 260.0 + panel_gap;
             }
             if self.conn_panel.is_visible() {
                 self.conn_panel
                     .layout(Rect::new(panel_x, panel_y, 260.0, 200.0));
                 self.conn_panel.paint(&mut self.paint_ctx);
-                panel_x += 268.0;
+                panel_x += 260.0 + panel_gap;
             }
             if self.display_panel.is_visible() {
                 self.display_panel
@@ -697,66 +700,76 @@ impl PrismApp {
             let screen_h = renderer.height() as f32;
 
             // Layout widgets
-            let padding = 24.0;
+            let content_w = (screen_w - 96.0).min(1040.0);
+            let content_x = (screen_w - content_w) * 0.5;
+            let quick_y = 150.0;
+            let section_y = quick_y + 130.0;
+            let card_y = section_y + 34.0;
 
-            // QuickConnect bar at y=60
             self.quick_connect
-                .layout(Rect::new(padding, 60.0, screen_w - padding * 2.0, 60.0));
-
-            // CardGrid below at y=140
+                .layout(Rect::new(content_x, quick_y, content_w, 94.0));
             self.card_grid.layout(Rect::new(
-                padding,
-                140.0,
-                screen_w - padding * 2.0,
-                screen_h - 160.0,
+                content_x,
+                card_y,
+                content_w,
+                (screen_h - card_y - 40.0).max(0.0),
             ));
 
             // Paint into PaintContext
             self.paint_ctx.clear();
 
-            // Title text
             self.paint_ctx.push_text_run(TextRun {
-                x: padding,
-                y: 20.0,
+                x: content_x,
+                y: 52.0,
                 text: "PRISM".to_string(),
-                font_size: 32.0,
-                color: [1.0, 1.0, 1.0, 0.95],
+                font_size: 44.0,
+                color: theme::TEXT_PRIMARY,
                 monospace: false,
             });
 
-            // Subtitle
             self.paint_ctx.push_text_run(TextRun {
-                x: padding + 110.0,
-                y: 25.0,
-                text: "Remote Desktop".to_string(),
-                font_size: 12.0,
-                color: [0.6, 0.5, 0.8, 0.5],
+                x: content_x,
+                y: 104.0,
+                text: "Connect instantly or reopen the desktops you use most.".to_string(),
+                font_size: 14.0,
+                color: theme::TEXT_SECONDARY,
                 monospace: false,
             });
 
-            // Show "Connecting..." indicator
             if self.ui_state == UiState::Connecting {
+                let status_rect = Rect::new(content_x + 268.0, 56.0, 148.0, 28.0);
+                self.paint_ctx.push_glass_quad(theme::glass_quad(
+                    status_rect,
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.12],
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.18],
+                    theme::CHIP_RADIUS,
+                ));
                 self.paint_ctx.push_text_run(TextRun {
-                    x: screen_w / 2.0 - 60.0,
-                    y: screen_h / 2.0,
+                    x: status_rect.x + 14.0,
+                    y: status_rect.y + 6.0,
                     text: "Connecting...".to_string(),
-                    font_size: 18.0,
-                    color: [0.8, 0.7, 1.0, 0.9],
+                    font_size: 12.0,
+                    color: theme::TEXT_PRIMARY,
                     monospace: false,
                 });
             }
 
             self.quick_connect.paint(&mut self.paint_ctx);
 
-            // Separator line between quick connect bar and card grid
-            self.paint_ctx.push_glass_quad(GlassQuad {
-                rect: Rect::new(padding, 130.0, screen_w - padding * 2.0, 1.0),
-                blur_rect: Rect::new(padding, 130.0, screen_w - padding * 2.0, 1.0),
-                tint: [1.0, 1.0, 1.0, 0.04],
-                border_color: [0.0, 0.0, 0.0, 0.0],
-                corner_radius: 0.0,
-                noise_intensity: 0.0,
+            self.paint_ctx.push_text_run(TextRun {
+                x: content_x,
+                y: section_y,
+                text: "Saved desktops".to_string(),
+                font_size: 12.0,
+                color: theme::TEXT_MUTED,
+                monospace: false,
             });
+            self.paint_ctx.push_glass_quad(theme::separator(Rect::new(
+                content_x,
+                section_y + 20.0,
+                content_w,
+                1.0,
+            )));
 
             self.card_grid.paint(&mut self.paint_ctx);
 

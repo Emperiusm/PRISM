@@ -2,11 +2,12 @@
 //! Add/Edit server form overlay.
 
 use crate::config::servers::SavedServer;
-use crate::ui::widgets::button::Button;
+use crate::ui::theme;
+use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::text_input::TextInput;
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    EventResponse, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------
@@ -32,8 +33,9 @@ impl ServerForm {
             address_input: TextInput::new("host:port"),
             noise_key_input: TextInput::new("Noise public key (optional)"),
             profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0),
-            save_button: Button::new("Save", UiAction::AddServer),
-            cancel_button: Button::new("Cancel", UiAction::CloseOverlay),
+            save_button: Button::new("Save", UiAction::AddServer).with_style(ButtonStyle::Primary),
+            cancel_button: Button::new("Cancel", UiAction::CloseOverlay)
+                .with_style(ButtonStyle::Secondary),
             editing_id: None,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             visible: false,
@@ -152,14 +154,7 @@ impl Widget for ServerForm {
         }
 
         // Glass panel background
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.08, 0.0, 0.15, 0.20],
-            border_color: [1.0, 1.0, 1.0, 0.2],
-            corner_radius: 12.0,
-            noise_intensity: 0.03,
-        });
+        ctx.push_glass_quad(theme::floating_surface(self.rect));
 
         // Title
         let title = if self.editing_id.is_some() {
@@ -172,7 +167,7 @@ impl Widget for ServerForm {
             y: self.rect.y + 16.0,
             text: title.to_string(),
             font_size: 16.0,
-            color: [1.0, 1.0, 1.0, 0.95],
+            color: theme::TEXT_PRIMARY,
             monospace: false,
         });
 

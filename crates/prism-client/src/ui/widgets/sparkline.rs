@@ -2,6 +2,7 @@
 //! Sparkline chart widget for time-series metrics.
 
 use super::{EventResponse, GlowRect, PaintContext, Rect, Size, UiEvent, Widget};
+use crate::ui::theme;
 
 pub struct Sparkline {
     values: Vec<f32>,
@@ -24,7 +25,7 @@ impl Sparkline {
             min_val: 0.0,
             max_val: 1.0,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
-            accent_color: [0.55, 0.36, 0.96, 0.8],
+            accent_color: [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.72],
         }
     }
 

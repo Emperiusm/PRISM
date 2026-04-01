@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Glassmorphism server card with hover animation.
+//! Saved server card with calmer glass styling and hover feedback.
 
 use crate::config::servers::SavedServer;
 use crate::renderer::animation::{Animation, EaseCurve};
+use crate::ui::theme;
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, GlowRect, MouseButton, PaintContext, Rect, Size, TextRun, UiAction,
-    UiEvent, Widget,
+    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
-
-// ---------------------------------------------------------------------------
-// ServerCard
-// ---------------------------------------------------------------------------
 
 pub struct ServerCard {
     server_id: uuid::Uuid,
@@ -25,6 +21,9 @@ pub struct ServerCard {
 }
 
 impl ServerCard {
+    pub const WIDTH: f32 = 264.0;
+    pub const HEIGHT: f32 = 164.0;
+
     /// Build a `ServerCard` from a `SavedServer`.
     pub fn from_saved(server: &SavedServer) -> Self {
         let accent_color = [
@@ -34,7 +33,7 @@ impl ServerCard {
         ];
 
         let last_info = match (&server.last_codec, &server.last_resolution) {
-            (Some(codec), Some((w, h))) => format!("{} · {}×{}", codec, w, h),
+            (Some(codec), Some((w, h))) => format!("{codec} at {w}x{h}"),
             _ => String::from("Never connected"),
         };
 
@@ -47,7 +46,7 @@ impl ServerCard {
             accent_color,
             hover_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             hovered: false,
-            rect: Rect::new(0.0, 0.0, 240.0, 140.0),
+            rect: Rect::new(0.0, 0.0, Self::WIDTH, Self::HEIGHT),
         }
     }
 
@@ -58,95 +57,92 @@ impl ServerCard {
 
 impl Widget for ServerCard {
     fn layout(&mut self, available: Rect) -> Size {
-        self.rect = Rect::new(available.x, available.y, 240.0, 140.0);
-        Size { w: 240.0, h: 140.0 }
+        self.rect = Rect::new(available.x, available.y, Self::WIDTH, Self::HEIGHT);
+        Size {
+            w: Self::WIDTH,
+            h: Self::HEIGHT,
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
         let r = self.rect;
+        let hover = self.hover_anim.value();
+        let accent = [
+            self.accent_color[0],
+            self.accent_color[1],
+            self.accent_color[2],
+            1.0,
+        ];
 
-        // 1. Glass card body
-        ctx.push_glass_quad(GlassQuad {
-            rect: r,
-            blur_rect: r,
-            tint: [0.10, 0.05, 0.18, 0.20],
-            border_color: [1.0, 1.0, 1.0, 0.06],
-            corner_radius: 10.0,
-            noise_intensity: 0.03,
-        });
+        ctx.push_glass_quad(theme::card_surface(r));
 
-        // 2. Accent stripe — 4 px wide on left edge
-        let stripe = Rect::new(r.x, r.y, 4.0, r.h);
-        ctx.push_glow_rect(GlowRect {
-            rect: stripe,
-            color: [
-                self.accent_color[0],
-                self.accent_color[1],
-                self.accent_color[2],
-                0.7,
-            ],
-            spread: 0.0,
-            intensity: 1.0,
-        });
-
-        // 3. Hover glow (when hover_anim > 0.01)
-        let hover_val = self.hover_anim.value();
-        if hover_val > 0.01 {
-            ctx.push_glow_rect(GlowRect {
-                rect: r,
-                color: [
-                    self.accent_color[0],
-                    self.accent_color[1],
-                    self.accent_color[2],
-                    hover_val * 0.15,
-                ],
-                spread: 8.0,
-                intensity: hover_val * 0.3,
-            });
+        if hover > 0.01 {
+            ctx.push_glass_quad(theme::glass_quad(
+                r,
+                [accent[0], accent[1], accent[2], 0.05 + hover * 0.08],
+                [accent[0], accent[1], accent[2], 0.08 + hover * 0.10],
+                theme::CARD_RADIUS,
+            ));
         }
 
-        // 4. Display name
+        let accent_dot = Rect::new(r.x + 18.0, r.y + 18.0, 10.0, 10.0);
+        ctx.push_glass_quad(theme::glass_quad(
+            accent_dot,
+            [accent[0], accent[1], accent[2], 0.78],
+            [1.0, 1.0, 1.0, 0.08],
+            5.0,
+        ));
+
         ctx.push_text_run(TextRun {
-            x: r.x + 16.0,
-            y: r.y + 16.0,
+            x: r.x + 36.0,
+            y: r.y + 14.0,
             text: self.display_name.clone(),
-            font_size: 15.0,
-            color: [1.0, 1.0, 1.0, 0.92],
+            font_size: 16.0,
+            color: theme::TEXT_PRIMARY,
             monospace: false,
         });
 
-        // 5. Address
         ctx.push_text_run(TextRun {
-            x: r.x + 16.0,
-            y: r.y + 38.0,
+            x: r.x + 18.0,
+            y: r.y + 44.0,
             text: self.address.clone(),
             font_size: 12.0,
-            color: [1.0, 1.0, 1.0, 0.55],
+            color: theme::TEXT_SECONDARY,
             monospace: false,
         });
 
-        // 6. Last info
         ctx.push_text_run(TextRun {
-            x: r.x + 16.0,
-            y: r.y + 58.0,
-            text: self.last_info.clone(),
+            x: r.x + 18.0,
+            y: r.y + 78.0,
+            text: "Last session".into(),
             font_size: 11.0,
-            color: [1.0, 1.0, 1.0, 0.55],
+            color: theme::TEXT_TERTIARY,
             monospace: false,
         });
 
-        // 7. Last profile
         ctx.push_text_run(TextRun {
-            x: r.x + 16.0,
-            y: r.y + 110.0,
+            x: r.x + 18.0,
+            y: r.y + 96.0,
+            text: self.last_info.clone(),
+            font_size: 12.0,
+            color: theme::TEXT_SECONDARY,
+            monospace: false,
+        });
+
+        let chip_w = theme::text_width(&self.last_profile, 11.0) + 24.0;
+        let chip_rect = Rect::new(r.x + 18.0, r.y + r.h - 38.0, chip_w, 22.0);
+        ctx.push_glass_quad(theme::glass_quad(
+            chip_rect,
+            [accent[0], accent[1], accent[2], 0.14],
+            [accent[0], accent[1], accent[2], 0.18],
+            theme::CHIP_RADIUS,
+        ));
+        ctx.push_text_run(TextRun {
+            x: chip_rect.x + 12.0,
+            y: chip_rect.y + 4.0,
             text: self.last_profile.clone(),
             font_size: 11.0,
-            color: [
-                self.accent_color[0],
-                self.accent_color[1],
-                self.accent_color[2],
-                0.85,
-            ],
+            color: [accent[0], accent[1], accent[2], 0.92],
             monospace: false,
         });
     }
@@ -187,10 +183,6 @@ impl Widget for ServerCard {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,8 +208,8 @@ mod tests {
         let mut ctx = PaintContext::new();
         card.paint(&mut ctx);
 
-        assert!(ctx.glass_quads.len() >= 1, "expected at least 1 glass quad");
-        assert!(ctx.text_runs.len() >= 3, "expected at least 3 text runs");
+        assert!(ctx.glass_quads.len() >= 2, "expected card body and profile chip");
+        assert!(ctx.text_runs.len() >= 4, "expected primary card labels");
     }
 
     #[test]

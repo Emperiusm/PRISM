@@ -3,6 +3,7 @@
 
 pub mod launcher;
 pub mod overlay;
+pub mod theme;
 pub mod widgets;
 
 use crate::config::LaunchMode;

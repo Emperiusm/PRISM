@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-monitor layout map widget.
 
-use super::{
-    EventResponse, GlassQuad, GlowRect, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent,
-    Widget,
-};
+use super::{EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use crate::ui::theme;
 
 #[derive(Debug, Clone)]
 pub struct MonitorInfo {
@@ -102,37 +100,33 @@ impl Widget for MonitorMap {
             let r = self.scaled_rect(mon);
             let is_selected = mon.index == self.selected;
 
-            let tint = if is_selected {
-                [0.55, 0.36, 0.96, 0.2]
-            } else {
-                [0.1, 0.0, 0.2, 0.15]
-            };
-
-            ctx.push_glass_quad(GlassQuad {
-                rect: r,
-                blur_rect: r,
-                tint,
-                border_color: [1.0, 1.0, 1.0, if is_selected { 0.4 } else { 0.15 }],
-                corner_radius: 3.0,
-                noise_intensity: 0.0,
-            });
-
-            if is_selected {
-                ctx.push_glow_rect(GlowRect {
-                    rect: r,
-                    color: [0.55, 0.36, 0.96, 0.6],
-                    spread: 4.0,
-                    intensity: 0.8,
-                });
-            }
+            ctx.push_glass_quad(theme::glass_quad(
+                r,
+                if is_selected {
+                    [0.22, 0.30, 0.39, 0.94]
+                } else {
+                    [0.14, 0.18, 0.24, 0.86]
+                },
+                if is_selected {
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.34]
+                } else {
+                    [1.0, 1.0, 1.0, 0.12]
+                },
+                6.0,
+            ));
 
             // Index number centered
+            let label = mon.index.to_string();
             ctx.push_text_run(TextRun {
-                x: r.x + r.w * 0.5,
-                y: r.y + r.h * 0.5,
-                text: format!("{}", mon.index),
+                x: r.x + (r.w - theme::text_width(&label, 11.0)) * 0.5,
+                y: r.y + (r.h - 11.0) * 0.5 - 1.0,
+                text: label,
                 font_size: 11.0,
-                color: [1.0, 1.0, 1.0, 0.9],
+                color: if is_selected {
+                    theme::TEXT_PRIMARY
+                } else {
+                    theme::TEXT_SECONDARY
+                },
                 monospace: false,
             });
         }

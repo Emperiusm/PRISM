@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Horizontal value slider widget.
 
-use super::{
-    EventResponse, GlassQuad, GlowRect, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent,
-    Widget,
-};
+use super::{EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use crate::ui::theme;
 
 pub struct Slider {
     label: String,
@@ -77,6 +75,7 @@ impl Widget for Slider {
         let track = self.track_rect();
         let thumb_x = self.value_to_x(self.value);
         const THUMB_SIZE: f32 = 12.0;
+        let value_text = (self.display_format)(self.value);
 
         // Label (left) and value (right)
         ctx.push_text_run(TextRun {
@@ -84,38 +83,36 @@ impl Widget for Slider {
             y: self.rect.y,
             text: self.label.clone(),
             font_size: 12.0,
-            color: [1.0, 1.0, 1.0, 0.8],
+            color: theme::TEXT_SECONDARY,
             monospace: false,
         });
         ctx.push_text_run(TextRun {
-            x: self.rect.x + self.rect.w,
+            x: self.rect.x + self.rect.w - theme::text_width(&value_text, 12.0),
             y: self.rect.y,
-            text: (self.display_format)(self.value),
+            text: value_text,
             font_size: 12.0,
-            color: [1.0, 1.0, 1.0, 0.9],
+            color: theme::TEXT_PRIMARY,
             monospace: true,
         });
 
         // Track background
-        ctx.push_glass_quad(GlassQuad {
-            rect: track,
-            blur_rect: track,
-            tint: [1.0, 1.0, 1.0, 0.08],
-            border_color: [1.0, 1.0, 1.0, 0.1],
-            corner_radius: 3.0,
-            noise_intensity: 0.0,
-        });
+        ctx.push_glass_quad(theme::glass_quad(
+            track,
+            [0.17, 0.21, 0.28, 0.88],
+            [1.0, 1.0, 1.0, 0.08],
+            4.0,
+        ));
 
         // Fill from left to thumb
         let fill_w = (thumb_x - track.x).max(0.0);
         if fill_w > 0.0 {
             let fill_rect = Rect::new(track.x, track.y, fill_w, track.h);
-            ctx.push_glow_rect(GlowRect {
-                rect: fill_rect,
-                color: [0.55, 0.36, 0.96, 0.8],
-                spread: 2.0,
-                intensity: 0.8,
-            });
+            ctx.push_glass_quad(theme::glass_quad(
+                fill_rect,
+                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.72],
+                [0.0, 0.0, 0.0, 0.0],
+                4.0,
+            ));
         }
 
         // Thumb
@@ -125,12 +122,12 @@ impl Widget for Slider {
             THUMB_SIZE,
             THUMB_SIZE,
         );
-        ctx.push_glow_rect(GlowRect {
-            rect: thumb_rect,
-            color: [0.55, 0.36, 0.96, 1.0],
-            spread: 4.0,
-            intensity: 1.0,
-        });
+        ctx.push_glass_quad(theme::glass_quad(
+            thumb_rect,
+            [0.93, 0.96, 1.0, 0.92],
+            [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.40],
+            6.0,
+        ));
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {

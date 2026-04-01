@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Single-line text input widget.
 
-use super::{
-    EventResponse, GlassQuad, KeyCode, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent,
-    Widget,
-};
+use super::{EventResponse, KeyCode, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use crate::ui::theme;
 
 pub struct TextInput {
     text: String,
@@ -51,30 +49,23 @@ impl TextInput {
 
 impl Widget for TextInput {
     fn layout(&mut self, available: Rect) -> Size {
-        let h = 36.0;
+        let h = 42.0;
         self.rect = Rect::new(available.x, available.y, available.w, h);
         Size { w: available.w, h }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.06, 0.03, 0.12, 0.30],
-            border_color: [1.0, 1.0, 1.0, if self.focused { 0.15 } else { 0.06 }],
-            corner_radius: 6.0,
-            noise_intensity: 0.0,
-        });
+        ctx.push_glass_quad(theme::control_surface(self.rect, self.focused));
 
         let (display_text, color) = if self.text.is_empty() {
-            (self.placeholder.clone(), [1.0, 1.0, 1.0, 0.35_f32])
+            (self.placeholder.clone(), theme::TEXT_TERTIARY)
         } else {
-            (self.text.clone(), [1.0, 1.0, 1.0, 0.92_f32])
+            (self.text.clone(), theme::TEXT_PRIMARY)
         };
 
         ctx.push_text_run(TextRun {
-            x: self.rect.x + 10.0,
-            y: self.rect.y + 10.0,
+            x: self.rect.x + 14.0,
+            y: self.rect.y + (self.rect.h - 14.0) * 0.5 - 1.0,
             text: display_text,
             font_size: 14.0,
             color,
