@@ -18,6 +18,7 @@ pub mod control_handler;
 pub mod input_handler;
 pub mod audio_sender;
 pub mod quality_task;
+pub mod clipboard_stream;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
 
@@ -71,3 +72,6 @@ pub use server_app::ServerApp;
 
 // quality_task
 pub use quality_task::{QualityCache, build_probe_datagram, evaluate_quality};
+
+// clipboard_stream
+pub use clipboard_stream::ClipboardSyncState;
