@@ -118,10 +118,7 @@ impl ServerConfig {
     /// Load configuration from `path` if the file exists; silently fall back
     /// to [`Default::default`] on any error (missing file, parse error, etc.).
     pub fn load_or_default(path: &std::path::Path) -> Self {
-        match Self::load_from_file(path) {
-            Ok(cfg) => cfg,
-            Err(_) => Self::default(),
-        }
+        Self::load_from_file(path).unwrap_or_default()
     }
 }
 

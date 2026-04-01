@@ -413,9 +413,9 @@ impl ServerApp {
                 // client and update the QualityCache.  Then adjust current_interval
                 // based on the recommendation so we back off under poor network
                 // conditions without a runtime bitrate-reconfigure method.
-                if seq % 8 == 0 {
+                if seq.is_multiple_of(8) {
                     let conns_snap = conn_store_send.snapshot_with_ids();
-                    for (_, conn) in &conns_snap {
+                    if let Some((_, conn)) = conns_snap.first() {
                         let stats = conn.stats();
                         let metrics = prism_transport::TransportMetrics {
                             rtt_us: stats.path.rtt.as_micros() as u64,
@@ -424,7 +424,6 @@ impl ServerApp {
                         };
                         let quality = crate::quality_task::evaluate_quality(&metrics);
                         quality_cache.update(quality);
-                        break; // use first client only
                     }
                     let quality = quality_cache.load();
                     use prism_transport::quality::QualityRecommendation;
@@ -528,7 +527,7 @@ impl ServerApp {
                 }
 
                 // Log cache savings every 15 frames (~1 second at 15fps).
-                if seq % 15 == 0 && cache_savings.bytes_saved() > 0 {
+                if seq.is_multiple_of(15) && cache_savings.bytes_saved() > 0 {
                     tracing::debug!(
                         hit_rate = cache_savings.cache_hit_rate(),
                         saved_kb = cache_savings.bytes_saved() / 1024,
@@ -747,6 +746,7 @@ impl ServerApp {
 ///
 /// This is a free function (not a method) so it can be moved into a `tokio::spawn`
 /// task without borrowing `ServerApp`.
+#[allow(clippy::too_many_arguments)]
 async fn handle_connection(
     incoming: quinn::Incoming,
     sm: Arc<Mutex<SessionManager>>,
@@ -781,7 +781,7 @@ async fn handle_connection(
                     }
                 };
 
-                let mut hs = match prism_security::handshake::ServerHandshake::new(&*server_identity) {
+                let mut hs = match prism_security::handshake::ServerHandshake::new(&server_identity) {
                     Ok(hs) => hs,
                     Err(e) => {
                         tracing::warn!(remote = %remote, error = %e, "Noise: handshake init failed");
