@@ -3,7 +3,7 @@
 
 mod harness;
 
-use harness::{TestServer, TestClient};
+use harness::{TestClient, TestServer};
 
 /// Server survives an abrupt client crash (no clean close).
 #[tokio::test(flavor = "multi_thread")]
@@ -89,11 +89,12 @@ async fn server_shutdown_during_active_session() {
     let result = tokio::time::timeout(
         std::time::Duration::from_secs(3),
         client.connection().read_datagram(),
-    ).await;
+    )
+    .await;
 
     match result {
-        Ok(Err(_)) => {}  // Connection error — expected
-        Err(_) => {}      // Timeout — acceptable
-        Ok(Ok(_)) => {}   // Got a buffered datagram — acceptable
+        Ok(Err(_)) => {} // Connection error — expected
+        Err(_) => {}     // Timeout — acceptable
+        Ok(Ok(_)) => {}  // Got a buffered datagram — acceptable
     }
 }

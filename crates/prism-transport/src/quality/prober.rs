@@ -22,9 +22,9 @@ impl ActivityState {
     fn probe_interval(self) -> Duration {
         match self {
             ActivityState::ActiveStreaming => Duration::from_secs(2),
-            ActivityState::ActiveTransfer  => Duration::from_secs(5),
-            ActivityState::BackgroundSync  => Duration::from_secs(30),
-            ActivityState::Idle            => Duration::from_secs(60),
+            ActivityState::ActiveTransfer => Duration::from_secs(5),
+            ActivityState::BackgroundSync => Duration::from_secs(30),
+            ActivityState::Idle => Duration::from_secs(60),
         }
     }
 }
@@ -51,8 +51,12 @@ impl ProbePayload {
             return None;
         }
         let seq = u32::from_le_bytes([b[0], b[1], b[2], b[3]]);
-        let sender_timestamp_us = u64::from_le_bytes([b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11]]);
-        Some(Self { seq, sender_timestamp_us })
+        let sender_timestamp_us =
+            u64::from_le_bytes([b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11]]);
+        Some(Self {
+            seq,
+            sender_timestamp_us,
+        })
     }
 }
 
@@ -78,9 +82,15 @@ impl ProbeEcho {
             return None;
         }
         let seq = u32::from_le_bytes([b[0], b[1], b[2], b[3]]);
-        let sender_timestamp_us = u64::from_le_bytes([b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11]]);
-        let responder_timestamp_us = u64::from_le_bytes([b[12], b[13], b[14], b[15], b[16], b[17], b[18], b[19]]);
-        Some(Self { seq, sender_timestamp_us, responder_timestamp_us })
+        let sender_timestamp_us =
+            u64::from_le_bytes([b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11]]);
+        let responder_timestamp_us =
+            u64::from_le_bytes([b[12], b[13], b[14], b[15], b[16], b[17], b[18], b[19]]);
+        Some(Self {
+            seq,
+            sender_timestamp_us,
+            responder_timestamp_us,
+        })
     }
 }
 
@@ -133,7 +143,8 @@ impl ConnectionProber {
     pub fn generate_probe(&mut self) -> Option<ProbePayload> {
         let now = Instant::now();
         if let Some(last) = self.last_probe
-            && now.duration_since(last) < self.interval {
+            && now.duration_since(last) < self.interval
+        {
             return None;
         }
         let seq = self.next_seq;
@@ -141,7 +152,10 @@ impl ConnectionProber {
         let sender_timestamp_us = now.duration_since(self.epoch).as_micros() as u64;
         self.pending.insert(seq, now);
         self.last_probe = Some(now);
-        Some(ProbePayload { seq, sender_timestamp_us })
+        Some(ProbePayload {
+            seq,
+            sender_timestamp_us,
+        })
     }
 
     /// Process an echo, compute RTT, return ProbeResult if seq was pending.
@@ -203,7 +217,11 @@ mod tests {
     #[test]
     fn process_unknown_echo_returns_none() {
         let mut p = ConnectionProber::new();
-        let echo = ProbeEcho { seq: 999, sender_timestamp_us: 0, responder_timestamp_us: 0 };
+        let echo = ProbeEcho {
+            seq: 999,
+            sender_timestamp_us: 0,
+            responder_timestamp_us: 0,
+        };
         assert!(p.process_echo(&echo, Instant::now()).is_none());
     }
 
@@ -218,7 +236,10 @@ mod tests {
 
     #[test]
     fn probe_payload_roundtrip() {
-        let pl = ProbePayload { seq: 42, sender_timestamp_us: 123_456_789 };
+        let pl = ProbePayload {
+            seq: 42,
+            sender_timestamp_us: 123_456_789,
+        };
         let b = pl.to_bytes();
         let d = ProbePayload::from_bytes(&b).unwrap();
         assert_eq!(d.seq, 42);
@@ -227,7 +248,11 @@ mod tests {
 
     #[test]
     fn probe_echo_roundtrip() {
-        let echo = ProbeEcho { seq: 7, sender_timestamp_us: 100, responder_timestamp_us: 200 };
+        let echo = ProbeEcho {
+            seq: 7,
+            sender_timestamp_us: 100,
+            responder_timestamp_us: 200,
+        };
         let b = echo.to_bytes();
         let d = ProbeEcho::from_bytes(&b).unwrap();
         assert_eq!(d.seq, 7);

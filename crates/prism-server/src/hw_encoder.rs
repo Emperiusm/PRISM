@@ -108,7 +108,11 @@ impl HwEncoder {
     /// The constructor probes for hardware encoders in priority order
     /// (NVENC → QSV → AMF → software) and uses the first one that opens
     /// successfully.
-    pub fn new(width: u32, height: u32, bitrate_bps: u64) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        width: u32,
+        height: u32,
+        bitrate_bps: u64,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let available = detect_available_encoders();
         // `available` always has at least one entry (Software).
         let preferred = available[0];
@@ -173,8 +177,12 @@ impl HwEncoder {
         use ffmpeg_next::format::Pixel;
         use ffmpeg_next::util::rational::Rational;
 
-        let codec = codec::encoder::find_by_name(backend.ffmpeg_codec_name())
-            .ok_or_else(|| format!("encoder '{}' not found in FFmpeg", backend.ffmpeg_codec_name()))?;
+        let codec = codec::encoder::find_by_name(backend.ffmpeg_codec_name()).ok_or_else(|| {
+            format!(
+                "encoder '{}' not found in FFmpeg",
+                backend.ffmpeg_codec_name()
+            )
+        })?;
 
         let context = codec::context::Context::new_with_codec(codec);
         let mut video = context.encoder().video()?;
@@ -190,10 +198,10 @@ impl HwEncoder {
         let mut opts = ffmpeg_next::Dictionary::new();
         match backend {
             HwEncoderBackend::Nvenc => {
-                opts.set("preset", "p1");         // fastest NVENC preset
-                opts.set("tune", "ull");           // ultra-low-latency
+                opts.set("preset", "p1"); // fastest NVENC preset
+                opts.set("tune", "ull"); // ultra-low-latency
                 opts.set("zerolatency", "1");
-                opts.set("rc", "cbr");             // constant bitrate
+                opts.set("rc", "cbr"); // constant bitrate
             }
             HwEncoderBackend::Qsv => {
                 opts.set("preset", "veryfast");
@@ -240,9 +248,17 @@ impl HwEncoder {
     pub fn set_bitrate(&mut self, bitrate_bps: u64) -> Result<(), Box<dyn std::error::Error>> {
         let old = self.bitrate_bps;
         self.bitrate_bps = bitrate_bps;
-        let ratio = if old > 0 { bitrate_bps as f64 / old as f64 } else { 2.0 };
+        let ratio = if old > 0 {
+            bitrate_bps as f64 / old as f64
+        } else {
+            2.0
+        };
         if !(0.8..=1.2).contains(&ratio) {
-            tracing::info!(old_bps = old, new_bps = bitrate_bps, "encoder bitrate reconfigure");
+            tracing::info!(
+                old_bps = old,
+                new_bps = bitrate_bps,
+                "encoder bitrate reconfigure"
+            );
             *self = Self::create_software(self.width, self.height, bitrate_bps)?;
         }
         Ok(())
@@ -266,7 +282,8 @@ impl HwEncoder {
     fn encode_openh264(&mut self, bgra: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let encoder = self.openh264_encoder.as_mut().unwrap();
         let yuv = bgra_to_yuv420_raw(bgra, self.width as usize, self.height as usize);
-        let yuv_buf = openh264::formats::YUVBuffer::from_vec(yuv, self.width as usize, self.height as usize);
+        let yuv_buf =
+            openh264::formats::YUVBuffer::from_vec(yuv, self.width as usize, self.height as usize);
         let bitstream = encoder.encode(&yuv_buf)?;
         Ok(bitstream.to_vec())
     }
@@ -361,8 +378,12 @@ pub fn bgra_to_yuv420_raw(bgra: &[u8], width: usize, height: usize) -> Vec<u8> {
             let b = bgra[src] as f32;
             let g = bgra[src + 1] as f32;
             let r = bgra[src + 2] as f32;
-            let u = (-0.169 * r - 0.331 * g + 0.500 * b + 128.0).round().clamp(0.0, 255.0) as u8;
-            let v = (0.500 * r - 0.419 * g - 0.081 * b + 128.0).round().clamp(0.0, 255.0) as u8;
+            let u = (-0.169 * r - 0.331 * g + 0.500 * b + 128.0)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+            let v = (0.500 * r - 0.419 * g - 0.081 * b + 128.0)
+                .round()
+                .clamp(0.0, 255.0) as u8;
             yuv[y_size + uv_row * uv_w + uv_col] = u;
             yuv[y_size + uv_size + uv_row * uv_w + uv_col] = v;
         }
@@ -467,8 +488,15 @@ mod tests {
         let mut encoder = HwEncoder::new(320, 240, 1_000_000).unwrap();
         let bgra = vec![128u8; 320 * 240 * 4]; // mid-grey frame
         let result = encoder.encode_bgra(&bgra);
-        assert!(result.is_ok(), "encode_bgra returned error: {:?}", result.err());
-        assert!(!result.unwrap().is_empty(), "encoded bitstream must not be empty");
+        assert!(
+            result.is_ok(),
+            "encode_bgra returned error: {:?}",
+            result.err()
+        );
+        assert!(
+            !result.unwrap().is_empty(),
+            "encoded bitstream must not be empty"
+        );
     }
 
     #[test]

@@ -87,12 +87,7 @@ impl NvencConfig {
     /// B-frames, infinite GOP, NV12 input.
     ///
     /// `max_bitrate_bps` is set to `bitrate_bps * 2` to absorb scene bursts.
-    pub fn ultra_low_latency(
-        codec: CodecId,
-        width: u32,
-        height: u32,
-        bitrate_bps: u64,
-    ) -> Self {
+    pub fn ultra_low_latency(codec: CodecId, width: u32, height: u32, bitrate_bps: u64) -> Self {
         Self {
             codec,
             width,
@@ -156,9 +151,9 @@ impl NvencConfig {
     /// Structural changes — codec, resolution, pixel format, or slice count —
     /// all require reinitialisation.
     pub fn needs_reinit(&self, other: &NvencConfig) -> bool {
-        self.codec        != other.codec
-            || self.width       != other.width
-            || self.height      != other.height
+        self.codec != other.codec
+            || self.width != other.width
+            || self.height != other.height
             || self.input_format != other.input_format
             || self.slice_count != other.slice_count
     }
@@ -167,10 +162,10 @@ impl NvencConfig {
     /// the bitrate / QP settings (a live bitrate update, no reinit needed).
     pub fn is_bitrate_change_only(&self, other: &NvencConfig) -> bool {
         !self.needs_reinit(other)
-            && (self.bitrate_bps     != other.bitrate_bps
+            && (self.bitrate_bps != other.bitrate_bps
                 || self.max_bitrate_bps != other.max_bitrate_bps
-                || self.min_qp          != other.min_qp
-                || self.max_qp          != other.max_qp)
+                || self.min_qp != other.min_qp
+                || self.max_qp != other.max_qp)
     }
 }
 
@@ -236,7 +231,11 @@ mod tests {
     #[test]
     fn no_reinit_on_bitrate() {
         let a = ull();
-        let b = NvencConfig { bitrate_bps: 5_000_000, max_bitrate_bps: 10_000_000, ..ull() };
+        let b = NvencConfig {
+            bitrate_bps: 5_000_000,
+            max_bitrate_bps: 10_000_000,
+            ..ull()
+        };
         assert!(!a.needs_reinit(&b));
         assert!(a.is_bitrate_change_only(&b));
     }
@@ -252,7 +251,10 @@ mod tests {
     #[test]
     fn reinit_on_format() {
         let a = ull();
-        let b = NvencConfig { input_format: TextureFormat::P010, ..ull() };
+        let b = NvencConfig {
+            input_format: TextureFormat::P010,
+            ..ull()
+        };
         assert!(a.needs_reinit(&b));
     }
 }

@@ -107,11 +107,11 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use bytes::Bytes;
-    use tokio::sync::broadcast;
     use prism_transport::{
-        PrismConnection, TransportError, TransportMetrics, TransportType, TransportEvent,
-        StreamPriority, OwnedSendStream, OwnedRecvStream,
+        OwnedRecvStream, OwnedSendStream, PrismConnection, StreamPriority, TransportError,
+        TransportEvent, TransportMetrics, TransportType,
     };
+    use tokio::sync::broadcast;
 
     // ── Minimal PrismConnection mock (MockConnection is pub(crate) in prism-transport) ──
 
@@ -128,7 +128,10 @@ mod tests {
         async fn recv_datagram(&self) -> Result<Bytes, TransportError> {
             std::future::pending().await
         }
-        async fn open_bi(&self, _p: StreamPriority) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
+        async fn open_bi(
+            &self,
+            _p: StreamPriority,
+        ) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
             Err(TransportError::ConnectionClosed)
         }
         async fn open_uni(&self, _p: StreamPriority) -> Result<OwnedSendStream, TransportError> {

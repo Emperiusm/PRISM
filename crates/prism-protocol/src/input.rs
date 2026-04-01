@@ -7,11 +7,11 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum MouseButton {
-    Left   = 0,
-    Right  = 1,
+    Left = 0,
+    Right = 1,
     Middle = 2,
-    X1     = 3,
-    X2     = 4,
+    X1 = 3,
+    X2 = 4,
 }
 
 impl MouseButton {
@@ -47,15 +47,15 @@ impl MouseButton {
 /// | 9   | `SetMouseMode`           | relative u8 (0=absolute, 1=relative)           |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputEvent {
-    KeyDown             { scancode: u16, vk: u16 },
-    KeyUp               { scancode: u16, vk: u16 },
-    TextInput           { codepoint: u32 },
-    MouseMove           { x: u16, y: u16 },
-    MouseDown           { button: MouseButton },
-    MouseUp             { button: MouseButton },
-    MouseScroll         { delta_x: i16, delta_y: i16 },
-    MouseMoveRelative   { dx: i16, dy: i16 },
-    SetMouseMode        { relative: bool },
+    KeyDown { scancode: u16, vk: u16 },
+    KeyUp { scancode: u16, vk: u16 },
+    TextInput { codepoint: u32 },
+    MouseMove { x: u16, y: u16 },
+    MouseDown { button: MouseButton },
+    MouseUp { button: MouseButton },
+    MouseScroll { delta_x: i16, delta_y: i16 },
+    MouseMoveRelative { dx: i16, dy: i16 },
+    SetMouseMode { relative: bool },
 }
 
 /// Fixed byte length of every serialised [`InputEvent`].
@@ -123,12 +123,12 @@ impl InputEvent {
         match tag {
             1 => {
                 let scancode = u16::from_le_bytes([data[1], data[2]]);
-                let vk       = u16::from_le_bytes([data[3], data[4]]);
+                let vk = u16::from_le_bytes([data[3], data[4]]);
                 Some(Self::KeyDown { scancode, vk })
             }
             2 => {
                 let scancode = u16::from_le_bytes([data[1], data[2]]);
-                let vk       = u16::from_le_bytes([data[3], data[4]]);
+                let vk = u16::from_le_bytes([data[3], data[4]]);
                 Some(Self::KeyUp { scancode, vk })
             }
             3 => {
@@ -179,13 +179,19 @@ mod tests {
 
     #[test]
     fn key_down_roundtrip() {
-        let ev = InputEvent::KeyDown { scancode: 0x001C, vk: 0x000D };
+        let ev = InputEvent::KeyDown {
+            scancode: 0x001C,
+            vk: 0x000D,
+        };
         assert_eq!(roundtrip(ev), ev);
     }
 
     #[test]
     fn key_up_roundtrip() {
-        let ev = InputEvent::KeyUp { scancode: 0x001C, vk: 0x000D };
+        let ev = InputEvent::KeyUp {
+            scancode: 0x001C,
+            vk: 0x000D,
+        };
         assert_eq!(roundtrip(ev), ev);
     }
 
@@ -210,7 +216,10 @@ mod tests {
 
     #[test]
     fn mouse_scroll_roundtrip() {
-        let ev = InputEvent::MouseScroll { delta_x: 0, delta_y: -3 };
+        let ev = InputEvent::MouseScroll {
+            delta_x: 0,
+            delta_y: -3,
+        };
         assert_eq!(roundtrip(ev), ev);
     }
 
@@ -224,9 +233,9 @@ mod tests {
             MouseButton::X2,
         ] {
             let down = InputEvent::MouseDown { button };
-            let up   = InputEvent::MouseUp   { button };
+            let up = InputEvent::MouseUp { button };
             assert_eq!(roundtrip(down), down, "MouseDown {button:?}");
-            assert_eq!(roundtrip(up),   up,   "MouseUp {button:?}");
+            assert_eq!(roundtrip(up), up, "MouseUp {button:?}");
         }
     }
 

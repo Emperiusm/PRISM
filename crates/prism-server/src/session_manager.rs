@@ -88,7 +88,9 @@ impl SessionManager {
         let mut granted_channels = Vec::new();
 
         for &channel_id in requested_channels {
-            let result = self.channel_registry.request_channel(channel_id, client_id)?;
+            let result = self
+                .channel_registry
+                .request_channel(channel_id, client_id)?;
             match result {
                 ChannelGrantResult::Granted
                 | ChannelGrantResult::AlreadyOwned
@@ -138,10 +140,9 @@ impl SessionManager {
         );
         self.tombstones.insert(tombstone);
 
-        let _ = self.event_tx.send(SessionEvent::ClientDisconnected {
-            client_id,
-            reason,
-        });
+        let _ = self
+            .event_tx
+            .send(SessionEvent::ClientDisconnected { client_id, reason });
     }
 
     /// Touch a client's session and heartbeat monitor.
@@ -203,11 +204,11 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use bytes::Bytes;
-    use tokio::sync::broadcast;
     use prism_transport::{
         OwnedRecvStream, OwnedSendStream, PrismConnection, StreamPriority, TransportError,
         TransportEvent, TransportMetrics, TransportType,
     };
+    use tokio::sync::broadcast;
 
     // ── Minimal stub connection (MockConnection is pub(crate) in prism-transport) ──
 
@@ -230,15 +231,10 @@ mod tests {
         ) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
             Err(TransportError::ConnectionClosed)
         }
-        async fn open_uni(
-            &self,
-            _p: StreamPriority,
-        ) -> Result<OwnedSendStream, TransportError> {
+        async fn open_uni(&self, _p: StreamPriority) -> Result<OwnedSendStream, TransportError> {
             Err(TransportError::ConnectionClosed)
         }
-        async fn accept_bi(
-            &self,
-        ) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
+        async fn accept_bi(&self) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
             std::future::pending().await
         }
         async fn accept_uni(&self) -> Result<OwnedRecvStream, TransportError> {
@@ -380,7 +376,10 @@ mod tests {
             )
             .unwrap();
 
-        assert!(!granted.is_empty(), "reconnecting device should get channels");
+        assert!(
+            !granted.is_empty(),
+            "reconnecting device should get channels"
+        );
         assert_eq!(mgr.client_count(), 1);
     }
 
@@ -403,7 +402,9 @@ mod tests {
         mgr.activity(client_id);
         let stale = mgr.check_heartbeats();
         assert!(
-            !stale.iter().any(|(id, tombstoned)| *id == client_id && *tombstoned),
+            !stale
+                .iter()
+                .any(|(id, tombstoned)| *id == client_id && *tombstoned),
             "client should not be tombstoned immediately after activity"
         );
     }
@@ -424,7 +425,9 @@ mod tests {
         )
         .unwrap();
 
-        let event = rx.try_recv().expect("should have received ClientConnected event");
+        let event = rx
+            .try_recv()
+            .expect("should have received ClientConnected event");
         match event {
             SessionEvent::ClientConnected { client_id: id, .. } => {
                 assert_eq!(id, client_id);
@@ -463,8 +466,14 @@ mod tests {
             )
             .unwrap();
 
-        assert!(!b_channels.contains(&DISPLAY), "Display must be denied to B");
-        assert!(b_channels.contains(&CONTROL), "Control (shared) must be granted to B");
+        assert!(
+            !b_channels.contains(&DISPLAY),
+            "Display must be denied to B"
+        );
+        assert!(
+            b_channels.contains(&CONTROL),
+            "Control (shared) must be granted to B"
+        );
     }
 
     // ── Integration tests ─────────────────────────────────────────────────────
@@ -525,7 +534,10 @@ mod tests {
                 &[DISPLAY, CONTROL, CLIPBOARD],
             )
             .unwrap();
-        assert!(a_channels.contains(&DISPLAY), "A must get exclusive Display");
+        assert!(
+            a_channels.contains(&DISPLAY),
+            "A must get exclusive Display"
+        );
         assert!(a_channels.contains(&CONTROL));
         assert!(a_channels.contains(&CLIPBOARD));
 
@@ -539,9 +551,15 @@ mod tests {
                 &[DISPLAY, CONTROL, CLIPBOARD],
             )
             .unwrap();
-        assert!(!b_channels.contains(&DISPLAY), "B must be denied exclusive Display");
+        assert!(
+            !b_channels.contains(&DISPLAY),
+            "B must be denied exclusive Display"
+        );
         assert!(b_channels.contains(&CONTROL), "B must get shared Control");
-        assert!(b_channels.contains(&CLIPBOARD), "B must get shared Clipboard");
+        assert!(
+            b_channels.contains(&CLIPBOARD),
+            "B must get shared Clipboard"
+        );
 
         // Routing: Display has exactly 1 route (A), Control has 2 routes (A + B).
         let snap = mgr.routing_table().snapshot();

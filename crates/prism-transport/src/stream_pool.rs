@@ -5,7 +5,9 @@
 
 // Stream pool: manage reusable QUIC streams per channel.
 
-use crate::connection::{OwnedSendStream, OwnedRecvStream, PrismConnection, StreamPriority, TransportError};
+use crate::connection::{
+    OwnedRecvStream, OwnedSendStream, PrismConnection, StreamPriority, TransportError,
+};
 
 pub const DEFAULT_POOL_SIZE: usize = 4;
 

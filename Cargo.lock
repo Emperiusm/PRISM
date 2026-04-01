@@ -1842,6 +1842,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "prism-tests"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "hex",
+ "prism-client",
+ "prism-protocol",
+ "prism-security",
+ "prism-server",
+ "prism-transport",
+ "quinn",
+ "rustls",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "prism-transport"
 version = "0.1.0"
 dependencies = [

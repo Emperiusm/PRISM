@@ -11,13 +11,13 @@
 //! - DXGI monitor enumeration
 //! - GPU texture pool management
 
-pub mod error;
 pub mod d3d;
-pub mod texture;
-pub mod dda;
-pub mod monitor;
 pub mod damage;
+pub mod dda;
+pub mod error;
+pub mod monitor;
 pub mod nvenc;
+pub mod texture;
 
 // ── error ─────────────────────────────────────────────────────────────────────
 pub use error::PlatformError;

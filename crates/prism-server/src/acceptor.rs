@@ -77,19 +77,18 @@ impl ConnectionAcceptor {
     /// Uses [`latency_transport_config`] for transport tuning.
     pub fn bind(addr: SocketAddr, tls_cert: SelfSignedCert) -> Result<Self, AcceptorError> {
         let mut server_config =
-            quinn::ServerConfig::with_single_cert(
-                vec![tls_cert.cert_der],
-                tls_cert.key_der,
-            )
-            .map_err(|e| AcceptorError::Tls(e.to_string()))?;
+            quinn::ServerConfig::with_single_cert(vec![tls_cert.cert_der], tls_cert.key_der)
+                .map_err(|e| AcceptorError::Tls(e.to_string()))?;
 
-        server_config
-            .transport_config(Arc::new(latency_transport_config(None)));
+        server_config.transport_config(Arc::new(latency_transport_config(None)));
 
         let endpoint = quinn::Endpoint::server(server_config, addr)?;
         let local_addr = endpoint.local_addr()?;
 
-        Ok(Self { endpoint, local_addr })
+        Ok(Self {
+            endpoint,
+            local_addr,
+        })
     }
 
     /// Return the local address the endpoint is bound to.
@@ -125,8 +124,7 @@ mod tests {
     #[tokio::test]
     async fn acceptor_binds_to_port() {
         let cert = SelfSignedCert::generate().unwrap();
-        let acceptor =
-            ConnectionAcceptor::bind("127.0.0.1:0".parse().unwrap(), cert).unwrap();
+        let acceptor = ConnectionAcceptor::bind("127.0.0.1:0".parse().unwrap(), cert).unwrap();
         assert!(acceptor.local_addr().port() > 0, "must bind to a real port");
         acceptor.close();
     }
@@ -138,8 +136,7 @@ mod tests {
         // Clone the cert_der before moving into acceptor.
         let cert_der_for_client = cert.cert_der.clone();
 
-        let acceptor =
-            ConnectionAcceptor::bind("127.0.0.1:0".parse().unwrap(), cert).unwrap();
+        let acceptor = ConnectionAcceptor::bind("127.0.0.1:0".parse().unwrap(), cert).unwrap();
         let server_addr = acceptor.local_addr();
 
         // ── client ───────────────────────────────────────────────────────────
@@ -153,18 +150,17 @@ mod tests {
             quinn::crypto::rustls::QuicClientConfig::try_from(client_crypto).unwrap(),
         ));
 
-        let mut client_endpoint =
-            quinn::Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
+        let mut client_endpoint = quinn::Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
         client_endpoint.set_default_client_config(client_config);
 
         // ── handshake ────────────────────────────────────────────────────────
         let connect_future = client_endpoint.connect(server_addr, "localhost").unwrap();
         let incoming = acceptor.accept().await.expect("server must accept");
 
-        let (client_conn, server_conn) = tokio::join!(
-            async { connect_future.await.unwrap() },
-            async { incoming.await.unwrap() },
-        );
+        let (client_conn, server_conn) =
+            tokio::join!(async { connect_future.await.unwrap() }, async {
+                incoming.await.unwrap()
+            },);
 
         // Both sides connected — verify the client sees the server address and
         // the server sees a remote (the client's ephemeral address).

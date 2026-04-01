@@ -197,11 +197,11 @@ mod tests {
         FrameTrace {
             frame_seq: 1,
             capture_start_us: 1_000,
-            capture_end_us: 1_500,   // capture: 500
-            classify_end_us: 2_000,  // classify: 500
+            capture_end_us: 1_500,  // capture: 500
+            classify_end_us: 2_000, // classify: 500
             encode_start_us: 2_000,
-            encode_end_us: 4_000,    // encode: 2 000
-            send_us: 4_100,          // send: 100
+            encode_end_us: 4_000, // encode: 2 000
+            send_us: 4_100,       // send: 100
             network_recv_us: None,
             decode_end_us: None,
             render_end_us: None,
@@ -212,14 +212,14 @@ mod tests {
         FrameTrace {
             frame_seq: 2,
             capture_start_us: 0,
-            capture_end_us: 300,       // capture: 300
-            classify_end_us: 600,      // classify: 300
+            capture_end_us: 300,  // capture: 300
+            classify_end_us: 600, // classify: 300
             encode_start_us: 600,
-            encode_end_us: 2_600,      // encode: 2 000
-            send_us: 2_700,            // send: 100
-            network_recv_us: Some(5_700),  // network: 3 000
-            decode_end_us: Some(7_700),    // decode: 2 000
-            render_end_us: Some(8_200),    // render: 500
+            encode_end_us: 2_600,         // encode: 2 000
+            send_us: 2_700,               // send: 100
+            network_recv_us: Some(5_700), // network: 3 000
+            decode_end_us: Some(7_700),   // decode: 2 000
+            render_end_us: Some(8_200),   // render: 500
         }
     }
 

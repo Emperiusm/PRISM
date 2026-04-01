@@ -66,17 +66,27 @@ impl Default for EncodeQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{DisplayId, QualityTier, Rect, TextureFormat, SharedTexture};
-    use crate::frame::FrameMetadata;
     use crate::classify::RegionType;
+    use crate::frame::FrameMetadata;
+    use crate::types::{DisplayId, QualityTier, Rect, SharedTexture, TextureFormat};
 
     fn dummy_job(seq: u32) -> EncodeJob {
         EncodeJob {
             frame_seq: seq,
             display_id: DisplayId(0),
-            region_rect: Rect { x: 0, y: 0, w: 100, h: 100 },
+            region_rect: Rect {
+                x: 0,
+                y: 0,
+                w: 100,
+                h: 100,
+            },
             region_type: RegionType::Video,
-            texture: SharedTexture { handle: 0, width: 100, height: 100, format: TextureFormat::Bgra8 },
+            texture: SharedTexture {
+                handle: 0,
+                width: 100,
+                height: 100,
+                format: TextureFormat::Bgra8,
+            },
             target_bitrate: 5_000_000,
             force_keyframe: false,
             quality_tier: QualityTier::Normal,

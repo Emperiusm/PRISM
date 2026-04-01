@@ -181,7 +181,11 @@ mod tests {
 
         // Change content.
         let decision = tracker.check(key, hash_b);
-        assert_eq!(decision, StaticDecision::EncodeNormally, "changed hash must invalidate cache");
+        assert_eq!(
+            decision,
+            StaticDecision::EncodeNormally,
+            "changed hash must invalidate cache"
+        );
     }
 
     #[test]
@@ -211,7 +215,7 @@ mod tests {
 
         // Stabilise and cache A.
         assert_eq!(tracker.check(key_a, 0xAA), StaticDecision::EncodeNormally); // count=1
-        assert_eq!(tracker.check(key_a, 0xAA), StaticDecision::SendAndCache);   // count=2>=2
+        assert_eq!(tracker.check(key_a, 0xAA), StaticDecision::SendAndCache); // count=2>=2
 
         // Stabilise and cache B.
         assert_eq!(tracker.check(key_b, 0xBB), StaticDecision::EncodeNormally);

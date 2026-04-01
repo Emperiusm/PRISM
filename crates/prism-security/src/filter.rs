@@ -35,7 +35,9 @@ mod tests {
                 FilterResult::Allow
             }
         }
-        fn description(&self) -> &str { "test filter" }
+        fn description(&self) -> &str {
+            "test filter"
+        }
     }
 
     #[test]

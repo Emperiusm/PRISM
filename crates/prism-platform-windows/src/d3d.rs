@@ -51,7 +51,7 @@ impl D3DFeatureLevel {
     /// These constants match the `D3D_FEATURE_LEVEL_*` enum in `d3dcommon.h`.
     pub fn to_d3d_value(self) -> u32 {
         match self {
-            D3DFeatureLevel::Level9_1  => 0x9100,
+            D3DFeatureLevel::Level9_1 => 0x9100,
             D3DFeatureLevel::Level10_0 => 0xa000,
             D3DFeatureLevel::Level10_1 => 0xa100,
             D3DFeatureLevel::Level11_0 => 0xb000,
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn feature_level_ordering() {
-        assert!(D3DFeatureLevel::Level9_1  < D3DFeatureLevel::Level10_0);
+        assert!(D3DFeatureLevel::Level9_1 < D3DFeatureLevel::Level10_0);
         assert!(D3DFeatureLevel::Level10_0 < D3DFeatureLevel::Level10_1);
         assert!(D3DFeatureLevel::Level10_1 < D3DFeatureLevel::Level11_0);
         assert!(D3DFeatureLevel::Level11_0 < D3DFeatureLevel::Level11_1);
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn d3d_value_encoding() {
-        assert_eq!(D3DFeatureLevel::Level9_1.to_d3d_value(),  0x9100);
+        assert_eq!(D3DFeatureLevel::Level9_1.to_d3d_value(), 0x9100);
         assert_eq!(D3DFeatureLevel::Level10_0.to_d3d_value(), 0xa000);
         assert_eq!(D3DFeatureLevel::Level10_1.to_d3d_value(), 0xa100);
         assert_eq!(D3DFeatureLevel::Level11_0.to_d3d_value(), 0xb000);

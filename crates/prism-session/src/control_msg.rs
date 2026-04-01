@@ -36,8 +36,8 @@ pub struct ShutdownNotice {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn all_msg_types_distinct() {
@@ -95,10 +95,25 @@ mod tests {
     fn count_is_nineteen() {
         // Sanity: exactly 19 distinct type constants
         let types = [
-            HEARTBEAT, HEARTBEAT_ACK, CAPABILITY_UPDATE, PROFILE_SWITCH, PROBE_REQUEST,
-            PROBE_RESPONSE, CLIENT_FEEDBACK, CLIENT_ALERT, OVERLAY_TOGGLE, OVERLAY_DATA,
-            KEY_ROTATION, CERT_RENEWAL, QUALITY_UPDATE, REDUCE_SEND_RATE, CHANNEL_TRANSFER,
-            SESSION_INFO, MONITOR_LAYOUT, THROUGHPUT_TOKEN, SHUTDOWN_NOTICE,
+            HEARTBEAT,
+            HEARTBEAT_ACK,
+            CAPABILITY_UPDATE,
+            PROFILE_SWITCH,
+            PROBE_REQUEST,
+            PROBE_RESPONSE,
+            CLIENT_FEEDBACK,
+            CLIENT_ALERT,
+            OVERLAY_TOGGLE,
+            OVERLAY_DATA,
+            KEY_ROTATION,
+            CERT_RENEWAL,
+            QUALITY_UPDATE,
+            REDUCE_SEND_RATE,
+            CHANNEL_TRANSFER,
+            SESSION_INFO,
+            MONITOR_LAYOUT,
+            THROUGHPUT_TOKEN,
+            SHUTDOWN_NOTICE,
         ];
         assert_eq!(types.len(), 19);
     }

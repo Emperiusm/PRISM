@@ -15,8 +15,8 @@
 </p>
 
 <p align="center">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-648%20passing-brightgreen">
-  <img alt="Crates" src="https://img.shields.io/badge/crates-10-blue">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-657%20passing-brightgreen">
+  <img alt="Crates" src="https://img.shields.io/badge/crates-11-blue">
   <img alt="Lines" src="https://img.shields.io/badge/lines-23K%20Rust-orange">
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
@@ -395,14 +395,14 @@ git clone https://github.com/Emperiusm/PRISM.git
 cd PRISM
 cargo build                    # Debug build
 cargo build --release          # Optimized (LTO, strip)
-cargo test --workspace         # Run all 648 tests
+cargo test --workspace         # Run all 657 tests
 cargo clippy --workspace       # Zero warnings
 ```
 
 ### Project Stats
 
 ```
-10 crates | 648 tests | 23K lines of Rust | 137 source files | 0 clippy warnings
+11 crates | 657 tests | 23K lines of Rust | 137 source files | 0 clippy warnings
 ```
 
 ### Release Build Profile

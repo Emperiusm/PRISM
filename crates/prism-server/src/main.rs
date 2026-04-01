@@ -107,7 +107,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if args.iter().any(|a| a == "--init") {
         let path = "prism-server.toml";
         if std::path::Path::new(path).exists() {
-            eprintln!("Error: {path} already exists. Remove it first or use --config to load a different file.");
+            eprintln!(
+                "Error: {path} already exists. Remove it first or use --config to load a different file."
+            );
             std::process::exit(1);
         }
         std::fs::write(path, DEFAULT_CONFIG)?;
@@ -135,12 +137,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| "prism-server.toml".to_string());
 
     // Load config, then apply CLI overrides
-    let mut config = prism_server::ServerConfig::load_or_default(std::path::Path::new(&config_path));
+    let mut config =
+        prism_server::ServerConfig::load_or_default(std::path::Path::new(&config_path));
 
-    if let Some(port) = args.windows(2).find(|w| w[0] == "--port").and_then(|w| w[1].parse::<u16>().ok()) {
+    if let Some(port) = args
+        .windows(2)
+        .find(|w| w[0] == "--port")
+        .and_then(|w| w[1].parse::<u16>().ok())
+    {
         config.listen_addr_str = format!("0.0.0.0:{port}");
     }
-    if let Some(bind) = args.windows(2).find(|w| w[0] == "--bind").map(|w| w[1].clone()) {
+    if let Some(bind) = args
+        .windows(2)
+        .find(|w| w[0] == "--bind")
+        .map(|w| w[1].clone())
+    {
         config.listen_addr_str = bind;
     }
 

@@ -57,7 +57,10 @@ impl AtomicHistogram {
         let mut current = self.min.load(Ordering::Relaxed);
         while value < current {
             match self.min.compare_exchange_weak(
-                current, value, Ordering::Relaxed, Ordering::Relaxed,
+                current,
+                value,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
             ) {
                 Ok(_) => break,
                 Err(actual) => current = actual,
@@ -69,7 +72,10 @@ impl AtomicHistogram {
         let mut current = self.max.load(Ordering::Relaxed);
         while value > current {
             match self.max.compare_exchange_weak(
-                current, value, Ordering::Relaxed, Ordering::Relaxed,
+                current,
+                value,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
             ) {
                 Ok(_) => break,
                 Err(actual) => current = actual,
@@ -117,7 +123,9 @@ impl AtomicHistogram {
     }
 
     fn percentile(buckets: &[u64; BUCKET_COUNT], total: u64, pct: f64) -> u64 {
-        if total == 0 { return 0; }
+        if total == 0 {
+            return 0;
+        }
         let target = (total as f64 * pct) as u64;
         let mut cumulative = 0u64;
         for (i, &count) in buckets.iter().enumerate() {
@@ -127,7 +135,9 @@ impl AtomicHistogram {
                 let bucket_end = 1u64 << (i + 1);
                 let fraction = if count > 0 {
                     (target.saturating_sub(cumulative - count)) as f64 / count as f64
-                } else { 0.0 };
+                } else {
+                    0.0
+                };
                 return bucket_start + ((bucket_end - bucket_start) as f64 * fraction) as u64;
             }
         }
@@ -136,7 +146,9 @@ impl AtomicHistogram {
 }
 
 impl Default for AtomicHistogram {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -202,21 +214,37 @@ mod tests {
     #[test]
     fn percentile_uniform_distribution() {
         let h = AtomicHistogram::new();
-        for i in 1..=100 { h.record(i); }
+        for i in 1..=100 {
+            h.record(i);
+        }
         let snap = h.snapshot();
         assert_eq!(snap.count, 100);
         assert_eq!(snap.min_us, 1);
         assert_eq!(snap.max_us, 100);
-        assert!(snap.p50_us >= 32 && snap.p50_us <= 80, "p50 was {}", snap.p50_us);
-        assert!(snap.p95_us >= 64 && snap.p95_us <= 128, "p95 was {}", snap.p95_us);
+        assert!(
+            snap.p50_us >= 32 && snap.p50_us <= 80,
+            "p50 was {}",
+            snap.p50_us
+        );
+        assert!(
+            snap.p95_us >= 64 && snap.p95_us <= 128,
+            "p95 was {}",
+            snap.p95_us
+        );
     }
 
     #[test]
     fn percentile_all_same_value() {
         let h = AtomicHistogram::new();
-        for _ in 0..1000 { h.record(500); }
+        for _ in 0..1000 {
+            h.record(500);
+        }
         let snap = h.snapshot();
-        assert!(snap.p50_us >= 256 && snap.p50_us <= 512, "p50 was {}", snap.p50_us);
+        assert!(
+            snap.p50_us >= 256 && snap.p50_us <= 512,
+            "p50 was {}",
+            snap.p50_us
+        );
     }
 
     #[test]
@@ -255,10 +283,14 @@ mod tests {
         for t in 0..4 {
             let h = h.clone();
             handles.push(thread::spawn(move || {
-                for i in 0..1000 { h.record((t * 1000 + i) as u64); }
+                for i in 0..1000 {
+                    h.record((t * 1000 + i) as u64);
+                }
             }));
         }
-        for handle in handles { handle.join().unwrap(); }
+        for handle in handles {
+            handle.join().unwrap();
+        }
         let snap = h.snapshot();
         assert_eq!(snap.count, 4000);
         assert_eq!(snap.min_us, 0);

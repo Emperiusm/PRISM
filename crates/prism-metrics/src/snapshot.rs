@@ -16,4 +16,3 @@ pub struct RecorderSnapshot {
     pub gauge_names: Vec<&'static str>,
     pub histogram_names: Vec<&'static str>,
 }
-

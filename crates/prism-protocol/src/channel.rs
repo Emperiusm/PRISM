@@ -6,7 +6,7 @@
 use bytes::{Buf, Bytes, BytesMut};
 
 use crate::error::ProtocolError;
-use crate::header::{PrismHeader, HEADER_SIZE};
+use crate::header::{HEADER_SIZE, PrismHeader};
 
 // === Core channels (0x001-0x0FF) ===
 pub const CHANNEL_DISPLAY: u16 = 0x001;
@@ -153,7 +153,10 @@ mod tests {
 
     #[test]
     fn fileshare_is_stream_transport() {
-        assert_eq!(channel_transport(CHANNEL_FILESHARE), ChannelTransport::Stream);
+        assert_eq!(
+            channel_transport(CHANNEL_FILESHARE),
+            ChannelTransport::Stream
+        );
     }
 
     #[test]
@@ -166,10 +169,14 @@ mod tests {
 
     #[test]
     fn priority_weights_are_monotonic() {
-        assert!(priority_weight(ChannelPriority::Critical) > priority_weight(ChannelPriority::High));
+        assert!(
+            priority_weight(ChannelPriority::Critical) > priority_weight(ChannelPriority::High)
+        );
         assert!(priority_weight(ChannelPriority::High) > priority_weight(ChannelPriority::Normal));
         assert!(priority_weight(ChannelPriority::Normal) > priority_weight(ChannelPriority::Low));
-        assert!(priority_weight(ChannelPriority::Low) > priority_weight(ChannelPriority::Background));
+        assert!(
+            priority_weight(ChannelPriority::Low) > priority_weight(ChannelPriority::Background)
+        );
     }
 
     #[test]
@@ -180,8 +187,14 @@ mod tests {
 
     #[test]
     fn mobile_channels_have_expected_transport() {
-        assert_eq!(channel_transport(CHANNEL_CAMERA), ChannelTransport::Datagram);
-        assert_eq!(channel_transport(CHANNEL_SENSOR), ChannelTransport::Datagram);
+        assert_eq!(
+            channel_transport(CHANNEL_CAMERA),
+            ChannelTransport::Datagram
+        );
+        assert_eq!(
+            channel_transport(CHANNEL_SENSOR),
+            ChannelTransport::Datagram
+        );
         assert_eq!(channel_transport(CHANNEL_NOTIFY), ChannelTransport::Stream);
         assert_eq!(channel_transport(CHANNEL_TOUCH), ChannelTransport::Stream);
     }

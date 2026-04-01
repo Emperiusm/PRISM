@@ -3,7 +3,7 @@
 // Licensed under the GNU Affero General Public License v3.0.
 // Commercial licensing available — see LICENSE-COMMERCIAL.md.
 
-pub mod recorder;
 pub mod histogram;
 pub mod rate;
+pub mod recorder;
 pub mod snapshot;

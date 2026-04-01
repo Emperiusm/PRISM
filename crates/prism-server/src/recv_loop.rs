@@ -12,12 +12,12 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use tokio::sync::mpsc;
-use prism_protocol::header::{PrismHeader, HEADER_SIZE};
 use prism_protocol::channel::CHANNEL_CONTROL;
-use prism_session::{ChannelBandwidthTracker, ChannelDispatcher, ClientId};
+use prism_protocol::header::{HEADER_SIZE, PrismHeader};
 use prism_session::control_msg;
+use prism_session::{ChannelBandwidthTracker, ChannelDispatcher, ClientId};
 use prism_transport::{PrismConnection, TransportError};
+use tokio::sync::mpsc;
 
 /// The action the recv loop should take for a received datagram.
 #[derive(Debug, PartialEq)]

@@ -188,9 +188,7 @@ impl DdaCapture {
             .map(|t| t.elapsed().as_micros() as u64)
             .unwrap_or(0);
 
-        let display_id = DisplayId(
-            self.config.adapter_index * 16 + self.config.output_index,
-        );
+        let display_id = DisplayId(self.config.adapter_index * 16 + self.config.output_index);
 
         CapturedFrame {
             texture,

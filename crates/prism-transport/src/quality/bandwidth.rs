@@ -5,8 +5,8 @@
 
 // Bandwidth estimation for transport quality.
 
-use std::time::{Duration, Instant};
 use std::collections::VecDeque;
+use std::time::{Duration, Instant};
 
 /// Free function to avoid &self/&mut field borrow conflict
 fn trim_samples(samples: &mut VecDeque<(Instant, u64)>, window: Duration, now: Instant) {

@@ -115,7 +115,9 @@ pub struct PairingSnapshot {
 impl PairingSnapshot {
     /// Check if a key is authorized (paired and not blocked). O(1).
     pub fn is_authorized(&self, key: &[u8; 32]) -> bool {
-        self.by_key.get(key).is_some_and(|e| e.state == PairingState::Paired)
+        self.by_key
+            .get(key)
+            .is_some_and(|e| e.state == PairingState::Paired)
     }
 
     /// Number of entries.
@@ -182,10 +184,7 @@ impl PairingStore {
     /// Create a store backed by an encrypted file.
     ///
     /// If the file already exists it is loaded immediately.
-    pub fn with_encrypted_file(
-        path: PathBuf,
-        master_key: [u8; 32],
-    ) -> Result<Self, PairingError> {
+    pub fn with_encrypted_file(path: PathBuf, master_key: [u8; 32]) -> Result<Self, PairingError> {
         let store = PairingStore {
             current: ArcSwap::from_pointee(PairingSnapshot::default()),
             writer: Mutex::new(()),
@@ -240,7 +239,9 @@ impl PairingStore {
     pub fn block(&self, device_id: Uuid) -> Result<(), PairingError> {
         let _guard = self.writer.lock().unwrap();
         let mut snap = (*self.current.load_full()).clone();
-        let mut entry = snap.by_device_id.get(&device_id)
+        let mut entry = snap
+            .by_device_id
+            .get(&device_id)
             .ok_or(PairingError::NotFound)?
             .as_ref()
             .clone();
@@ -254,7 +255,9 @@ impl PairingStore {
     pub fn update_key(&self, device_id: Uuid, new_key: [u8; 32]) -> Result<(), PairingError> {
         let _guard = self.writer.lock().unwrap();
         let mut snap = (*self.current.load_full()).clone();
-        let mut entry = snap.by_device_id.get(&device_id)
+        let mut entry = snap
+            .by_device_id
+            .get(&device_id)
             .ok_or(PairingError::NotFound)?
             .as_ref()
             .clone();
@@ -275,7 +278,9 @@ impl PairingStore {
             None => return Ok(()),
         };
         let snap = self.current.load_full();
-        let persisted = PersistedSnapshot { entries: snap.to_entries() };
+        let persisted = PersistedSnapshot {
+            entries: snap.to_entries(),
+        };
         let json = serde_json::to_vec(&persisted)?;
         let data = match &self.encryption_key {
             Some(master) => {
@@ -331,7 +336,9 @@ mod tests {
     fn make_entry(name: &str) -> PairingEntry {
         let id = LocalIdentity::generate(name);
         let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         PairingEntry {
             device: id.identity,
             state: PairingState::Paired,
@@ -466,7 +473,9 @@ mod tests {
                 s.add(entry).unwrap();
             }));
         }
-        for h in handles { h.join().unwrap(); }
+        for h in handles {
+            h.join().unwrap();
+        }
         assert_eq!(store.snapshot().by_device_id.len(), 4);
     }
 

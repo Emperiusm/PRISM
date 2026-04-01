@@ -163,7 +163,11 @@ mod tests {
     fn coding_always_has_regions() {
         let ladder = DegradationLadder::coding();
         for level in &ladder.levels {
-            assert!(level.region_detection, "level '{}' should have region_detection=true", level.name);
+            assert!(
+                level.region_detection,
+                "level '{}' should have region_detection=true",
+                level.name
+            );
         }
     }
 
@@ -191,9 +195,18 @@ mod tests {
     fn target_level_for_recommendation() {
         let ladder = DegradationLadder::gaming();
         assert_eq!(ladder.target_level(&QualityRecommendation::Optimal), 0);
-        assert_eq!(ladder.target_level(&QualityRecommendation::ReduceResolution), 1);
-        assert_eq!(ladder.target_level(&QualityRecommendation::ReduceFramerate), 2);
-        assert_eq!(ladder.target_level(&QualityRecommendation::ConnectionUnusable), 3);
+        assert_eq!(
+            ladder.target_level(&QualityRecommendation::ReduceResolution),
+            1
+        );
+        assert_eq!(
+            ladder.target_level(&QualityRecommendation::ReduceFramerate),
+            2
+        );
+        assert_eq!(
+            ladder.target_level(&QualityRecommendation::ConnectionUnusable),
+            3
+        );
     }
 
     #[test]

@@ -3,9 +3,9 @@
 // Licensed under the GNU Affero General Public License v3.0.
 // Commercial licensing available — see LICENSE-COMMERCIAL.md.
 
-pub mod header;
-pub mod channel;
 pub mod capability;
-pub mod error;
-pub mod input;
+pub mod channel;
 pub mod clipboard;
+pub mod error;
+pub mod header;
+pub mod input;

@@ -5,14 +5,17 @@
 
 // Transport connection types: errors, transport variants, stream priorities, metrics, events.
 
+use async_trait::async_trait;
+use bytes::Bytes;
+use prism_protocol::channel::ChannelPriority;
 use std::net::SocketAddr;
 #[cfg(test)]
-use std::sync::{Arc, Mutex as StdMutex, atomic::{AtomicBool, Ordering}};
-use bytes::Bytes;
-use async_trait::async_trait;
-use tokio::sync::broadcast;
+use std::sync::{
+    Arc, Mutex as StdMutex,
+    atomic::{AtomicBool, Ordering},
+};
 use thiserror::Error;
-use prism_protocol::channel::ChannelPriority;
+use tokio::sync::broadcast;
 
 #[derive(Debug, Error)]
 pub enum TransportError {
@@ -123,12 +126,25 @@ impl Default for TransportMetrics {
 
 #[derive(Debug, Clone)]
 pub enum TransportEvent {
-    Connected { transport_type: TransportType, remote_addr: SocketAddr },
-    Migrated { old_addr: SocketAddr, new_addr: SocketAddr },
+    Connected {
+        transport_type: TransportType,
+        remote_addr: SocketAddr,
+    },
+    Migrated {
+        old_addr: SocketAddr,
+        new_addr: SocketAddr,
+    },
     MetricsUpdated(TransportMetrics),
-    Degraded { reason: String },
-    Upgraded { from: TransportType, to: TransportType },
-    Disconnected { reason: String },
+    Degraded {
+        reason: String,
+    },
+    Upgraded {
+        from: TransportType,
+        to: TransportType,
+    },
+    Disconnected {
+        reason: String,
+    },
 }
 
 // ── Stream inner enums ────────────────────────────────────────────────────────
@@ -158,14 +174,17 @@ pub struct OwnedSendStream {
 
 impl OwnedSendStream {
     pub fn from_quic(s: quinn::SendStream) -> Self {
-        Self { inner: SendStreamInner::Quic(s) }
+        Self {
+            inner: SendStreamInner::Quic(s),
+        }
     }
 
     pub async fn write(&mut self, data: &[u8]) -> Result<(), TransportError> {
         match &mut self.inner {
-            SendStreamInner::Quic(s) => {
-                s.write_all(data).await.map_err(|e| TransportError::StreamError(e.to_string()))
-            }
+            SendStreamInner::Quic(s) => s
+                .write_all(data)
+                .await
+                .map_err(|e| TransportError::StreamError(e.to_string())),
             #[cfg(test)]
             SendStreamInner::Mock { buffer, .. } => {
                 buffer.lock().unwrap().extend_from_slice(data);
@@ -176,10 +195,9 @@ impl OwnedSendStream {
 
     pub fn set_priority(&mut self, priority: StreamPriority) -> Result<(), TransportError> {
         match &mut self.inner {
-            SendStreamInner::Quic(s) => {
-                s.set_priority(priority.to_quinn_priority())
-                    .map_err(|e| TransportError::StreamError(e.to_string()))
-            }
+            SendStreamInner::Quic(s) => s
+                .set_priority(priority.to_quinn_priority())
+                .map_err(|e| TransportError::StreamError(e.to_string())),
             #[cfg(test)]
             SendStreamInner::Mock { .. } => Ok(()),
         }
@@ -187,9 +205,9 @@ impl OwnedSendStream {
 
     pub async fn finish(self) -> Result<(), TransportError> {
         match self.inner {
-            SendStreamInner::Quic(mut s) => {
-                s.finish().map_err(|e| TransportError::StreamError(e.to_string()))
-            }
+            SendStreamInner::Quic(mut s) => s
+                .finish()
+                .map_err(|e| TransportError::StreamError(e.to_string())),
             #[cfg(test)]
             SendStreamInner::Mock { finished, .. } => {
                 finished.store(true, Ordering::Release);
@@ -220,18 +238,24 @@ pub struct OwnedRecvStream {
 
 impl OwnedRecvStream {
     pub fn from_quic(s: quinn::RecvStream) -> Self {
-        Self { inner: RecvStreamInner::Quic(s) }
+        Self {
+            inner: RecvStreamInner::Quic(s),
+        }
     }
 
     pub async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), TransportError> {
         match &mut self.inner {
-            RecvStreamInner::Quic(s) => {
-                s.read_exact(buf).await.map_err(|e| TransportError::StreamError(e.to_string()))
-            }
+            RecvStreamInner::Quic(s) => s
+                .read_exact(buf)
+                .await
+                .map_err(|e| TransportError::StreamError(e.to_string())),
             #[cfg(test)]
             RecvStreamInner::Mock { cursor } => {
                 use std::io::Read;
-                cursor.lock().unwrap().read_exact(buf)
+                cursor
+                    .lock()
+                    .unwrap()
+                    .read_exact(buf)
                     .map_err(|e| TransportError::StreamError(e.to_string()))
             }
         }
@@ -239,14 +263,18 @@ impl OwnedRecvStream {
 
     pub async fn read_to_end(self, limit: usize) -> Result<Vec<u8>, TransportError> {
         match self.inner {
-            RecvStreamInner::Quic(mut s) => {
-                s.read_to_end(limit).await.map_err(|e| TransportError::StreamError(e.to_string()))
-            }
+            RecvStreamInner::Quic(mut s) => s
+                .read_to_end(limit)
+                .await
+                .map_err(|e| TransportError::StreamError(e.to_string())),
             #[cfg(test)]
             RecvStreamInner::Mock { cursor } => {
                 use std::io::Read;
                 let mut buf = Vec::new();
-                cursor.into_inner().unwrap().read_to_end(&mut buf)
+                cursor
+                    .into_inner()
+                    .unwrap()
+                    .read_to_end(&mut buf)
                     .map_err(|e| TransportError::StreamError(e.to_string()))?;
                 if buf.len() > limit {
                     return Err(TransportError::MessageTooLarge(buf.len()));
@@ -273,7 +301,10 @@ pub trait PrismConnection: Send + Sync {
     fn try_send_datagram(&self, data: Bytes) -> Result<(), TransportError>;
     async fn send_datagram(&self, data: Bytes) -> Result<(), TransportError>;
     async fn recv_datagram(&self) -> Result<Bytes, TransportError>;
-    async fn open_bi(&self, priority: StreamPriority) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError>;
+    async fn open_bi(
+        &self,
+        priority: StreamPriority,
+    ) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError>;
     async fn open_uni(&self, priority: StreamPriority) -> Result<OwnedSendStream, TransportError>;
     async fn accept_bi(&self) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError>;
     async fn accept_uni(&self) -> Result<OwnedRecvStream, TransportError>;
@@ -345,13 +376,19 @@ pub(crate) mod mock {
             }
         }
 
-        async fn open_bi(&self, _priority: StreamPriority) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
+        async fn open_bi(
+            &self,
+            _priority: StreamPriority,
+        ) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
             let (send, _buf) = OwnedSendStream::mock();
             let recv = OwnedRecvStream::mock(Vec::new());
             Ok((send, recv))
         }
 
-        async fn open_uni(&self, _priority: StreamPriority) -> Result<OwnedSendStream, TransportError> {
+        async fn open_uni(
+            &self,
+            _priority: StreamPriority,
+        ) -> Result<OwnedSendStream, TransportError> {
             let (send, _buf) = OwnedSendStream::mock();
             Ok(send)
         }
@@ -396,8 +433,14 @@ mod tests {
 
     #[test]
     fn transport_error_display_datagram_too_large() {
-        let err = TransportError::DatagramTooLarge { size: 2000, max: 1200 };
-        assert_eq!(format!("{err}"), "datagram too large: 2000 bytes (max 1200)");
+        let err = TransportError::DatagramTooLarge {
+            size: 2000,
+            max: 1200,
+        };
+        assert_eq!(
+            format!("{err}"),
+            "datagram too large: 2000 bytes (max 1200)"
+        );
     }
 
     #[test]
@@ -422,7 +465,10 @@ mod tests {
 
     #[test]
     fn stream_priority_to_quinn_maps_correctly() {
-        assert!(StreamPriority::Critical.to_quinn_priority() < StreamPriority::Background.to_quinn_priority());
+        assert!(
+            StreamPriority::Critical.to_quinn_priority()
+                < StreamPriority::Background.to_quinn_priority()
+        );
         assert_eq!(StreamPriority::Critical.to_quinn_priority(), 0);
         assert_eq!(StreamPriority::Background.to_quinn_priority(), 4);
     }
@@ -430,11 +476,26 @@ mod tests {
     #[test]
     fn stream_priority_from_channel_priority() {
         use prism_protocol::channel::ChannelPriority;
-        assert_eq!(StreamPriority::from(ChannelPriority::Critical), StreamPriority::Critical);
-        assert_eq!(StreamPriority::from(ChannelPriority::High), StreamPriority::High);
-        assert_eq!(StreamPriority::from(ChannelPriority::Normal), StreamPriority::Normal);
-        assert_eq!(StreamPriority::from(ChannelPriority::Low), StreamPriority::Low);
-        assert_eq!(StreamPriority::from(ChannelPriority::Background), StreamPriority::Background);
+        assert_eq!(
+            StreamPriority::from(ChannelPriority::Critical),
+            StreamPriority::Critical
+        );
+        assert_eq!(
+            StreamPriority::from(ChannelPriority::High),
+            StreamPriority::High
+        );
+        assert_eq!(
+            StreamPriority::from(ChannelPriority::Normal),
+            StreamPriority::Normal
+        );
+        assert_eq!(
+            StreamPriority::from(ChannelPriority::Low),
+            StreamPriority::Low
+        );
+        assert_eq!(
+            StreamPriority::from(ChannelPriority::Background),
+            StreamPriority::Background
+        );
     }
 
     #[test]
@@ -465,7 +526,9 @@ mod tests {
 
     #[test]
     fn transport_event_clone() {
-        let event = TransportEvent::Degraded { reason: "high loss".into() };
+        let event = TransportEvent::Degraded {
+            reason: "high loss".into(),
+        };
         let cloned = event.clone();
         if let TransportEvent::Degraded { reason } = cloned {
             assert_eq!(reason, "high loss");
@@ -510,7 +573,8 @@ mod tests {
     #[tokio::test]
     async fn mock_connection_datagram_roundtrip() {
         let conn = mock::MockConnection::new(1200);
-        conn.try_send_datagram(bytes::Bytes::from_static(b"hello")).unwrap();
+        conn.try_send_datagram(bytes::Bytes::from_static(b"hello"))
+            .unwrap();
         assert_eq!(conn.sent_datagrams().len(), 1);
     }
 
@@ -518,7 +582,10 @@ mod tests {
     async fn mock_connection_datagram_too_large() {
         let conn = mock::MockConnection::new(4);
         let result = conn.try_send_datagram(bytes::Bytes::from_static(b"toolarge"));
-        assert!(matches!(result, Err(TransportError::DatagramTooLarge { .. })));
+        assert!(matches!(
+            result,
+            Err(TransportError::DatagramTooLarge { .. })
+        ));
     }
 
     #[tokio::test]

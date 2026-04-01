@@ -136,15 +136,26 @@ mod tests {
         assert_eq!(meta.total_regions, 3);
         assert!(meta.replaces_seq.is_none());
 
-        let with_replacement = FrameMetadata { replaces_seq: Some(7), ..meta.clone() };
+        let with_replacement = FrameMetadata {
+            replaces_seq: Some(7),
+            ..meta.clone()
+        };
         assert_eq!(with_replacement.replaces_seq, Some(7));
     }
 
     #[test]
     fn encoded_region_keyframe() {
         let region = EncodedRegion {
-            rect: Rect { x: 0, y: 0, w: 960, h: 540 },
-            encoding: RegionEncoding::Video { codec: CodecId::H265, is_keyframe: true },
+            rect: Rect {
+                x: 0,
+                y: 0,
+                w: 960,
+                h: 540,
+            },
+            encoding: RegionEncoding::Video {
+                codec: CodecId::H265,
+                is_keyframe: true,
+            },
             decoder_slot: 2,
             slices: vec![EncodedSlice {
                 slice_index: 0,

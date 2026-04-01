@@ -5,7 +5,7 @@
 
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
-use prism_protocol::clipboard::{fast_hash, ClipboardEchoGuard};
+use prism_protocol::clipboard::{ClipboardEchoGuard, fast_hash};
 
 // ── ClipboardSyncState ────────────────────────────────────────────────────────
 

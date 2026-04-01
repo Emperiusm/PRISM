@@ -49,7 +49,11 @@ impl Hysteresis {
         }
 
         let is_downgrade = target_level > current_level;
-        let hold = if is_downgrade { self.downgrade_hold } else { self.upgrade_hold };
+        let hold = if is_downgrade {
+            self.downgrade_hold
+        } else {
+            self.upgrade_hold
+        };
 
         // If the target changed, restart the timer.
         if self.last_target != Some(target_level) {
@@ -84,12 +88,7 @@ pub struct LevelChange {
 
 impl LevelChange {
     /// Compute the side-effects of moving from `old_level` to `new_level`.
-    pub fn compute(
-        old_level: u8,
-        new_level: u8,
-        old_res: (u32, u32),
-        new_res: (u32, u32),
-    ) -> Self {
+    pub fn compute(old_level: u8, new_level: u8, old_res: (u32, u32), new_res: (u32, u32)) -> Self {
         let resolution_changed = old_res != new_res;
         Self {
             old_level,

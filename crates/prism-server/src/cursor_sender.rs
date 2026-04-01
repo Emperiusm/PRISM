@@ -94,8 +94,7 @@ pub fn deserialize_cursor_shape(data: &[u8]) -> Option<CursorShape> {
     let hotspot_x = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
     let hotspot_y = u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
     let hash = u64::from_le_bytes([
-        data[16], data[17], data[18], data[19],
-        data[20], data[21], data[22], data[23],
+        data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23],
     ]);
     Some(CursorShape {
         width,
@@ -168,8 +167,8 @@ mod tests {
         };
 
         let bytes = serialize_cursor_shape(&original);
-        let recovered = deserialize_cursor_shape(&bytes)
-            .expect("deserialize must succeed for valid data");
+        let recovered =
+            deserialize_cursor_shape(&bytes).expect("deserialize must succeed for valid data");
 
         assert_eq!(recovered.width, original.width);
         assert_eq!(recovered.height, original.height);

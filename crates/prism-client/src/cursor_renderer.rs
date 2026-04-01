@@ -129,7 +129,11 @@ mod tests {
         predictor2.update_server(0.0, 0.0, true);
         // No correction since |3| and |4| are both < 10
         let div = predictor2.divergence();
-        assert!((div - 5.0).abs() < 1e-5, "expected divergence ~5.0, got {}", div);
+        assert!(
+            (div - 5.0).abs() < 1e-5,
+            "expected divergence ~5.0, got {}",
+            div
+        );
     }
 
     #[test]

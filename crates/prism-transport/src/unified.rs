@@ -5,8 +5,8 @@
 
 // Unified transport abstraction over QUIC, WebSocket, and TCP.
 
-use prism_protocol::channel;
 use crate::connection::PrismConnection;
+use prism_protocol::channel;
 
 // ── ConnectionSlot ────────────────────────────────────────────────────────────
 
@@ -67,9 +67,7 @@ impl UnifiedConnection {
     pub fn for_channel(&self, channel_id: u16) -> &dyn PrismConnection {
         match self.routing.slot_for_channel(channel_id) {
             ConnectionSlot::Latency => &*self.latency,
-            ConnectionSlot::Throughput => {
-                self.throughput.as_deref().unwrap_or(&*self.latency)
-            }
+            ConnectionSlot::Throughput => self.throughput.as_deref().unwrap_or(&*self.latency),
         }
     }
 
@@ -90,41 +88,65 @@ mod tests {
     use crate::connection::TransportType;
     use crate::connection::mock::MockConnection;
     use prism_protocol::channel::{
-        CHANNEL_DISPLAY, CHANNEL_INPUT, CHANNEL_CONTROL, CHANNEL_FILESHARE,
-        CHANNEL_SENSOR, CHANNEL_AUDIO, CHANNEL_CLIPBOARD, CHANNEL_DEVICE,
+        CHANNEL_AUDIO, CHANNEL_CLIPBOARD, CHANNEL_CONTROL, CHANNEL_DEVICE, CHANNEL_DISPLAY,
+        CHANNEL_FILESHARE, CHANNEL_INPUT, CHANNEL_SENSOR,
     };
 
     #[test]
     fn default_routing_critical_to_latency() {
         let routing = ChannelRouting::default();
-        assert_eq!(routing.slot_for_channel(CHANNEL_INPUT), ConnectionSlot::Latency);
+        assert_eq!(
+            routing.slot_for_channel(CHANNEL_INPUT),
+            ConnectionSlot::Latency
+        );
     }
 
     #[test]
     fn default_routing_high_to_latency() {
         let routing = ChannelRouting::default();
-        assert_eq!(routing.slot_for_channel(CHANNEL_DISPLAY), ConnectionSlot::Latency);
-        assert_eq!(routing.slot_for_channel(CHANNEL_AUDIO), ConnectionSlot::Latency);
+        assert_eq!(
+            routing.slot_for_channel(CHANNEL_DISPLAY),
+            ConnectionSlot::Latency
+        );
+        assert_eq!(
+            routing.slot_for_channel(CHANNEL_AUDIO),
+            ConnectionSlot::Latency
+        );
     }
 
     #[test]
     fn default_routing_normal_to_latency() {
         let routing = ChannelRouting::default();
-        assert_eq!(routing.slot_for_channel(CHANNEL_CONTROL), ConnectionSlot::Latency);
-        assert_eq!(routing.slot_for_channel(CHANNEL_CLIPBOARD), ConnectionSlot::Latency);
+        assert_eq!(
+            routing.slot_for_channel(CHANNEL_CONTROL),
+            ConnectionSlot::Latency
+        );
+        assert_eq!(
+            routing.slot_for_channel(CHANNEL_CLIPBOARD),
+            ConnectionSlot::Latency
+        );
     }
 
     #[test]
     fn default_routing_low_to_throughput() {
         let routing = ChannelRouting::default();
-        assert_eq!(routing.slot_for_channel(CHANNEL_FILESHARE), ConnectionSlot::Throughput);
-        assert_eq!(routing.slot_for_channel(CHANNEL_DEVICE), ConnectionSlot::Throughput);
+        assert_eq!(
+            routing.slot_for_channel(CHANNEL_FILESHARE),
+            ConnectionSlot::Throughput
+        );
+        assert_eq!(
+            routing.slot_for_channel(CHANNEL_DEVICE),
+            ConnectionSlot::Throughput
+        );
     }
 
     #[test]
     fn default_routing_background_to_throughput() {
         let routing = ChannelRouting::default();
-        assert_eq!(routing.slot_for_channel(CHANNEL_SENSOR), ConnectionSlot::Throughput);
+        assert_eq!(
+            routing.slot_for_channel(CHANNEL_SENSOR),
+            ConnectionSlot::Throughput
+        );
     }
 
     #[test]

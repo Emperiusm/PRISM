@@ -33,7 +33,12 @@ impl HeartbeatMonitor {
 
     /// Register a new client, resetting its activity timer to now.
     pub fn register(&mut self, client_id: ClientId) {
-        self.clients.insert(client_id, HeartbeatState { last_activity: Instant::now() });
+        self.clients.insert(
+            client_id,
+            HeartbeatState {
+                last_activity: Instant::now(),
+            },
+        );
     }
 
     /// Remove a client from monitoring.
@@ -76,11 +81,7 @@ impl HeartbeatMonitor {
                 let elapsed = state.last_activity.elapsed();
                 let ns = elapsed > self.suspend_threshold;
                 let nt = elapsed > self.tombstone_threshold;
-                if ns || nt {
-                    Some((*id, ns, nt))
-                } else {
-                    None
-                }
+                if ns || nt { Some((*id, ns, nt)) } else { None }
             })
             .collect()
     }
@@ -97,10 +98,7 @@ mod tests {
     }
 
     fn monitor() -> HeartbeatMonitor {
-        HeartbeatMonitor::new(
-            Duration::from_millis(10),
-            Duration::from_millis(15),
-        )
+        HeartbeatMonitor::new(Duration::from_millis(10), Duration::from_millis(15))
     }
 
     #[test]

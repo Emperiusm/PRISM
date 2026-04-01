@@ -130,9 +130,7 @@ impl OverlayPacket {
             return None;
         }
 
-        let u16_at = |off: usize| -> u16 {
-            u16::from_le_bytes([bytes[off], bytes[off + 1]])
-        };
+        let u16_at = |off: usize| -> u16 { u16::from_le_bytes([bytes[off], bytes[off + 1]]) };
         let u32_at = |off: usize| -> u32 {
             u32::from_le_bytes([bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]])
         };

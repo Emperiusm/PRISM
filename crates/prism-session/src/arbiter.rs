@@ -55,9 +55,9 @@ pub struct BandwidthNeeds {
 
 // ─── BandwidthArbiter ────────────────────────────────────────────────────────
 
-use std::collections::HashMap;
 use crate::types::ClientId;
 use prism_protocol::channel::ChannelPriority;
+use std::collections::HashMap;
 
 struct ChannelEntry {
     priority: ChannelPriority,
@@ -92,7 +92,11 @@ impl BandwidthArbiter {
     ) {
         self.channels.insert(
             (client_id, channel_id),
-            ChannelEntry { priority, needs, allocated_bps: 0 },
+            ChannelEntry {
+                priority,
+                needs,
+                allocated_bps: 0,
+            },
         );
     }
 
@@ -130,8 +134,7 @@ impl BandwidthArbiter {
             let keys: Vec<_> = self.channels.keys().cloned().collect();
             for key in keys {
                 if let Some(entry) = self.channels.get(&key) {
-                    let weight =
-                        prism_protocol::channel::priority_weight(entry.priority) as u64;
+                    let weight = prism_protocol::channel::priority_weight(entry.priority) as u64;
                     let headroom = entry.needs.max_bps.saturating_sub(entry.needs.min_bps);
                     let share = (remaining * weight / total_weight).min(headroom);
                     let new_alloc = entry.allocated_bps + share;
@@ -232,7 +235,12 @@ mod tests {
     }
 
     fn needs(min: u64, ideal: u64, max: u64) -> BandwidthNeeds {
-        BandwidthNeeds { min_bps: min, ideal_bps: ideal, max_bps: max, urgency: 0.5 }
+        BandwidthNeeds {
+            min_bps: min,
+            ideal_bps: ideal,
+            max_bps: max,
+            urgency: 0.5,
+        }
     }
 
     #[test]
@@ -252,8 +260,18 @@ mod tests {
     #[test]
     fn min_guarantees_satisfied() {
         let mut arb = BandwidthArbiter::new(300_000);
-        arb.add_channel(client(), 0x001, ChannelPriority::Normal, needs(100_000, 200_000, 400_000));
-        arb.add_channel(client(), 0x002, ChannelPriority::Normal, needs(100_000, 200_000, 400_000));
+        arb.add_channel(
+            client(),
+            0x001,
+            ChannelPriority::Normal,
+            needs(100_000, 200_000, 400_000),
+        );
+        arb.add_channel(
+            client(),
+            0x002,
+            ChannelPriority::Normal,
+            needs(100_000, 200_000, 400_000),
+        );
         arb.rebalance();
         assert!(arb.allocation(client(), 0x001).unwrap() >= 100_000);
         assert!(arb.allocation(client(), 0x002).unwrap() >= 100_000);
@@ -262,20 +280,42 @@ mod tests {
     #[test]
     fn priority_weighting_higher_gets_more() {
         let mut arb = BandwidthArbiter::new(1_000_000);
-        arb.add_channel(client(),       0x001, ChannelPriority::High, needs(0, 500_000, 1_000_000));
-        arb.add_channel(other_client(), 0x002, ChannelPriority::Low,  needs(0, 500_000, 1_000_000));
+        arb.add_channel(
+            client(),
+            0x001,
+            ChannelPriority::High,
+            needs(0, 500_000, 1_000_000),
+        );
+        arb.add_channel(
+            other_client(),
+            0x002,
+            ChannelPriority::Low,
+            needs(0, 500_000, 1_000_000),
+        );
         arb.rebalance();
-        let high_alloc = arb.allocation(client(),       0x001).unwrap();
-        let low_alloc  = arb.allocation(other_client(), 0x002).unwrap();
-        assert!(high_alloc > low_alloc,
-            "High priority ({high_alloc}) should exceed Low priority ({low_alloc})");
+        let high_alloc = arb.allocation(client(), 0x001).unwrap();
+        let low_alloc = arb.allocation(other_client(), 0x002).unwrap();
+        assert!(
+            high_alloc > low_alloc,
+            "High priority ({high_alloc}) should exceed Low priority ({low_alloc})"
+        );
     }
 
     #[test]
     fn remove_client_frees_allocation() {
         let mut arb = BandwidthArbiter::new(1_000_000);
-        arb.add_channel(client(),       0x001, ChannelPriority::Normal, needs(0, 500_000, 1_000_000));
-        arb.add_channel(other_client(), 0x002, ChannelPriority::Normal, needs(0, 500_000, 1_000_000));
+        arb.add_channel(
+            client(),
+            0x001,
+            ChannelPriority::Normal,
+            needs(0, 500_000, 1_000_000),
+        );
+        arb.add_channel(
+            other_client(),
+            0x002,
+            ChannelPriority::Normal,
+            needs(0, 500_000, 1_000_000),
+        );
         arb.rebalance();
         arb.remove_client(client());
         assert!(arb.allocation(client(), 0x001).is_none());
@@ -291,7 +331,10 @@ mod tests {
             det.update(0x001, 1_000_000, 0);
         }
         let warnings = det.check();
-        assert!(!warnings.is_empty(), "expected starvation warning after 6 ticks");
+        assert!(
+            !warnings.is_empty(),
+            "expected starvation warning after 6 ticks"
+        );
         assert_eq!(warnings[0].channel_id, 0x001);
         assert!(warnings[0].starved_ticks > 5);
     }
@@ -304,6 +347,9 @@ mod tests {
         }
         assert!(!det.check().is_empty());
         det.update(0x001, 1_000_000, 600_000);
-        assert!(det.check().is_empty(), "starvation should clear after recovery");
+        assert!(
+            det.check().is_empty(),
+            "starvation should clear after recovery"
+        );
     }
 }

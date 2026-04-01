@@ -33,7 +33,11 @@ pub enum RoutingMutation {
     /// Remove all routes that reference a specific client.
     RemoveClient(ClientId),
     /// Replace `from` with `to_entry` on `channel_id`, preserving all others.
-    TransferChannel { channel_id: u16, from: ClientId, to_entry: RouteEntry },
+    TransferChannel {
+        channel_id: u16,
+        from: ClientId,
+        to_entry: RouteEntry,
+    },
 }
 
 /// Lock-free routing table backed by ArcSwap for wait-free reads.
@@ -81,7 +85,11 @@ impl RoutingTable {
                     // Remove channels that became empty
                     next.channel_routes.retain(|_, v| !v.is_empty());
                 }
-                RoutingMutation::TransferChannel { channel_id, from, to_entry } => {
+                RoutingMutation::TransferChannel {
+                    channel_id,
+                    from,
+                    to_entry,
+                } => {
                     if let Some(routes) = next.channel_routes.get_mut(&channel_id) {
                         for entry in routes.iter_mut() {
                             if entry.client_id == from {
@@ -126,9 +134,18 @@ mod tests {
         let c1 = cid();
         let c2 = cid();
         table.batch_update(vec![
-            RoutingMutation::AddRoute { channel_id: 0x001, entry: entry(c1) },
-            RoutingMutation::AddRoute { channel_id: 0x001, entry: entry(c2) },
-            RoutingMutation::AddRoute { channel_id: 0x002, entry: entry(c1) },
+            RoutingMutation::AddRoute {
+                channel_id: 0x001,
+                entry: entry(c1),
+            },
+            RoutingMutation::AddRoute {
+                channel_id: 0x001,
+                entry: entry(c2),
+            },
+            RoutingMutation::AddRoute {
+                channel_id: 0x002,
+                entry: entry(c1),
+            },
         ]);
         let snap = table.snapshot();
         assert_eq!(snap.channel_routes[&0x001].len(), 2);
@@ -142,9 +159,18 @@ mod tests {
         let c1 = cid();
         let c2 = cid();
         table.batch_update(vec![
-            RoutingMutation::AddRoute { channel_id: 0x001, entry: entry(c1) },
-            RoutingMutation::AddRoute { channel_id: 0x002, entry: entry(c1) },
-            RoutingMutation::AddRoute { channel_id: 0x002, entry: entry(c2) },
+            RoutingMutation::AddRoute {
+                channel_id: 0x001,
+                entry: entry(c1),
+            },
+            RoutingMutation::AddRoute {
+                channel_id: 0x002,
+                entry: entry(c1),
+            },
+            RoutingMutation::AddRoute {
+                channel_id: 0x002,
+                entry: entry(c2),
+            },
         ]);
         table.batch_update(vec![RoutingMutation::RemoveClient(c1)]);
         let snap = table.snapshot();
@@ -160,16 +186,15 @@ mod tests {
         let table = RoutingTable::new();
         let c1 = cid();
         let c2 = cid();
-        table.batch_update(vec![
-            RoutingMutation::AddRoute { channel_id: 0x004, entry: entry(c1) },
-        ]);
-        table.batch_update(vec![
-            RoutingMutation::TransferChannel {
-                channel_id: 0x004,
-                from: c1,
-                to_entry: entry(c2),
-            },
-        ]);
+        table.batch_update(vec![RoutingMutation::AddRoute {
+            channel_id: 0x004,
+            entry: entry(c1),
+        }]);
+        table.batch_update(vec![RoutingMutation::TransferChannel {
+            channel_id: 0x004,
+            from: c1,
+            to_entry: entry(c2),
+        }]);
         let snap = table.snapshot();
         assert_eq!(snap.channel_routes[&0x004].len(), 1);
         assert_eq!(snap.channel_routes[&0x004][0].client_id, c2);
@@ -179,9 +204,18 @@ mod tests {
     fn generation_increments_per_batch() {
         let table = RoutingTable::new();
         let c = cid();
-        table.batch_update(vec![RoutingMutation::AddRoute { channel_id: 0x001, entry: entry(c) }]);
-        table.batch_update(vec![RoutingMutation::AddRoute { channel_id: 0x002, entry: entry(c) }]);
-        table.batch_update(vec![RoutingMutation::AddRoute { channel_id: 0x003, entry: entry(c) }]);
+        table.batch_update(vec![RoutingMutation::AddRoute {
+            channel_id: 0x001,
+            entry: entry(c),
+        }]);
+        table.batch_update(vec![RoutingMutation::AddRoute {
+            channel_id: 0x002,
+            entry: entry(c),
+        }]);
+        table.batch_update(vec![RoutingMutation::AddRoute {
+            channel_id: 0x003,
+            entry: entry(c),
+        }]);
         let snap = table.snapshot();
         assert_eq!(snap.generation, 3);
     }
@@ -192,16 +226,18 @@ mod tests {
         let c1 = cid();
         let c2 = cid();
 
-        table.batch_update(vec![
-            RoutingMutation::AddRoute { channel_id: 0x001, entry: entry(c1) },
-        ]);
+        table.batch_update(vec![RoutingMutation::AddRoute {
+            channel_id: 0x001,
+            entry: entry(c1),
+        }]);
 
         // Capture old snapshot before next mutation
         let old_snap = table.snapshot();
 
-        table.batch_update(vec![
-            RoutingMutation::AddRoute { channel_id: 0x001, entry: entry(c2) },
-        ]);
+        table.batch_update(vec![RoutingMutation::AddRoute {
+            channel_id: 0x001,
+            entry: entry(c2),
+        }]);
 
         // Old snapshot still shows only c1
         assert_eq!(old_snap.channel_routes[&0x001].len(), 1);

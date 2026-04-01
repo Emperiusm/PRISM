@@ -276,7 +276,10 @@ mod tests {
     #[test]
     fn new_validates_channel_overflow() {
         let result = PrismHeader::new(0x2000, 0, 0, 0, 0, 0);
-        assert!(matches!(result, Err(ProtocolError::ChannelIdOverflow(0x2000))));
+        assert!(matches!(
+            result,
+            Err(ProtocolError::ChannelIdOverflow(0x2000))
+        ));
     }
 
     #[test]

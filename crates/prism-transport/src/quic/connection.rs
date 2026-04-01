@@ -5,10 +5,10 @@
 
 // QUIC connection lifecycle management.
 
-use bytes::Bytes;
-use async_trait::async_trait;
-use tokio::sync::broadcast;
 use crate::connection::*;
+use async_trait::async_trait;
+use bytes::Bytes;
+use tokio::sync::broadcast;
 
 pub struct QuicConnection {
     connection: quinn::Connection,
@@ -18,7 +18,10 @@ pub struct QuicConnection {
 impl QuicConnection {
     pub fn new(connection: quinn::Connection) -> Self {
         let (event_tx, _) = broadcast::channel(64);
-        Self { connection, event_tx }
+        Self {
+            connection,
+            event_tx,
+        }
     }
 }
 
@@ -39,18 +42,21 @@ impl PrismConnection for QuicConnection {
 
     async fn send_datagram(&self, data: Bytes) -> Result<(), TransportError> {
         if let Some(max) = self.connection.max_datagram_size()
-            && data.len() <= max {
+            && data.len() <= max
+        {
             return self.try_send_datagram(data);
         }
         // Spill to uni stream when datagram is too large
-        let mut s = self.connection
+        let mut s = self
+            .connection
             .open_uni()
             .await
             .map_err(|e| TransportError::StreamError(e.to_string()))?;
         s.write_all(&data)
             .await
             .map_err(|e| TransportError::StreamError(e.to_string()))?;
-        s.finish().map_err(|e| TransportError::StreamError(e.to_string()))?;
+        s.finish()
+            .map_err(|e| TransportError::StreamError(e.to_string()))?;
         Ok(())
     }
 
@@ -61,17 +67,25 @@ impl PrismConnection for QuicConnection {
             .map_err(|e| TransportError::ConnectionError(e.to_string()))
     }
 
-    async fn open_bi(&self, priority: StreamPriority) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
-        let (send, recv) = self.connection
+    async fn open_bi(
+        &self,
+        priority: StreamPriority,
+    ) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
+        let (send, recv) = self
+            .connection
             .open_bi()
             .await
             .map_err(|e| TransportError::StreamError(e.to_string()))?;
         let _ = send.set_priority(priority.to_quinn_priority());
-        Ok((OwnedSendStream::from_quic(send), OwnedRecvStream::from_quic(recv)))
+        Ok((
+            OwnedSendStream::from_quic(send),
+            OwnedRecvStream::from_quic(recv),
+        ))
     }
 
     async fn open_uni(&self, priority: StreamPriority) -> Result<OwnedSendStream, TransportError> {
-        let send = self.connection
+        let send = self
+            .connection
             .open_uni()
             .await
             .map_err(|e| TransportError::StreamError(e.to_string()))?;
@@ -80,15 +94,20 @@ impl PrismConnection for QuicConnection {
     }
 
     async fn accept_bi(&self) -> Result<(OwnedSendStream, OwnedRecvStream), TransportError> {
-        let (send, recv) = self.connection
+        let (send, recv) = self
+            .connection
             .accept_bi()
             .await
             .map_err(|e| TransportError::ConnectionError(e.to_string()))?;
-        Ok((OwnedSendStream::from_quic(send), OwnedRecvStream::from_quic(recv)))
+        Ok((
+            OwnedSendStream::from_quic(send),
+            OwnedRecvStream::from_quic(recv),
+        ))
     }
 
     async fn accept_uni(&self) -> Result<OwnedRecvStream, TransportError> {
-        let recv = self.connection
+        let recv = self
+            .connection
             .accept_uni()
             .await
             .map_err(|e| TransportError::ConnectionError(e.to_string()))?;
@@ -139,7 +158,9 @@ mod tests {
 
         let mut server_config =
             quinn::ServerConfig::with_single_cert(vec![cert_der.clone()], key_der).unwrap();
-        server_config.transport_config(Arc::new(super::super::config::latency_transport_config(None)));
+        server_config.transport_config(Arc::new(super::super::config::latency_transport_config(
+            None,
+        )));
 
         let server_endpoint =
             quinn::Endpoint::server(server_config, "127.0.0.1:0".parse().unwrap()).unwrap();
@@ -154,17 +175,16 @@ mod tests {
             quinn::crypto::rustls::QuicClientConfig::try_from(client_crypto).unwrap(),
         ));
 
-        let mut client_endpoint =
-            quinn::Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
+        let mut client_endpoint = quinn::Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
         client_endpoint.set_default_client_config(client_config);
 
         let connect_future = client_endpoint.connect(server_addr, "localhost").unwrap();
         let accept_future = server_endpoint.accept().await.unwrap();
 
-        let (client_conn, server_conn) = tokio::join!(
-            async { connect_future.await.unwrap() },
-            async { accept_future.await.unwrap() },
-        );
+        let (client_conn, server_conn) =
+            tokio::join!(async { connect_future.await.unwrap() }, async {
+                accept_future.await.unwrap()
+            },);
         (client_conn, server_conn)
     }
 

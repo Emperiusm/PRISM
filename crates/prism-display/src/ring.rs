@@ -78,7 +78,9 @@ impl<T> FrameRing<T> {
         }
 
         // Release: publish the written data to the consumer.
-        self.write_pos.0.store(write.wrapping_add(1), Ordering::Release);
+        self.write_pos
+            .0
+            .store(write.wrapping_add(1), Ordering::Release);
         Some(())
     }
 
@@ -102,7 +104,9 @@ impl<T> FrameRing<T> {
         let item = unsafe { (*self.slots[slot].get()).take() };
 
         // Release: publish the freed slot to the producer.
-        self.read_pos.0.store(read.wrapping_add(1), Ordering::Release);
+        self.read_pos
+            .0
+            .store(read.wrapping_add(1), Ordering::Release);
 
         item
     }
@@ -248,7 +252,12 @@ mod tests {
         producer.join().expect("producer panicked");
         let received = consumer.join().expect("consumer panicked");
 
-        assert_eq!(received.len(), N, "expected {N} items, got {}", received.len());
+        assert_eq!(
+            received.len(),
+            N,
+            "expected {N} items, got {}",
+            received.len()
+        );
         for (idx, &val) in received.iter().enumerate() {
             assert_eq!(val, idx, "FIFO violation at position {idx}: got {val}");
         }

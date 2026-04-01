@@ -3,7 +3,7 @@
 
 mod harness;
 
-use harness::{TestServer, TestClient};
+use harness::{TestClient, TestServer};
 
 /// A client connects and the QUIC session is established successfully.
 #[tokio::test(flavor = "multi_thread")]
@@ -38,9 +38,10 @@ async fn input_round_trip() {
 
     // Build and send an input datagram.
     let mut input_sender = prism_client::InputSender::new();
-    let datagram = input_sender.build_datagram(
-        InputEvent::KeyDown { scancode: 0x1E, vk: 0x41 },
-    );
+    let datagram = input_sender.build_datagram(InputEvent::KeyDown {
+        scancode: 0x1E,
+        vk: 0x41,
+    });
     client.send_datagram(datagram);
 
     // Give the server time to process.

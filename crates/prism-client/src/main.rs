@@ -55,12 +55,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── Parse arguments ──────────────────────────────────────────────────
     // Skip args that are flags (--*) or values of --noise.
     let noise_pos = args.iter().position(|a| a == "--noise");
-    let server_addr = args.iter()
+    let server_addr = args
+        .iter()
         .enumerate()
         .skip(1)
-        .filter(|(i, a)| {
-            !a.starts_with("--") && noise_pos.map_or(true, |np| *i != np + 1)
-        })
+        .filter(|(i, a)| !a.starts_with("--") && noise_pos.is_none_or(|np| *i != np + 1))
         .map(|(_, a)| a.as_str())
         .next()
         .unwrap_or("127.0.0.1:7000")
@@ -72,7 +71,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|i| args.get(i + 1))
         .map(|hex_str| {
             let bytes = hex::decode(hex_str).expect("invalid hex key — expected 64 hex characters");
-            assert!(bytes.len() == 32, "Noise key must be exactly 32 bytes (64 hex characters)");
+            assert!(
+                bytes.len() == 32,
+                "Noise key must be exactly 32 bytes (64 hex characters)"
+            );
             let mut key = [0u8; 32];
             key.copy_from_slice(&bytes);
             key

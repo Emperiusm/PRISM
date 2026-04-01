@@ -103,7 +103,10 @@ mod tests {
             stats.complete();
         }
         let rate = stats.completion_rate();
-        assert!((rate - 0.8).abs() < f32::EPSILON, "expected 0.8, got {rate}");
+        assert!(
+            (rate - 0.8).abs() < f32::EPSILON,
+            "expected 0.8, got {rate}"
+        );
     }
 
     #[test]

@@ -6,8 +6,8 @@
 // QUIC socket setup with socket2 for platform-specific tuning.
 
 use crate::connection::TransportError;
-use std::net::{SocketAddr, UdpSocket};
 use socket2::SockRef;
+use std::net::{SocketAddr, UdpSocket};
 
 pub fn set_dscp(socket: &UdpSocket, dscp: u8) -> Result<(), std::io::Error> {
     let sock_ref = SockRef::from(socket);
@@ -16,8 +16,8 @@ pub fn set_dscp(socket: &UdpSocket, dscp: u8) -> Result<(), std::io::Error> {
 }
 
 pub fn create_latency_socket(addr: SocketAddr) -> Result<UdpSocket, TransportError> {
-    let socket = UdpSocket::bind(addr)
-        .map_err(|e| TransportError::ConnectionError(e.to_string()))?;
+    let socket =
+        UdpSocket::bind(addr).map_err(|e| TransportError::ConnectionError(e.to_string()))?;
     let _ = set_dscp(&socket, 0x2E); // EF
     let _ = socket.set_nonblocking(true);
     let sock_ref = SockRef::from(&socket);
@@ -27,8 +27,8 @@ pub fn create_latency_socket(addr: SocketAddr) -> Result<UdpSocket, TransportErr
 }
 
 pub fn create_throughput_socket(addr: SocketAddr) -> Result<UdpSocket, TransportError> {
-    let socket = UdpSocket::bind(addr)
-        .map_err(|e| TransportError::ConnectionError(e.to_string()))?;
+    let socket =
+        UdpSocket::bind(addr).map_err(|e| TransportError::ConnectionError(e.to_string()))?;
     let _ = set_dscp(&socket, 0x0A); // AF11
     let _ = socket.set_nonblocking(true);
     let sock_ref = SockRef::from(&socket);

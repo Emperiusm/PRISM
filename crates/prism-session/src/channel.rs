@@ -11,8 +11,8 @@ use prism_protocol::channel::{
     CHANNEL_TOUCH, EXTENSION_CHANNEL_START,
 };
 
-use crate::types::ClientId;
 use crate::error::SessionError;
+use crate::types::ClientId;
 
 /// Policy governing how a transferable channel changes hands.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,9 +44,16 @@ pub enum ChannelOwnership {
 pub enum ChannelGrantResult {
     Granted,
     AlreadyOwned,
-    Denied { reason: String, current_owner: Option<ClientId> },
-    Transferred { from: ClientId },
-    PendingApproval { current_owner: ClientId },
+    Denied {
+        reason: String,
+        current_owner: Option<ClientId>,
+    },
+    Transferred {
+        from: ClientId,
+    },
+    PendingApproval {
+        current_owner: ClientId,
+    },
 }
 
 /// Registry of all channels and their ownership state.
@@ -74,7 +81,12 @@ impl ChannelRegistry {
             CHANNEL_NOTIFY,
             CHANNEL_SENSOR,
         ] {
-            channels.insert(id, ChannelOwnership::Shared { subscribers: HashSet::new() });
+            channels.insert(
+                id,
+                ChannelOwnership::Shared {
+                    subscribers: HashSet::new(),
+                },
+            );
         }
 
         // Transferable channels
@@ -101,7 +113,9 @@ impl ChannelRegistry {
         if channel_id >= EXTENSION_CHANNEL_START && !self.channels.contains_key(&channel_id) {
             self.channels.insert(
                 channel_id,
-                ChannelOwnership::Shared { subscribers: HashSet::new() },
+                ChannelOwnership::Shared {
+                    subscribers: HashSet::new(),
+                },
             );
         }
 
@@ -130,7 +144,10 @@ impl ChannelRegistry {
                     Ok(ChannelGrantResult::Granted)
                 }
             }
-            ChannelOwnership::Transferable { owner, transfer_policy } => match owner {
+            ChannelOwnership::Transferable {
+                owner,
+                transfer_policy,
+            } => match owner {
                 None => {
                     *owner = Some(client_id);
                     Ok(ChannelGrantResult::Granted)
@@ -142,9 +159,9 @@ impl ChannelRegistry {
                         *owner = Some(client_id);
                         Ok(ChannelGrantResult::Transferred { from })
                     }
-                    TransferPolicy::OwnerApproves => {
-                        Ok(ChannelGrantResult::PendingApproval { current_owner: *current })
-                    }
+                    TransferPolicy::OwnerApproves => Ok(ChannelGrantResult::PendingApproval {
+                        current_owner: *current,
+                    }),
                     TransferPolicy::ServerDecides => Ok(ChannelGrantResult::Denied {
                         reason: "server decides allocation".to_string(),
                         current_owner: Some(*current),
@@ -222,10 +239,19 @@ mod tests {
         let mut reg = ChannelRegistry::with_defaults();
         let c1 = id();
         let c2 = id();
-        assert_eq!(reg.request_channel(CHANNEL_CLIPBOARD, c1).unwrap(), ChannelGrantResult::Granted);
-        assert_eq!(reg.request_channel(CHANNEL_CLIPBOARD, c2).unwrap(), ChannelGrantResult::Granted);
+        assert_eq!(
+            reg.request_channel(CHANNEL_CLIPBOARD, c1).unwrap(),
+            ChannelGrantResult::Granted
+        );
+        assert_eq!(
+            reg.request_channel(CHANNEL_CLIPBOARD, c2).unwrap(),
+            ChannelGrantResult::Granted
+        );
         // Subscribing again is AlreadyOwned
-        assert_eq!(reg.request_channel(CHANNEL_CLIPBOARD, c1).unwrap(), ChannelGrantResult::AlreadyOwned);
+        assert_eq!(
+            reg.request_channel(CHANNEL_CLIPBOARD, c1).unwrap(),
+            ChannelGrantResult::AlreadyOwned
+        );
     }
 
     #[test]
@@ -247,8 +273,14 @@ mod tests {
         reg.release_all(c);
         // After release, another client can claim
         let c2 = id();
-        assert_eq!(reg.request_channel(CHANNEL_DISPLAY, c2).unwrap(), ChannelGrantResult::Granted);
-        assert_eq!(reg.request_channel(CHANNEL_INPUT, c2).unwrap(), ChannelGrantResult::Granted);
+        assert_eq!(
+            reg.request_channel(CHANNEL_DISPLAY, c2).unwrap(),
+            ChannelGrantResult::Granted
+        );
+        assert_eq!(
+            reg.request_channel(CHANNEL_INPUT, c2).unwrap(),
+            ChannelGrantResult::Granted
+        );
     }
 
     #[test]
@@ -260,7 +292,10 @@ mod tests {
         reg.request_channel(CHANNEL_CLIPBOARD, c2).unwrap();
         reg.release_all(c1);
         // c1 removed; c2 can still re-subscribe (already subscribed, not changed by release_all on c1)
-        assert_eq!(reg.request_channel(CHANNEL_CLIPBOARD, c1).unwrap(), ChannelGrantResult::Granted);
+        assert_eq!(
+            reg.request_channel(CHANNEL_CLIPBOARD, c1).unwrap(),
+            ChannelGrantResult::Granted
+        );
     }
 
     #[test]

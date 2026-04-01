@@ -52,7 +52,9 @@ mod tests {
         let secret = [42u8; 32];
         let device_id = Uuid::from_bytes([1; 16]);
         let token = generate_throughput_token(&secret, &device_id, 1_000_000);
-        assert!(validate_throughput_token(&secret, &device_id, 1_000_000, &token, 500_000));
+        assert!(validate_throughput_token(
+            &secret, &device_id, 1_000_000, &token, 500_000
+        ));
     }
 
     #[test]

@@ -15,7 +15,10 @@ pub struct ThroughputEndpointConfig {
 
 impl ThroughputEndpointConfig {
     pub fn new(addr: SocketAddr) -> Self {
-        Self { addr, enabled: true }
+        Self {
+            addr,
+            enabled: true,
+        }
     }
 
     pub fn disabled() -> Self {
