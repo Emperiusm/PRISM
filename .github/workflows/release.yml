@@ -13,6 +13,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -35,41 +37,44 @@ jobs:
           Copy-Item LICENSE $dir/
           Compress-Archive -Path $dir/* -DestinationPath "$dir.zip"
           echo "ARTIFACT=$dir.zip" >> $env:GITHUB_ENV
-          echo "VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Generate changelog
-        id: changelog
-        shell: pwsh
+        shell: bash
         run: |
-          # Get commits since last tag
-          $prevTag = git describe --tags --abbrev=0 HEAD^ 2>$null
-          if ($prevTag) {
-            $log = git log --pretty=format:"- %s" "$prevTag..HEAD" -- ':!.github'
-          } else {
-            $log = git log --pretty=format:"- %s" -20
-          }
-          $body = @"
+          VERSION="${{ github.ref_name }}"
+
+          # Get commits since previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            LOG=$(git log --pretty=format:"- %s" "$PREV_TAG..HEAD" -- ':!.github')
+          else
+            LOG=$(git log --pretty=format:"- %s" -20)
+          fi
+
+          cat > changelog.md << 'HEADER'
           ## What's Changed
 
-          $($log -join "`n")
+          HEADER
+
+          echo "$LOG" >> changelog.md
+
+          cat >> changelog.md << FOOTER
 
           ## Downloads
 
           | File | Description |
           |------|-------------|
-          | ``prism-${{ github.ref_name }}-windows-x64.zip`` | Server + Client binaries (Windows x64) |
+          | \`prism-${VERSION}-windows-x64.zip\` | Server + Client binaries (Windows x64) |
 
           ### Quick Start
 
-          ```bash
+          \`\`\`bash
           # Extract and run
           prism-server.exe --dda          # Start server (real desktop capture)
           prism-client.exe                # Open launcher
           prism-client.exe 192.168.1.100:7000  # Direct connect
-          ```
-          "@
-          # Write to file to avoid escaping issues
-          $body | Out-File -FilePath changelog.md -Encoding utf8
+          \`\`\`
+          FOOTER
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
