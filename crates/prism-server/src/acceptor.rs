@@ -38,6 +38,15 @@ pub struct SelfSignedCert {
     pub key_der: rustls::pki_types::PrivateKeyDer<'static>,
 }
 
+impl Clone for SelfSignedCert {
+    fn clone(&self) -> Self {
+        Self {
+            cert_der: self.cert_der.clone(),
+            key_der: self.key_der.clone_key(),
+        }
+    }
+}
+
 impl SelfSignedCert {
     /// Generate a new self-signed certificate for `"localhost"`.
     pub fn generate() -> Result<Self, AcceptorError> {
