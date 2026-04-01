@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use tokio::sync::mpsc::Sender;
 use prism_protocol::{
     channel::CHANNEL_INPUT,
     header::{PrismHeader, HEADER_SIZE},
@@ -39,6 +40,7 @@ pub struct InputChannelHandler {
     screen_width: u32,
     screen_height: u32,
     stats: Arc<InputStats>,
+    capture_trigger: Option<Sender<()>>,
 }
 
 impl InputChannelHandler {
@@ -48,7 +50,16 @@ impl InputChannelHandler {
             screen_width,
             screen_height,
             stats: Arc::new(InputStats::default()),
+            capture_trigger: None,
         }
+    }
+
+    /// Attach a capture trigger channel.  On every processed input event the
+    /// sender fires a `()` signal so the frame pipeline can capture
+    /// immediately (reducing input-to-display latency by ~16 ms at 60 fps).
+    pub fn with_capture_trigger(mut self, tx: Sender<()>) -> Self {
+        self.capture_trigger = Some(tx);
+        self
     }
 
     /// Borrow the shared stats handle.
@@ -256,6 +267,12 @@ impl ChannelHandler for InputChannelHandler {
             self.stats.events_injected.fetch_add(1, Ordering::Relaxed);
         }
 
+        // Signal the frame pipeline to capture immediately after input,
+        // reducing input-to-display latency by approximately one frame interval.
+        if let Some(ref tx) = self.capture_trigger {
+            let _ = tx.try_send(());
+        }
+
         Ok(())
     }
 }
@@ -354,5 +371,16 @@ mod tests {
         let data = Bytes::from(vec![0u8; 10]);
         handler.handle_datagram(client(), data).await.unwrap();
         assert_eq!(stats.events_received.load(Ordering::Relaxed), 0);
+    }
+
+    // ── 7. capture_trigger_fires_on_input ──────────────────────────────────
+
+    #[tokio::test]
+    async fn capture_trigger_fires_on_input() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        let handler = InputChannelHandler::new(1920, 1080).with_capture_trigger(tx);
+        let data = make_input_datagram(InputEvent::KeyDown { scancode: 0x1E, vk: 0x41 });
+        handler.handle_datagram(Uuid::nil(), data).await.unwrap();
+        assert!(rx.try_recv().is_ok());
     }
 }
