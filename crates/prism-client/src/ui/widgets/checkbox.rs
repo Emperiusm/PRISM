@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Toggle checkbox widget.
 
-use super::{
-    EventResponse, GlassQuad, GlowRect, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent,
-    Widget,
-};
 use crate::renderer::animation::{Animation, EaseCurve};
+use crate::ui::theme;
+use crate::ui::widgets::{
+    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+};
 
 pub struct Checkbox {
     label: String,
@@ -59,32 +59,39 @@ impl Widget for Checkbox {
         );
 
         // Box background
-        ctx.push_glass_quad(GlassQuad {
-            rect: box_rect,
-            blur_rect: box_rect,
-            tint: [0.55, 0.36, 0.96, 0.15],
-            border_color: [1.0, 1.0, 1.0, 0.2],
-            corner_radius: 3.0,
-            noise_intensity: 0.0,
-        });
+        ctx.push_glass_quad(theme::glass_quad(
+            box_rect,
+            if self.checked {
+                [0.22, 0.31, 0.41, 0.94]
+            } else {
+                [0.15, 0.19, 0.25, 0.90]
+            },
+            if self.checked {
+                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.36]
+            } else {
+                [1.0, 1.0, 1.0, 0.14]
+            },
+            5.0,
+        ));
 
-        // Filled glow when checked
         if self.fill_anim.value() > 0.01 {
-            ctx.push_glow_rect(GlowRect {
-                rect: box_rect,
-                color: [0.55, 0.36, 0.96, self.fill_anim.value()],
-                spread: 4.0,
-                intensity: self.fill_anim.value(),
+            ctx.push_text_run(TextRun {
+                x: box_rect.x + 4.5,
+                y: box_rect.y + 1.0,
+                text: "x".into(),
+                font_size: 12.0,
+                color: theme::accent(0.60 + self.fill_anim.value() * 0.30),
+                monospace: false,
             });
         }
 
         // Label text
         ctx.push_text_run(TextRun {
             x: self.rect.x + BOX_SIZE + 8.0,
-            y: self.rect.y + self.rect.h * 0.5,
+            y: self.rect.y + 4.0,
             text: self.label.clone(),
             font_size: 13.0,
-            color: [1.0, 1.0, 1.0, 0.9],
+            color: theme::TEXT_SECONDARY,
             monospace: false,
         });
     }

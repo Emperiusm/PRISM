@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Connection info sub-panel — server address, encryption, session duration.
 
-use crate::ui::widgets::button::Button;
+use crate::ui::theme;
+use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::label::Label;
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
-    Widget,
+    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------
@@ -34,7 +34,8 @@ impl ConnPanel {
             encryption_label: Label::new("Encryption: —", 12.0),
             session_label: Label::new("Session: —", 12.0),
             client_id_label: Label::new("Client ID: —", 12.0),
-            disconnect_button: Button::new("Disconnect", UiAction::Disconnect),
+            disconnect_button: Button::new("Disconnect", UiAction::Disconnect)
+                .with_style(ButtonStyle::Destructive),
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             visible: false,
         }
@@ -120,21 +121,14 @@ impl Widget for ConnPanel {
             return;
         }
 
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.06, 0.0, 0.12, 0.25],
-            border_color: [1.0, 1.0, 1.0, 0.15],
-            corner_radius: 8.0,
-            noise_intensity: 0.02,
-        });
+        ctx.push_glass_quad(theme::floating_surface(self.rect));
 
         ctx.push_text_run(TextRun {
-            x: self.rect.x + 8.0,
-            y: self.rect.y + 8.0,
+            x: self.rect.x + 12.0,
+            y: self.rect.y + 10.0,
             text: "Connection".into(),
             font_size: 13.0,
-            color: [1.0, 1.0, 1.0, 0.95],
+            color: theme::TEXT_PRIMARY,
             monospace: false,
         });
 

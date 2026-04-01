@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hero quick-connect bar: address input + connect button in a glass panel.
 
-use crate::ui::widgets::button::Button;
+use crate::ui::theme;
+use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::text_input::TextInput;
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, KeyCode, PaintContext, Rect, Size, UiAction, UiEvent, Widget,
+    EventResponse, KeyCode, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------
@@ -20,14 +21,15 @@ pub struct QuickConnect {
 impl QuickConnect {
     pub fn new() -> Self {
         Self {
-            address_input: TextInput::new("Enter server address..."),
+            address_input: TextInput::new("Enter a host or IP address"),
             connect_button: Button::new(
                 "Connect",
                 UiAction::Connect {
                     address: String::new(),
                     noise_key: None,
                 },
-            ),
+            )
+            .with_style(ButtonStyle::Primary),
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
         }
     }
@@ -41,23 +43,23 @@ impl Default for QuickConnect {
 
 impl Widget for QuickConnect {
     fn layout(&mut self, available: Rect) -> Size {
-        let panel_h = 60.0;
+        let panel_h = 94.0;
         self.rect = Rect::new(available.x, available.y, available.w, panel_h);
 
-        // Address input: x+12, y+12, w-120, 36
+        let controls_y = available.y + 38.0;
+
         self.address_input.layout(Rect::new(
-            available.x + 12.0,
-            available.y + 12.0,
-            available.w - 120.0,
-            36.0,
+            available.x + 18.0,
+            controls_y,
+            available.w - 156.0,
+            42.0,
         ));
 
-        // Connect button: x+w-100, y+12, 88, 36
         self.connect_button.layout(Rect::new(
-            available.x + available.w - 100.0,
-            available.y + 12.0,
-            88.0,
-            36.0,
+            available.x + available.w - 120.0,
+            controls_y,
+            102.0,
+            42.0,
         ));
 
         Size {
@@ -67,14 +69,14 @@ impl Widget for QuickConnect {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        // Glass panel background
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.12, 0.06, 0.20, 0.25],
-            border_color: [1.0, 1.0, 1.0, 0.08],
-            corner_radius: 10.0,
-            noise_intensity: 0.03,
+        ctx.push_glass_quad(theme::hero_surface(self.rect));
+        ctx.push_text_run(TextRun {
+            x: self.rect.x + 18.0,
+            y: self.rect.y + 14.0,
+            text: "Quick connect".into(),
+            font_size: 12.0,
+            color: theme::TEXT_SECONDARY,
+            monospace: false,
         });
 
         self.address_input.paint(ctx);

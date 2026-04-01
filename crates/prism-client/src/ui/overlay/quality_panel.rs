@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Quality settings sub-panel — codec, FPS, bandwidth, lossless.
 
+use crate::ui::theme;
 use crate::ui::widgets::checkbox::Checkbox;
 use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::slider::Slider;
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    EventResponse, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------
@@ -103,21 +104,14 @@ impl Widget for QualityPanel {
             return;
         }
 
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.06, 0.0, 0.12, 0.25],
-            border_color: [1.0, 1.0, 1.0, 0.15],
-            corner_radius: 8.0,
-            noise_intensity: 0.02,
-        });
+        ctx.push_glass_quad(theme::floating_surface(self.rect));
 
         ctx.push_text_run(TextRun {
-            x: self.rect.x + 8.0,
-            y: self.rect.y + 8.0,
+            x: self.rect.x + 12.0,
+            y: self.rect.y + 10.0,
             text: "Quality".into(),
             font_size: 13.0,
-            color: [1.0, 1.0, 1.0, 0.95],
+            color: theme::TEXT_PRIMARY,
             monospace: false,
         });
 

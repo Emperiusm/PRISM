@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Minimal settings panel showing identity path and version.
 
+use crate::ui::theme;
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+    EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------
@@ -60,14 +61,7 @@ impl Widget for SettingsPanel {
         }
 
         // Glass panel background
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.08, 0.0, 0.15, 0.20],
-            border_color: [1.0, 1.0, 1.0, 0.2],
-            corner_radius: 12.0,
-            noise_intensity: 0.03,
-        });
+        ctx.push_glass_quad(theme::floating_surface(self.rect));
 
         // Title
         ctx.push_text_run(TextRun {
@@ -75,7 +69,7 @@ impl Widget for SettingsPanel {
             y: self.rect.y + 16.0,
             text: "Settings".to_string(),
             font_size: 16.0,
-            color: [1.0, 1.0, 1.0, 0.95],
+            color: theme::TEXT_PRIMARY,
             monospace: false,
         });
 
@@ -85,7 +79,7 @@ impl Widget for SettingsPanel {
             y: self.rect.y + 60.0,
             text: format!("Identity: {}", self.identity_path),
             font_size: 13.0,
-            color: [1.0, 1.0, 1.0, 0.75],
+            color: theme::TEXT_SECONDARY,
             monospace: true,
         });
 
@@ -95,7 +89,7 @@ impl Widget for SettingsPanel {
             y: self.rect.y + 90.0,
             text: format!("Version: {}", self.version),
             font_size: 13.0,
-            color: [1.0, 1.0, 1.0, 0.75],
+            color: theme::TEXT_SECONDARY,
             monospace: false,
         });
     }

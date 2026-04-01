@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Drop-down selection widget.
 
-use super::{
-    EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
-};
 use crate::renderer::animation::{Animation, EaseCurve};
+use crate::ui::theme;
+use crate::ui::widgets::{
+    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+};
 
 pub struct Dropdown {
     options: Vec<String>,
@@ -58,29 +59,22 @@ impl Dropdown {
 
 impl Widget for Dropdown {
     fn layout(&mut self, available: Rect) -> Size {
-        let h = 32.0;
+        let h = 40.0;
         self.rect = Rect::new(available.x, available.y, available.w, h);
         Size { w: available.w, h }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
         // Closed state header
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.05, 0.0, 0.1, 0.15],
-            border_color: [1.0, 1.0, 1.0, 0.2],
-            corner_radius: 6.0,
-            noise_intensity: 0.0,
-        });
+        ctx.push_glass_quad(theme::control_surface(self.rect, self.open));
 
-        let label = format!("{} \u{25be}", self.selected_text());
+        let label = format!("{} v", self.selected_text());
         ctx.push_text_run(TextRun {
-            x: self.rect.x + 10.0,
-            y: self.rect.y + 9.0,
+            x: self.rect.x + 14.0,
+            y: self.rect.y + (self.rect.h - 13.0) * 0.5 - 1.0,
             text: label,
             font_size: 13.0,
-            color: [1.0, 1.0, 1.0, 0.9],
+            color: theme::TEXT_PRIMARY,
             monospace: false,
         });
 
@@ -89,27 +83,31 @@ impl Widget for Dropdown {
             for (i, option) in self.options.iter().enumerate() {
                 let item_r = self.item_rect(i);
                 let is_selected = i == self.selected;
-                let tint = if is_selected {
-                    [0.55, 0.36, 0.96, 0.25]
-                } else {
-                    [0.05, 0.0, 0.1, 0.15]
-                };
-
-                ctx.push_glass_quad(GlassQuad {
-                    rect: item_r,
-                    blur_rect: item_r,
-                    tint,
-                    border_color: [1.0, 1.0, 1.0, 0.15],
-                    corner_radius: 4.0,
-                    noise_intensity: 0.0,
-                });
+                ctx.push_glass_quad(theme::glass_quad(
+                    item_r,
+                    if is_selected {
+                        [0.22, 0.30, 0.39, 0.96]
+                    } else {
+                        [0.14, 0.18, 0.24, 0.92]
+                    },
+                    if is_selected {
+                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.32]
+                    } else {
+                        [1.0, 1.0, 1.0, 0.10]
+                    },
+                    theme::CHIP_RADIUS,
+                ));
 
                 ctx.push_text_run(TextRun {
-                    x: item_r.x + 10.0,
+                    x: item_r.x + 14.0,
                     y: item_r.y + 7.0,
                     text: option.clone(),
                     font_size: 13.0,
-                    color: [1.0, 1.0, 1.0, 0.9],
+                    color: if is_selected {
+                        theme::TEXT_PRIMARY
+                    } else {
+                        theme::TEXT_SECONDARY
+                    },
                     monospace: false,
                 });
             }
@@ -222,7 +220,7 @@ mod tests {
         // item_rect(1) = y: rect.y + rect.h + 1*28 = 0 + 32 + 28 = 60, h=28 → center y=74
         dd.handle_event(&UiEvent::MouseDown {
             x: 100.0,
-            y: 74.0,
+            y: 82.0,
             button: MouseButton::Left,
         });
 

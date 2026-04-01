@@ -2,6 +2,7 @@
 //! Static text label widget.
 
 use super::{EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use crate::ui::theme;
 
 pub struct Label {
     text: String,
@@ -16,7 +17,7 @@ impl Label {
         Self {
             text: text.to_owned(),
             font_size,
-            color: [1.0, 1.0, 1.0, 0.9],
+            color: theme::TEXT_SECONDARY,
             monospace: false,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
         }

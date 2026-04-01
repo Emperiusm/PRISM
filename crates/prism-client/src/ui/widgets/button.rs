@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Clickable button widget with hover/press animation.
 
-use super::{
-    EventResponse, GlassQuad, GlowRect, MouseButton, PaintContext, Rect, Size, TextRun, UiAction,
-    UiEvent, Widget,
-};
 use crate::renderer::animation::{Animation, EaseCurve};
+use crate::ui::theme;
+use crate::ui::widgets::{
+    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ButtonStyle {
+    Primary,
+    Secondary,
+    Destructive,
+}
 
 pub struct Button {
     label: String,
     action: UiAction,
+    style: ButtonStyle,
     rect: Rect,
     hover_anim: Animation,
     hovered: bool,
@@ -20,50 +28,74 @@ impl Button {
         Self {
             label: label.to_owned(),
             action,
+            style: ButtonStyle::Primary,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             hover_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             hovered: false,
         }
     }
+
+    pub fn with_style(mut self, style: ButtonStyle) -> Self {
+        self.style = style;
+        self
+    }
 }
 
 impl Widget for Button {
     fn layout(&mut self, available: Rect) -> Size {
-        let h = 36.0;
+        let h = 40.0;
         self.rect = Rect::new(available.x, available.y, available.w, h);
         Size { w: available.w, h }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        // Glass background
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.55, 0.36, 0.96, 0.30],
-            border_color: [1.0, 1.0, 1.0, 0.08],
-            corner_radius: 6.0,
-            noise_intensity: 0.03,
-        });
+        let hover = self.hover_anim.value();
+        let (tint, border, text_color) = match self.style {
+            ButtonStyle::Primary => (
+                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.86 + hover * 0.10],
+                [1.0, 1.0, 1.0, 0.18 + hover * 0.10],
+                theme::TEXT_PRIMARY,
+            ),
+            ButtonStyle::Secondary => (
+                [0.18, 0.22, 0.29, 0.82 + hover * 0.08],
+                [1.0, 1.0, 1.0, 0.12 + hover * 0.08],
+                theme::TEXT_PRIMARY,
+            ),
+            ButtonStyle::Destructive => (
+                [0.42, 0.18, 0.22, 0.84 + hover * 0.08],
+                [1.0, 1.0, 1.0, 0.14 + hover * 0.08],
+                theme::TEXT_PRIMARY,
+            ),
+        };
+        ctx.push_glass_quad(theme::glass_quad(
+            self.rect,
+            tint,
+            border,
+            theme::CONTROL_RADIUS,
+        ));
 
-        // Hover glow
-        if self.hover_anim.value() > 0.01 {
-            ctx.push_glow_rect(GlowRect {
-                rect: self.rect,
-                color: [0.55, 0.36, 0.96, self.hover_anim.value()],
-                spread: 8.0,
-                intensity: self.hover_anim.value(),
-            });
+        if hover > 0.01 {
+            ctx.push_glass_quad(theme::glass_quad(
+                self.rect,
+                match self.style {
+                    ButtonStyle::Primary => theme::accent(0.08 + hover * 0.08),
+                    ButtonStyle::Secondary => [1.0, 1.0, 1.0, 0.04 + hover * 0.05],
+                    ButtonStyle::Destructive => theme::destructive(0.06 + hover * 0.08),
+                },
+                [0.0, 0.0, 0.0, 0.0],
+                theme::CONTROL_RADIUS,
+            ));
         }
 
-        // Centered label text
-        let text_x = self.rect.x + self.rect.w * 0.5;
-        let text_y = self.rect.y + self.rect.h * 0.5;
+        let font_size = 13.0;
+        let text_x = self.rect.x + (self.rect.w - theme::text_width(&self.label, font_size)) * 0.5;
+        let text_y = self.rect.y + (self.rect.h - font_size) * 0.5 - 1.0;
         ctx.push_text_run(TextRun {
             x: text_x,
             y: text_y,
             text: self.label.clone(),
-            font_size: 13.0,
-            color: [1.0, 1.0, 1.0, 0.95],
+            font_size,
+            color: text_color,
             monospace: false,
         });
     }
@@ -127,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn button_hover_adds_glow() {
+    fn button_hover_adds_overlay_surface() {
         let mut btn = make_button();
         btn.layout(available());
 
@@ -139,8 +171,8 @@ mod tests {
         let mut ctx = PaintContext::new();
         btn.paint(&mut ctx);
         assert!(
-            !ctx.glow_rects.is_empty(),
-            "expected a glow rect after hovering"
+            ctx.glass_quads.len() >= 2,
+            "expected an extra overlay quad after hovering"
         );
     }
 

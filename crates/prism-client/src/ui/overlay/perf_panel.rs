@@ -2,10 +2,11 @@
 //! Performance sub-panel — FPS, latency, decode time, bandwidth sparklines.
 
 use super::stats_bar::SessionStats;
+use crate::ui::theme;
 use crate::ui::widgets::label::Label;
 use crate::ui::widgets::sparkline::Sparkline;
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+    EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------
@@ -124,22 +125,15 @@ impl Widget for PerfPanel {
         }
 
         // Panel background
-        ctx.push_glass_quad(GlassQuad {
-            rect: self.rect,
-            blur_rect: self.rect,
-            tint: [0.06, 0.0, 0.12, 0.25],
-            border_color: [1.0, 1.0, 1.0, 0.15],
-            corner_radius: 8.0,
-            noise_intensity: 0.02,
-        });
+        ctx.push_glass_quad(theme::floating_surface(self.rect));
 
         // Title
         ctx.push_text_run(TextRun {
-            x: self.rect.x + 8.0,
-            y: self.rect.y + 8.0,
+            x: self.rect.x + 12.0,
+            y: self.rect.y + 10.0,
             text: "Performance".into(),
             font_size: 13.0,
-            color: [1.0, 1.0, 1.0, 0.95],
+            color: theme::TEXT_PRIMARY,
             monospace: false,
         });
 

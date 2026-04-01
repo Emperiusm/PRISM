@@ -3,18 +3,18 @@
 
 use super::server_card::ServerCard;
 use crate::config::servers::SavedServer;
+use crate::ui::theme;
 use crate::ui::widgets::{
-    EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
-    Widget,
+    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const CARD_WIDTH: f32 = 240.0;
-const CARD_HEIGHT: f32 = 140.0;
-const CARD_GAP: f32 = 16.0;
+const CARD_WIDTH: f32 = ServerCard::WIDTH;
+const CARD_HEIGHT: f32 = ServerCard::HEIGHT;
+const CARD_GAP: f32 = 20.0;
 
 // ---------------------------------------------------------------------------
 // CardGrid
@@ -183,32 +183,35 @@ impl Widget for CardGrid {
 
         // Paint the "+ Add Server" card
         if let Some(add_rect) = self.add_card_rect() {
-            ctx.push_glass_quad(GlassQuad {
-                rect: add_rect,
-                blur_rect: add_rect,
-                tint: [0.08, 0.04, 0.15, 0.10],
-                border_color: [1.0, 1.0, 1.0, 0.12],
-                corner_radius: 10.0,
-                noise_intensity: 0.02,
-            });
+            ctx.push_glass_quad(theme::card_surface(add_rect));
 
-            // "+" icon centered
+            let plus = "+";
             ctx.push_text_run(TextRun {
-                x: add_rect.x + CARD_WIDTH / 2.0 - 8.0,
-                y: add_rect.y + CARD_HEIGHT / 2.0 - 20.0,
-                text: "+".to_string(),
+                x: add_rect.x + (CARD_WIDTH - theme::text_width(plus, 32.0)) * 0.5,
+                y: add_rect.y + 50.0,
+                text: plus.to_string(),
                 font_size: 32.0,
-                color: [1.0, 1.0, 1.0, 0.4],
+                color: theme::TEXT_SECONDARY,
                 monospace: false,
             });
 
-            // "Add Server" label below
+            let title = "Add server";
             ctx.push_text_run(TextRun {
-                x: add_rect.x + CARD_WIDTH / 2.0 - 32.0,
-                y: add_rect.y + CARD_HEIGHT / 2.0 + 16.0,
-                text: "Add Server".to_string(),
-                font_size: 13.0,
-                color: [1.0, 1.0, 1.0, 0.35],
+                x: add_rect.x + (CARD_WIDTH - theme::text_width(title, 14.0)) * 0.5,
+                y: add_rect.y + 102.0,
+                text: title.to_string(),
+                font_size: 14.0,
+                color: theme::TEXT_PRIMARY,
+                monospace: false,
+            });
+
+            let body = "Save a new desktop";
+            ctx.push_text_run(TextRun {
+                x: add_rect.x + (CARD_WIDTH - theme::text_width(body, 12.0)) * 0.5,
+                y: add_rect.y + 124.0,
+                text: body.to_string(),
+                font_size: 12.0,
+                color: theme::TEXT_MUTED,
                 monospace: false,
             });
         }
