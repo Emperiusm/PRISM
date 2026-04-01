@@ -18,6 +18,7 @@ pub mod heartbeat_task;
 pub mod control_handler;
 pub mod input_handler;
 pub mod audio_sender;
+pub mod audio_task;
 pub mod quality_task;
 pub mod clipboard_stream;
 pub mod negotiation_handler;
