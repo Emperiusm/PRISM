@@ -1,6 +1,7 @@
 pub mod config;
 pub mod acceptor;
 pub mod allow_all_gate;
+pub mod server_app;
 pub mod pairing_gate;
 pub mod session_manager;
 pub mod client_session;
@@ -63,3 +64,6 @@ pub use control_handler::ControlChannelHandler;
 
 // input_handler
 pub use input_handler::InputChannelHandler;
+
+// server_app
+pub use server_app::ServerApp;
