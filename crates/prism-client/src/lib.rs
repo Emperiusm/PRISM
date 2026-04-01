@@ -10,6 +10,11 @@ pub mod cursor_renderer;
 pub mod frame_receiver;
 pub mod input_sender;
 
+pub mod renderer;
+pub mod ui;
+pub mod input;
+pub mod config;
+
 // Re-exports
 pub use audio_player::AdaptiveJitterBuffer;
 pub use client_app::{ClientApp, ClientConfig};

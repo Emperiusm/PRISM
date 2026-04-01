@@ -52,6 +52,12 @@ socket2 = { version = "0.5", features = ["all"] }
 rcgen = "0.13"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
+wgpu = "24"
+winit = "0.30"
+glyphon = "0.6"
+bytemuck = { version = "1", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 audiopus = "0.3.0-rc.0"
 cpal = "0.17"
 
