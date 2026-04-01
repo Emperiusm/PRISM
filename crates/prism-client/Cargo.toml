@@ -4,7 +4,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = []
+audio = ["dep:audiopus", "dep:cpal"]
+
 [dependencies]
+audiopus = { workspace = true, optional = true }
+cpal = { workspace = true, optional = true }
 prism-protocol = { workspace = true }
 prism-transport = { workspace = true }
 prism-display = { workspace = true }

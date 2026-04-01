@@ -50,6 +50,9 @@ socket2 = { version = "0.5", features = ["all"] }
 rcgen = "0.13"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
+audiopus = "0.3.0-rc.0"
+cpal = "0.17"
+
 prism-protocol = { path = "crates/prism-protocol" }
 prism-metrics = { path = "crates/prism-metrics" }
 prism-security = { path = "crates/prism-security" }
