@@ -44,39 +44,64 @@ RDP was designed in 1998. It uses TCP, GDI rendering, and a protocol that predat
 
 ## Quick Start
 
-**Prerequisites:** Rust 1.85+ (edition 2024), Windows 10+
+### Prerequisites
+
+- **Rust 1.85+** (edition 2024) — [install](https://rustup.rs)
+- **Windows 10+** (server requires DXGI for desktop capture)
+- **GPU drivers** up to date (for hardware H.264 encoding)
+
+### 1. Build
 
 ```bash
-# Clone and build
 git clone https://github.com/Emperiusm/PRISM.git
 cd PRISM
 cargo build --release -p prism-server -p prism-client
+```
 
-# Start the server (test pattern mode — works anywhere)
+### 2. Start the Server
+
+```bash
+# Test pattern mode (works anywhere, no desktop capture)
 cargo run --release -p prism-server
 
-# Connect from another terminal
-cargo run --release -p prism-client -- 127.0.0.1:7000
-```
-
-A window opens showing the server's display, streamed over QUIC with H.264 encoding. Move your mouse and type — input is forwarded back to the server.
-
-### Real Desktop Capture (Windows)
-
-```bash
-# Capture your actual desktop via DDA
+# Real desktop capture
 cargo run --release -p prism-server -- --dda
 
-# With Noise IK encryption
-cargo run --release -p prism-server -- --dda --noise
-# Copy the printed 64-char hex key, then:
-cargo run --release -p prism-client -- 127.0.0.1:7000 --noise <server-public-key>
+# See all options
+cargo run --release -p prism-server -- --help
 ```
 
-### Multi-Monitor
+### 3. Connect the Client
 
 ```bash
-# List monitors and select one
+# Same machine
+cargo run --release -p prism-client
+
+# Remote machine
+cargo run --release -p prism-client -- 192.168.1.100:7000
+
+# See all options
+cargo run --release -p prism-client -- --help
+```
+
+A window opens showing the server's display, streamed over QUIC with H.264 encoding. Mouse and keyboard input is forwarded back to the server. Clipboard syncs bidirectionally.
+
+### 4. Enable Encryption (Recommended)
+
+```bash
+# Server — prints a 64-character hex public key on startup
+cargo run --release -p prism-server -- --dda --noise
+
+# Client — paste the server's public key
+cargo run --release -p prism-client -- 192.168.1.100:7000 --noise <server-public-key>
+```
+
+First connection is auto-paired (SSH-style TOFU). Subsequent connections are recognized instantly.
+
+### 5. Multi-Monitor
+
+```bash
+# Capture the second monitor (0-indexed)
 cargo run --release -p prism-server -- --dda --monitor 1
 ```
 
@@ -275,36 +300,67 @@ cargo run -p prism-client -- 192.168.1.100:7000 --noise a3f1...beef
 
 ## Configuration
 
-### TOML Config File
+### Generate a Config File
 
-Create `prism-server.toml` in the working directory:
+```bash
+# Generate a fully commented prism-server.toml with all defaults
+prism-server --init
 
-```toml
-listen_addr = "0.0.0.0:9876"
-throughput_addr = "0.0.0.0:9877"
-max_clients = 4
-display_name = "My Workstation"
-total_bandwidth_bps = 100000000
-
-identity_path = "~/.prism/server_identity.json"
-pairing_path = "~/.prism/pairings.json"
-tombstone_path = "~/.prism/tombstones.json"
-
-heartbeat_suspend_secs = 10
-heartbeat_tombstone_secs = 60
-tombstone_max_age_secs = 300
+# Or when running from source:
+cargo run --release -p prism-server -- --init
 ```
 
-CLI flags override config file values.
+This creates `prism-server.toml` in the working directory. All keys are optional — missing keys use sensible defaults.
 
-### CLI Flags
+### Config File Reference
+
+```toml
+# Network
+listen_addr_str = "0.0.0.0:7000"       # Main QUIC endpoint (video, audio, input)
+throughput_addr_str = "0.0.0.0:7001"    # Bulk transfer endpoint
+
+# Limits
+max_clients = 4                          # Max simultaneous clients
+total_bandwidth_bps = 100000000          # 100 Mbps aggregate cap
+
+# Display
+display_name = "PRISM Server"            # Name shown to clients
+
+# Session management
+heartbeat_suspend_secs = 10              # Silence before session suspend
+heartbeat_tombstone_secs = 60            # Suspend before tombstone
+tombstone_max_age_secs = 300             # Tombstone before permanent removal
+
+# Security & Identity
+identity_path = "identity.key"           # Noise IK key file (auto-generated)
+pairing_path = "pairing.json"            # Approved devices registry
+tombstone_path = "tombstones.json"       # Session resurrection store
+```
+
+### Server CLI Flags
 
 | Flag | Description |
 |---|---|
-| `--dda` | Use DDA desktop capture (Windows) instead of test pattern |
-| `--noise` | Enable Noise IK authentication |
-| `--monitor <n>` | Select which monitor to capture (0-indexed) |
-| `--tofu` | Trust-on-first-use pairing (auto-pair unknown devices) |
+| `--dda` | Use DXGI Desktop Duplication (real desktop capture) |
+| `--noise` | Enable Noise IK end-to-end encryption |
+| `--monitor <N>` | Select monitor to capture (0-indexed, default: 0) |
+| `--port <PORT>` | Override listen port (default: 7000) |
+| `--bind <ADDR>` | Override bind address (e.g., `192.168.1.5:7000`) |
+| `--config <PATH>` | Path to TOML config file (default: `prism-server.toml`) |
+| `--init` | Generate default `prism-server.toml` and exit |
+| `--help` | Print help and exit |
+| `--version` | Print version and exit |
+
+CLI flags override config file values.
+
+### Client CLI Flags
+
+| Flag | Description |
+|---|---|
+| `HOST:PORT` | Server address (default: `127.0.0.1:7000`) |
+| `--noise <KEY>` | Server's Noise IK public key (64-char hex) |
+| `--help` | Print help and exit |
+| `--version` | Print version and exit |
 
 ### Hardware Encoding
 
@@ -317,6 +373,16 @@ cargo run -p prism-server --features hwenc -- --dda
 ```
 
 The encoder auto-detects: NVENC > QSV > AMF > software fallback.
+
+### File Locations
+
+| File | Location | Created |
+|------|----------|---------|
+| Server config | `./prism-server.toml` | `--init` or manual |
+| Server identity | `./identity.key` | Automatic on first run |
+| Paired devices | `./pairing.json` | Automatic on first pairing |
+| Session tombstones | `./tombstones.json` | Automatic |
+| Client identity | `~/.prism/client_identity.json` | Automatic on first run |
 
 ---
 

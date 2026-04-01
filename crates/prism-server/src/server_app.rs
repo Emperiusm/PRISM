@@ -44,8 +44,10 @@ impl ServerApp {
     /// management, channel dispatch, and the connection store.
     ///
     /// `monitor_index` selects which display output to capture (0 = primary).
-    pub fn new(use_dda: bool, noise_mode: bool, monitor_index: u32) -> Result<Self, Box<dyn std::error::Error>> {
-        tracing::info!("=== PRISM Server v0.1.0 ===");
+    /// Initialise with a pre-loaded configuration (preferred — lets the CLI
+    /// apply overrides before construction).
+    pub fn with_config(use_dda: bool, noise_mode: bool, monitor_index: u32, config: ServerConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        tracing::info!("=== PRISM Server v{} ===", env!("CARGO_PKG_VERSION"));
 
         // Generate Noise IK server identity (always, so the key is ready if needed).
         let server_identity = Arc::new(
@@ -58,7 +60,6 @@ impl ServerApp {
             );
         }
 
-        let config = ServerConfig::load_or_default(std::path::Path::new("prism-server.toml"));
         tracing::info!(addr = %config.listen_addr(), "server configuration loaded");
 
         // TLS
@@ -136,6 +137,13 @@ impl ServerApp {
             server_identity,
             audit_log,
         })
+    }
+
+    /// Convenience constructor that loads `prism-server.toml` from the working
+    /// directory (or uses defaults).
+    pub fn new(use_dda: bool, noise_mode: bool, monitor_index: u32) -> Result<Self, Box<dyn std::error::Error>> {
+        let config = ServerConfig::load_or_default(std::path::Path::new("prism-server.toml"));
+        Self::with_config(use_dda, noise_mode, monitor_index, config)
     }
 
     /// Bind the QUIC endpoint and enter the main accept loop.
