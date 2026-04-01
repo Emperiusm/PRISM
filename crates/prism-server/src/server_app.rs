@@ -144,6 +144,51 @@ impl ServerApp {
         tracing::info!(addr = %acceptor.local_addr(), "QUIC endpoint bound");
         tracing::info!("waiting for connections…");
 
+        // ── Throughput endpoint (Cubic, AF11, large windows) ─────────────────
+        // Bind a second QUIC socket optimised for bulk transfers (file share,
+        // device data).  A fresh self-signed cert is generated so it is
+        // independent of the latency endpoint's cert lifetime.
+        let throughput_config = crate::throughput_endpoint::ThroughputEndpointConfig::default();
+        if throughput_config.enabled {
+            match SelfSignedCert::generate() {
+                Ok(tp_cert) => {
+                    let tp_transport = crate::throughput_endpoint::build_throughput_config();
+                    match quinn::ServerConfig::with_single_cert(
+                        vec![tp_cert.cert_der],
+                        tp_cert.key_der,
+                    ) {
+                        Ok(mut tp_server_config) => {
+                            tp_server_config.transport_config(Arc::new(tp_transport));
+                            match quinn::Endpoint::server(tp_server_config, throughput_config.addr) {
+                                Ok(ep) => {
+                                    tracing::info!(
+                                        addr = %ep.local_addr().unwrap_or(throughput_config.addr),
+                                        "throughput endpoint bound"
+                                    );
+                                    // Endpoint is ready for file transfer channels;
+                                    // full integration deferred until channel routing lands.
+                                    drop(ep);
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        addr = %throughput_config.addr,
+                                        "throughput endpoint bind failed (non-fatal)"
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "throughput endpoint TLS config failed");
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "throughput endpoint cert generation failed");
+                }
+            }
+        }
+
         // ── Activity channel ──────────────────────────────────────────────────
         let (activity_tx, mut activity_rx) = mpsc::channel::<prism_session::ClientId>(256);
         let sm_activity = self.session_manager.clone();
