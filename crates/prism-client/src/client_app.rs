@@ -420,6 +420,26 @@ impl ClientApp {
                 current_buffer = frame.buffer;
             }
 
+            // Draw a simple 8x8 white cursor crosshair at predicted position.
+            let (cx, cy) = cursor_predictor.display_position();
+            let cx = cx as usize;
+            let cy = cy as usize;
+            let width = current_w;
+            let height = current_h;
+            if width > 0 && height > 0 {
+                for dy in 0..8usize {
+                    for dx in 0..8usize {
+                        let px = cx + dx;
+                        let py = cy + dy;
+                        if px < width && py < height {
+                            if dx == 3 || dx == 4 || dy == 3 || dy == 4 {
+                                current_buffer[py * width + px] = 0x00FFFFFF; // white
+                            }
+                        }
+                    }
+                }
+            }
+
             window
                 .update_with_buffer(&current_buffer, current_w, current_h)
                 .unwrap_or_else(|e| tracing::error!(error = %e, "renderer update error"));
