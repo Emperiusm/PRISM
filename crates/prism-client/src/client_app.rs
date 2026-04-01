@@ -41,11 +41,35 @@ impl ClientApp {
         Self { config }
     }
 
-    /// Run the client: connect, optionally handshake, spawn async tasks, render.
+    /// Run the client with automatic reconnection on failure.
+    ///
+    /// Calls [`connect_and_stream`] in a loop, backing off 3 seconds between
+    /// attempts. Returns `Ok(())` on clean exit (window closed / Escape pressed)
+    /// or propagates the last error after 100 failed attempts.
+    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut attempt = 0u32;
+        loop {
+            match self.connect_and_stream().await {
+                Ok(()) => break Ok(()),
+                Err(e) => {
+                    attempt += 1;
+                    if attempt > 100 {
+                        tracing::error!("max reconnect attempts exceeded");
+                        break Err(e);
+                    }
+                    tracing::warn!(attempt, error = %e, "connection lost, reconnecting in 3s...");
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+                }
+            }
+        }
+    }
+
+    /// Connect to the server, perform optional Noise IK handshake, spawn all
+    /// async tasks, and run the minifb render loop until the window is closed.
     ///
     /// The minifb render loop runs on the calling (main) thread as required by
     /// minifb's platform constraints.
-    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn connect_and_stream(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let server_addr = self.config.server_addr;
 
         tracing::info!("PRISM Client v0.1.0");
