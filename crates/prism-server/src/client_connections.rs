@@ -44,6 +44,16 @@ impl ClientConnectionStore {
     pub fn snapshot(&self) -> Vec<quinn::Connection> {
         self.connections.lock().unwrap().values().cloned().collect()
     }
+
+    /// Snapshot all current (client_id, connection) pairs for async use.
+    pub fn snapshot_with_ids(&self) -> Vec<(Uuid, quinn::Connection)> {
+        self.connections
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(id, conn)| (*id, conn.clone()))
+            .collect()
+    }
 }
 
 impl Default for ClientConnectionStore {

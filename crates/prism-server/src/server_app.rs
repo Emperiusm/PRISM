@@ -162,6 +162,12 @@ impl ServerApp {
         let tracker_send = self.tracker.clone();
         let use_dda = self.use_dda;
         tokio::spawn(async move {
+            // Per-client persistent send streams, keyed by client UUID.
+            // Opening one stream per client amortises QUIC stream-setup overhead
+            // across all frames; frames are length-prefixed so the client can
+            // demarcate them on a single contiguous stream.
+            let mut streams: std::collections::HashMap<uuid::Uuid, quinn::SendStream> =
+                std::collections::HashMap::new();
             // Decide capture source: DDA on Windows when --dda, else test pattern.
             #[cfg(windows)]
             let dda = if use_dda {
@@ -269,14 +275,18 @@ impl ServerApp {
                     continue;
                 }
 
-                // Wire format:
+                // Wire format (persistent stream, length-prefixed):
+                //   [4 bytes: total_frame_len u32 LE]  — byte count of the frame record below
                 //   [4 bytes: width    u32 LE]
                 //   [4 bytes: height   u32 LE]
                 //   [4 bytes: seq      u32 LE]
                 //   [4 bytes: h264_len u32 LE]
                 //   [h264_len bytes: H.264 NAL bitstream]
                 let h264_len = h264_data.len() as u32;
-                let mut frame_data = Vec::with_capacity(16 + h264_data.len());
+                // Inner frame record (without the leading length prefix).
+                let inner_len = 16u32 + h264_len; // 4 fields * 4B + payload
+                let mut frame_data = Vec::with_capacity(4 + inner_len as usize);
+                frame_data.extend_from_slice(&inner_len.to_le_bytes()); // length prefix
                 frame_data.extend_from_slice(&width.to_le_bytes());
                 frame_data.extend_from_slice(&height.to_le_bytes());
                 frame_data.extend_from_slice(&seq.to_le_bytes());
@@ -285,19 +295,49 @@ impl ServerApp {
 
                 bytes_sent_total += frame_data.len() as u64;
 
-                // Snapshot connections so we don't hold the mutex across await.
-                let conns = conn_store_send.snapshot();
+                // Snapshot (client_id, connection) pairs so we don't hold the
+                // mutex across await points.
+                let conns = conn_store_send.snapshot_with_ids();
+
+                // Remove stale stream entries for clients that have gone away.
+                streams.retain(|id, _| conns.iter().any(|(cid, _)| cid == id));
+
                 let mut sent = 0u32;
-                for conn in &conns {
-                    match conn.open_uni().await {
-                        Ok(mut send_stream) => {
-                            if send_stream.write_all(&frame_data).await.is_ok() {
-                                let _ = send_stream.finish();
-                                sent += 1;
+                for (client_id, conn) in &conns {
+                    // Get or lazily open a persistent uni stream for this client.
+                    if !streams.contains_key(client_id) {
+                        match conn.open_uni().await {
+                            Ok(s) => {
+                                tracing::debug!(
+                                    client = %&client_id.to_string()[..8],
+                                    "frame sender: opened persistent stream"
+                                );
+                                streams.insert(*client_id, s);
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    error = %e,
+                                    client = %&client_id.to_string()[..8],
+                                    "frame sender: open_uni error"
+                                );
+                                continue;
                             }
                         }
+                    }
+
+                    let stream = streams.get_mut(client_id).unwrap();
+                    match stream.write_all(&frame_data).await {
+                        Ok(()) => {
+                            sent += 1;
+                        }
                         Err(e) => {
-                            tracing::warn!(error = %e, "frame sender: open_uni error");
+                            tracing::warn!(
+                                error = %e,
+                                client = %&client_id.to_string()[..8],
+                                "frame sender: write error — stream will reopen next frame"
+                            );
+                            // Drop the broken stream; it will be reopened next tick.
+                            streams.remove(client_id);
                         }
                     }
                 }

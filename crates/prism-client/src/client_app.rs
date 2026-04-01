@@ -181,6 +181,17 @@ impl ClientApp {
         });
 
         // ── Spawn async frame-receive task ────────────────────────────────────
+        // The server opens ONE persistent uni stream per client and writes
+        // length-prefixed frames on it.  We accept that single stream here and
+        // read frames in a loop, avoiding per-frame stream-accept overhead.
+        //
+        // Wire format per frame:
+        //   [4 bytes: inner_len u32 LE]   — byte count of the fields below
+        //   [4 bytes: width     u32 LE]
+        //   [4 bytes: height    u32 LE]
+        //   [4 bytes: seq       u32 LE]
+        //   [4 bytes: h264_len  u32 LE]
+        //   [h264_len bytes: H.264 NAL bitstream]
         let conn_recv = connection.clone();
         tokio::spawn(async move {
             let mut decoder = match Decoder::new() {
@@ -194,64 +205,68 @@ impl ClientApp {
             let mut frames_received: u64 = 0;
             let mut last_log = Instant::now();
 
-            tracing::info!("receiving frames (close window or Ctrl+C to stop)");
+            tracing::info!("waiting for persistent frame stream from server");
+
+            // Accept the one persistent uni stream the server opens for us.
+            let mut recv = match conn_recv.accept_uni().await {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::info!(error = %e, "failed to accept frame stream — connection closed?");
+                    return;
+                }
+            };
+
+            tracing::info!("frame stream accepted — receiving frames (close window or Ctrl+C to stop)");
 
             loop {
-                let mut recv = match conn_recv.accept_uni().await {
-                    Ok(r) => r,
-                    Err(e) => {
-                        tracing::info!(error = %e, "connection closed");
-                        break;
-                    }
-                };
+                // Read 4-byte length prefix.
+                let mut len_buf = [0u8; 4];
+                if let Err(e) = recv.read_exact(&mut len_buf).await {
+                    tracing::info!(error = %e, "frame stream closed");
+                    break;
+                }
+                let inner_len = u32::from_le_bytes(len_buf) as usize;
 
-                // Read 16-byte header: width, height, seq, h264_len.
+                // Sanity check: max ~4 MiB header + payload.
+                if inner_len < 16 || inner_len > 4 * 1024 * 1024 + 16 {
+                    tracing::error!(inner_len, "invalid frame length prefix — stream corrupt");
+                    break;
+                }
+
+                // Read the fixed 16-byte header: width, height, seq, h264_len.
                 let mut header = [0u8; 16];
                 if let Err(e) = recv.read_exact(&mut header).await {
                     tracing::error!(error = %e, "header read error");
-                    continue;
+                    break;
                 }
 
-                let width = u32::from_le_bytes([
-                    header[0], header[1], header[2], header[3],
-                ]) as usize;
-                let height = u32::from_le_bytes([
-                    header[4], header[5], header[6], header[7],
-                ]) as usize;
-                let seq = u32::from_le_bytes([
-                    header[8], header[9], header[10], header[11],
-                ]);
-                let h264_len = u32::from_le_bytes([
-                    header[12], header[13], header[14], header[15],
-                ]) as usize;
+                let width = u32::from_le_bytes([header[0], header[1], header[2], header[3]]) as usize;
+                let height = u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize;
+                let seq = u32::from_le_bytes([header[8], header[9], header[10], header[11]]);
+                let h264_len = u32::from_le_bytes([header[12], header[13], header[14], header[15]]) as usize;
 
+                // Validate dimensions and payload size against the length prefix.
                 if width == 0 || height == 0 || width > 4096 || height > 4096 {
                     tracing::error!(width, height, "invalid frame dimensions");
-                    continue;
+                    break;
                 }
                 if h264_len == 0 || h264_len > 4 * 1024 * 1024 {
                     tracing::error!(h264_len, "invalid h264_len");
-                    continue;
+                    break;
+                }
+                if inner_len != 16 + h264_len {
+                    tracing::error!(inner_len, h264_len, "length prefix mismatch");
+                    break;
                 }
 
-                let h264_data = match recv.read_to_end(h264_len + 16).await {
-                    Ok(b) => b,
-                    Err(e) => {
-                        tracing::error!(error = %e, "h264 read error");
-                        continue;
-                    }
-                };
-
-                if h264_data.len() < h264_len {
-                    tracing::error!(
-                        got = h264_data.len(),
-                        expected = h264_len,
-                        "short h264 data"
-                    );
-                    continue;
+                // Read exactly h264_len bytes of H.264 NAL data.
+                let mut h264_data = vec![0u8; h264_len];
+                if let Err(e) = recv.read_exact(&mut h264_data).await {
+                    tracing::error!(error = %e, "h264 read error");
+                    break;
                 }
 
-                let yuv_frame = match decoder.decode(&h264_data[..h264_len]) {
+                let yuv_frame = match decoder.decode(&h264_data) {
                     Ok(Some(yuv)) => yuv,
                     Ok(None) => continue, // decoder buffering
                     Err(e) => {
