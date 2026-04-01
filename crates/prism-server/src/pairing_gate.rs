@@ -11,8 +11,8 @@
 //! logic lives in `main.rs` — this wrapper simply surfaces the count and logs a
 //! warning so the operator knows an auto-pair attempt occurred.
 
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use prism_security::audit::AuditEvent;
 use prism_security::context::SecurityContext;
@@ -35,7 +35,10 @@ pub struct TofuGate<G: SecurityGate> {
 impl<G: SecurityGate> TofuGate<G> {
     /// Wrap `inner` in a TOFU counter gate.
     pub fn new(inner: G) -> Self {
-        Self { inner, auto_paired: AtomicU32::new(0) }
+        Self {
+            inner,
+            auto_paired: AtomicU32::new(0),
+        }
     }
 
     /// Number of `SilentDrop` results observed since creation.
@@ -117,7 +120,11 @@ mod tests {
             matches!(result, AuthResult::Authenticated(_)),
             "TofuGate must pass Authenticated through unchanged"
         );
-        assert_eq!(gate.auto_paired_count(), 0, "no SilentDrop — count must stay 0");
+        assert_eq!(
+            gate.auto_paired_count(),
+            0,
+            "no SilentDrop — count must stay 0"
+        );
     }
 
     /// When the inner gate returns `SilentDrop`, the TOFU counter is incremented
@@ -131,7 +138,11 @@ mod tests {
             matches!(result, AuthResult::SilentDrop),
             "TofuGate must preserve SilentDrop"
         );
-        assert_eq!(gate.auto_paired_count(), 1, "one SilentDrop must increment counter to 1");
+        assert_eq!(
+            gate.auto_paired_count(),
+            1,
+            "one SilentDrop must increment counter to 1"
+        );
 
         // A second call increments to 2.
         gate.authenticate(&dummy_key(), &identity);
@@ -150,7 +161,9 @@ mod tests {
             device_id: Uuid::nil(),
             reason: "blocked".to_string(),
         });
-        gate.audit(AuditEvent::ClientDisconnected { device_id: Uuid::nil() });
+        gate.audit(AuditEvent::ClientDisconnected {
+            device_id: Uuid::nil(),
+        });
         // No assertion needed — must not panic.
     }
 }

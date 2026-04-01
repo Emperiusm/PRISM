@@ -13,7 +13,7 @@ use bytes::{Bytes, BytesMut};
 use prism_observability::overlay::OverlayPacket;
 use prism_protocol::{
     channel::CHANNEL_CONTROL,
-    header::{PrismHeader, HEADER_SIZE, PROTOCOL_VERSION},
+    header::{HEADER_SIZE, PROTOCOL_VERSION, PrismHeader},
 };
 use prism_session::control_msg::OVERLAY_DATA;
 

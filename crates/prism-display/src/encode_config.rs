@@ -105,11 +105,14 @@ impl RateControlHinter {
     /// The `ComplexityEstimate` stored is the cumulative average over all
     /// recorded samples.
     pub fn record(&mut self, hwnd: u64, qp: f32, bitrate_bps: u64) {
-        let entry = self.estimates.entry(hwnd).or_insert_with(|| ComplexityEstimate {
-            avg_qp: 0.0,
-            avg_bitrate_bps: 0,
-            frame_count: 0,
-        });
+        let entry = self
+            .estimates
+            .entry(hwnd)
+            .or_insert_with(|| ComplexityEstimate {
+                avg_qp: 0.0,
+                avg_bitrate_bps: 0,
+                frame_count: 0,
+            });
 
         let n = entry.frame_count + 1;
         // Running / cumulative average:  new_avg = old_avg + (x - old_avg) / n

@@ -49,11 +49,7 @@ pub struct Tombstone {
 
 impl Tombstone {
     /// Create a new tombstone, stamping `created_at_secs` from the wall clock.
-    pub fn new(
-        client_id: ClientId,
-        device_id: Uuid,
-        subscribed_channels: HashSet<u16>,
-    ) -> Self {
+    pub fn new(client_id: ClientId, device_id: Uuid, subscribed_channels: HashSet<u16>) -> Self {
         let created_at_secs = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -134,20 +130,19 @@ impl TombstoneStore {
 
     /// Persist the store to a file as JSON.
     pub fn persist(&self, path: &std::path::Path) -> std::io::Result<()> {
-        let bytes = serde_json::to_vec(&self.entries)
-            .map_err(std::io::Error::other)?;
+        let bytes = serde_json::to_vec(&self.entries).map_err(std::io::Error::other)?;
         std::fs::write(path, bytes)
     }
 
     /// Load a store from a file, applying `gc()` immediately.
-    pub fn restore(
-        path: &std::path::Path,
-        max_age_secs: u64,
-    ) -> std::io::Result<Self> {
+    pub fn restore(path: &std::path::Path, max_age_secs: u64) -> std::io::Result<Self> {
         let bytes = std::fs::read(path)?;
-        let entries: HashMap<Uuid, Tombstone> = serde_json::from_slice(&bytes)
-            .map_err(std::io::Error::other)?;
-        let mut store = Self { entries, max_age_secs };
+        let entries: HashMap<Uuid, Tombstone> =
+            serde_json::from_slice(&bytes).map_err(std::io::Error::other)?;
+        let mut store = Self {
+            entries,
+            max_age_secs,
+        };
         store.gc();
         Ok(store)
     }
@@ -164,11 +159,7 @@ mod tests {
     }
 
     fn make_tombstone(device_id: Uuid) -> Tombstone {
-        Tombstone::new(
-            new_uuid(),
-            device_id,
-            HashSet::from([0x0001u16, 0x0002u16]),
-        )
+        Tombstone::new(new_uuid(), device_id, HashSet::from([0x0001u16, 0x0002u16]))
     }
 
     #[test]

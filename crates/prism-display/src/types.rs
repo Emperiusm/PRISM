@@ -24,10 +24,7 @@ impl Rect {
     /// True if pixel (px, py) falls inside this rect.
     #[inline]
     pub fn contains(&self, px: i32, py: i32) -> bool {
-        px >= self.x
-            && py >= self.y
-            && px < self.x + self.w as i32
-            && py < self.y + self.h as i32
+        px >= self.x && py >= self.y && px < self.x + self.w as i32 && py < self.y + self.h as i32
     }
 
     /// True if this rect overlaps with `other` (touching edges are NOT an intersection).
@@ -104,14 +101,9 @@ pub enum LosslessFormat {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegionEncoding {
     /// Lossy video encode.
-    Video {
-        codec: CodecId,
-        is_keyframe: bool,
-    },
+    Video { codec: CodecId, is_keyframe: bool },
     /// Lossless encode (various formats).
-    Lossless {
-        format: LosslessFormat,
-    },
+    Lossless { format: LosslessFormat },
     /// Send only the damage bounding rect; client reconstructs from cache.
     DamageRect,
     /// Region is identical to previous frame; skip transmission.
@@ -134,53 +126,124 @@ mod tests {
 
     #[test]
     fn rect_area() {
-        let r = Rect { x: 0, y: 0, w: 1920, h: 1080 };
+        let r = Rect {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1080,
+        };
         assert_eq!(r.area(), 1920 * 1080);
     }
 
     #[test]
     fn rect_area_zero() {
-        let r = Rect { x: 5, y: 5, w: 0, h: 100 };
+        let r = Rect {
+            x: 5,
+            y: 5,
+            w: 0,
+            h: 100,
+        };
         assert_eq!(r.area(), 0);
     }
 
     #[test]
     fn rect_contains_point() {
-        let r = Rect { x: 10, y: 20, w: 100, h: 50 };
-        assert!(r.contains(10, 20));    // top-left corner (inclusive)
-        assert!(r.contains(50, 40));    // interior
+        let r = Rect {
+            x: 10,
+            y: 20,
+            w: 100,
+            h: 50,
+        };
+        assert!(r.contains(10, 20)); // top-left corner (inclusive)
+        assert!(r.contains(50, 40)); // interior
         assert!(!r.contains(110, 40)); // right edge (exclusive)
-        assert!(!r.contains(50, 70));  // bottom edge (exclusive)
-        assert!(!r.contains(9, 20));   // just outside left
+        assert!(!r.contains(50, 70)); // bottom edge (exclusive)
+        assert!(!r.contains(9, 20)); // just outside left
     }
 
     #[test]
     fn rect_intersects() {
-        let a = Rect { x: 0, y: 0, w: 100, h: 100 };
-        let b = Rect { x: 50, y: 50, w: 100, h: 100 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            w: 100,
+            h: 100,
+        };
+        let b = Rect {
+            x: 50,
+            y: 50,
+            w: 100,
+            h: 100,
+        };
         assert!(a.intersects(&b));
 
-        let c = Rect { x: 100, y: 0, w: 50, h: 50 }; // touching right edge, no overlap
+        let c = Rect {
+            x: 100,
+            y: 0,
+            w: 50,
+            h: 50,
+        }; // touching right edge, no overlap
         assert!(!a.intersects(&c));
 
-        let d = Rect { x: 200, y: 200, w: 10, h: 10 }; // completely separate
+        let d = Rect {
+            x: 200,
+            y: 200,
+            w: 10,
+            h: 10,
+        }; // completely separate
         assert!(!a.intersects(&d));
     }
 
     #[test]
     fn rect_merge() {
-        let a = Rect { x: 0, y: 0, w: 100, h: 100 };
-        let b = Rect { x: 50, y: 50, w: 100, h: 100 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            w: 100,
+            h: 100,
+        };
+        let b = Rect {
+            x: 50,
+            y: 50,
+            w: 100,
+            h: 100,
+        };
         let m = a.merge(&b);
-        assert_eq!(m, Rect { x: 0, y: 0, w: 150, h: 150 });
+        assert_eq!(
+            m,
+            Rect {
+                x: 0,
+                y: 0,
+                w: 150,
+                h: 150
+            }
+        );
     }
 
     #[test]
     fn rect_merge_disjoint() {
-        let a = Rect { x: 0, y: 0, w: 10, h: 10 };
-        let b = Rect { x: 90, y: 90, w: 10, h: 10 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            w: 10,
+            h: 10,
+        };
+        let b = Rect {
+            x: 90,
+            y: 90,
+            w: 10,
+            h: 10,
+        };
         let m = a.merge(&b);
-        assert_eq!(m, Rect { x: 0, y: 0, w: 100, h: 100 });
+        assert_eq!(
+            m,
+            Rect {
+                x: 0,
+                y: 0,
+                w: 100,
+                h: 100
+            }
+        );
     }
 
     #[test]
@@ -213,8 +276,13 @@ mod tests {
 
     #[test]
     fn region_encoding_variants() {
-        let video = RegionEncoding::Video { codec: CodecId::H264, is_keyframe: true };
-        let lossless = RegionEncoding::Lossless { format: LosslessFormat::CpuQoi };
+        let video = RegionEncoding::Video {
+            codec: CodecId::H264,
+            is_keyframe: true,
+        };
+        let lossless = RegionEncoding::Lossless {
+            format: LosslessFormat::CpuQoi,
+        };
         let damage = RegionEncoding::DamageRect;
         let unchanged = RegionEncoding::Unchanged;
 

@@ -3,33 +3,33 @@
 // Licensed under the GNU Affero General Public License v3.0.
 // Commercial licensing available — see LICENSE-COMMERCIAL.md.
 
-pub mod config;
 pub mod acceptor;
-pub mod rate_limiter;
 pub mod allow_all_gate;
-pub mod server_app;
-pub mod pairing_gate;
-pub mod session_manager;
-pub mod client_session;
-pub mod recv_loop;
-pub mod quality_monitor;
-pub mod shutdown;
-pub mod test_pattern;
-pub mod frame_sender;
-pub mod client_connections;
-pub mod dda_capture;
-pub mod hw_encoder;
-pub mod heartbeat_task;
-pub mod control_handler;
-pub mod input_handler;
+pub mod arbiter_task;
 pub mod audio_sender;
 pub mod audio_task;
-pub mod quality_task;
+pub mod client_connections;
+pub mod client_session;
 pub mod clipboard_stream;
-pub mod negotiation_handler;
+pub mod config;
+pub mod control_handler;
 pub mod cursor_sender;
-pub mod arbiter_task;
+pub mod dda_capture;
+pub mod frame_sender;
+pub mod heartbeat_task;
+pub mod hw_encoder;
+pub mod input_handler;
+pub mod negotiation_handler;
 pub mod overlay_sender;
+pub mod pairing_gate;
+pub mod quality_monitor;
+pub mod quality_task;
+pub mod rate_limiter;
+pub mod recv_loop;
+pub mod server_app;
+pub mod session_manager;
+pub mod shutdown;
+pub mod test_pattern;
 pub mod throughput_endpoint;
 
 // ── Flat re-exports ──────────────────────────────────────────────────────────
@@ -50,7 +50,9 @@ pub use quality_monitor::{QualityMonitor, QualityUpdate};
 pub use shutdown::{ShutdownCoordinator, ShutdownState};
 
 // recv_loop
-pub use recv_loop::{classify_datagram, record_datagram_bandwidth, DatagramAction, RecvLoopHandle, spawn_recv_loop};
+pub use recv_loop::{
+    DatagramAction, RecvLoopHandle, classify_datagram, record_datagram_bandwidth, spawn_recv_loop,
+};
 
 // test_pattern
 pub use test_pattern::TestPatternCapture;
@@ -104,16 +106,18 @@ pub use arbiter_task::{display_allocation_bps, update_arbiter_from_tracker};
 pub use overlay_sender::{build_overlay_datagram, build_overlay_packet};
 
 // throughput_endpoint
-pub use throughput_endpoint::{ThroughputEndpointConfig, build_throughput_config, is_throughput_channel};
+pub use throughput_endpoint::{
+    ThroughputEndpointConfig, build_throughput_config, is_throughput_channel,
+};
 
-pub mod service;
 pub mod auto_update;
-pub mod speculative_idr;
-pub mod encode_pool;
-pub mod static_cache;
-pub mod frame_tracer_task;
 pub mod client_metrics;
+pub mod encode_pool;
+pub mod frame_tracer_task;
 pub mod metrics_collector;
+pub mod service;
+pub mod speculative_idr;
+pub mod static_cache;
 
 // speculative_idr
 pub use speculative_idr::SpeculativeIdrController;
@@ -137,4 +141,4 @@ pub use metrics_collector::MetricsCollector;
 pub use service::{ServiceCommand, is_service_mode, sc_create_command, sc_delete_command};
 
 // auto_update
-pub use auto_update::{SemVer, UpdateStatus, check_version, CURRENT_VERSION};
+pub use auto_update::{CURRENT_VERSION, SemVer, UpdateStatus, check_version};

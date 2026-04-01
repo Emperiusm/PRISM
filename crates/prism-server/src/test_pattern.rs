@@ -45,7 +45,12 @@ impl TestPatternCapture {
 
     /// Create a new instance with an explicit resolution.
     pub fn with_resolution(width: u32, height: u32) -> Self {
-        Self { width, height, running: false, frame_seq: 0 }
+        Self {
+            width,
+            height,
+            running: false,
+            frame_seq: 0,
+        }
     }
 
     /// Generate raw BGRA8 pixel data for frame number `frame_num`.
@@ -248,9 +253,15 @@ mod tests {
     fn start_stop_lifecycle() {
         let mut cap = TestPatternCapture::new();
         cap.start(make_config()).unwrap();
-        assert!(cap.next_frame().unwrap().is_some(), "expected frame after start");
+        assert!(
+            cap.next_frame().unwrap().is_some(),
+            "expected frame after start"
+        );
         cap.stop();
-        assert!(cap.next_frame().unwrap().is_none(), "expected None after stop");
+        assert!(
+            cap.next_frame().unwrap().is_none(),
+            "expected None after stop"
+        );
     }
 
     #[test]

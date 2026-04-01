@@ -80,8 +80,7 @@ impl ClientApp {
         tracing::info!("PRISM Client v0.1.0");
         tracing::info!(addr = %server_addr, "connecting to server");
 
-        let connector =
-            crate::ClientConnector::new(crate::TlsMode::InsecureTrustAll)?;
+        let connector = crate::ClientConnector::new(crate::TlsMode::InsecureTrustAll)?;
         let connection = connector.connect(server_addr, "localhost").await?;
         tracing::info!(addr = %connection.remote_address(), "connected to server");
 
@@ -112,9 +111,8 @@ impl ClientApp {
                 .await
                 .map_err(|e| format!("Noise: open_bi failed: {}", e))?;
 
-            let mut hs =
-                prism_security::handshake::ClientHandshake::new(&identity, server_pubkey)
-                    .map_err(|e| format!("Noise: handshake init failed: {}", e))?;
+            let mut hs = prism_security::handshake::ClientHandshake::new(&identity, server_pubkey)
+                .map_err(|e| format!("Noise: handshake init failed: {}", e))?;
             let init_msg = hs
                 .initiate()
                 .map_err(|e| format!("Noise: initiate failed: {}", e))?;
@@ -142,8 +140,8 @@ impl ClientApp {
         // Open a bi stream, send ClientCapabilities (prism_session format),
         // read the NegotiationResult back. Must happen before frame tasks start.
         {
+            use prism_protocol::channel::{CHANNEL_CONTROL, CHANNEL_DISPLAY, CHANNEL_INPUT};
             use prism_session::{ClientCapabilities, ClientChannelCap, ClientPerformance};
-            use prism_protocol::channel::{CHANNEL_DISPLAY, CHANNEL_INPUT, CHANNEL_CONTROL};
 
             let (mut cap_send, mut cap_recv) = connection
                 .open_bi()
@@ -152,9 +150,18 @@ impl ClientApp {
 
             let client_caps = ClientCapabilities {
                 channels: vec![
-                    ClientChannelCap { channel_id: CHANNEL_DISPLAY, max_version: 1 },
-                    ClientChannelCap { channel_id: CHANNEL_INPUT,   max_version: 1 },
-                    ClientChannelCap { channel_id: CHANNEL_CONTROL, max_version: 1 },
+                    ClientChannelCap {
+                        channel_id: CHANNEL_DISPLAY,
+                        max_version: 1,
+                    },
+                    ClientChannelCap {
+                        channel_id: CHANNEL_INPUT,
+                        max_version: 1,
+                    },
+                    ClientChannelCap {
+                        channel_id: CHANNEL_CONTROL,
+                        max_version: 1,
+                    },
                 ],
                 performance: ClientPerformance {
                     supported_codecs: vec!["h264".into(), "h265".into()],
@@ -163,19 +170,27 @@ impl ClientApp {
 
             let json = serde_json::to_vec(&client_caps)
                 .map_err(|e| format!("cap negotiation: serialize failed: {}", e))?;
-            cap_send.write_all(&(json.len() as u32).to_le_bytes()).await
+            cap_send
+                .write_all(&(json.len() as u32).to_le_bytes())
+                .await
                 .map_err(|e| format!("cap negotiation: write len failed: {}", e))?;
-            cap_send.write_all(&json).await
+            cap_send
+                .write_all(&json)
+                .await
                 .map_err(|e| format!("cap negotiation: write body failed: {}", e))?;
             let _ = cap_send.finish();
 
             // Read server response.
             let mut len_buf = [0u8; 4];
-            cap_recv.read_exact(&mut len_buf).await
+            cap_recv
+                .read_exact(&mut len_buf)
+                .await
                 .map_err(|e| format!("cap negotiation: read len failed: {}", e))?;
             let resp_len = u32::from_le_bytes(len_buf) as usize;
             let mut resp_data = vec![0u8; resp_len];
-            cap_recv.read_exact(&mut resp_data).await
+            cap_recv
+                .read_exact(&mut resp_data)
+                .await
                 .map_err(|e| format!("cap negotiation: read body failed: {}", e))?;
             tracing::info!(bytes = resp_len, "capability negotiation complete");
         }
@@ -200,8 +215,7 @@ impl ClientApp {
             header_bytes[2] = 0x01; // HEARTBEAT
             let packet = Bytes::copy_from_slice(&header_bytes);
 
-            let mut interval =
-                tokio::time::interval(std::time::Duration::from_secs(5));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
             loop {
                 interval.tick().await;
                 if hb_conn.send_datagram(packet.clone()).is_err() {
@@ -269,7 +283,9 @@ impl ClientApp {
                 }
             };
 
-            tracing::info!("frame stream accepted — receiving frames (close window or Ctrl+C to stop)");
+            tracing::info!(
+                "frame stream accepted — receiving frames (close window or Ctrl+C to stop)"
+            );
 
             loop {
                 // Read 4-byte length prefix.
@@ -293,10 +309,13 @@ impl ClientApp {
                     break;
                 }
 
-                let width = u32::from_le_bytes([header[0], header[1], header[2], header[3]]) as usize;
-                let height = u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize;
+                let width =
+                    u32::from_le_bytes([header[0], header[1], header[2], header[3]]) as usize;
+                let height =
+                    u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize;
                 let seq = u32::from_le_bytes([header[8], header[9], header[10], header[11]]);
-                let h264_len = u32::from_le_bytes([header[12], header[13], header[14], header[15]]) as usize;
+                let h264_len =
+                    u32::from_le_bytes([header[12], header[13], header[14], header[15]]) as usize;
 
                 // Validate dimensions and payload size against the length prefix.
                 if width == 0 || height == 0 || width > 4096 || height > 4096 {
@@ -366,7 +385,12 @@ impl ClientApp {
                 }
 
                 // Non-blocking send; drop on backpressure.
-                let _ = tx.try_send(Frame { width, height, buffer, seq });
+                let _ = tx.try_send(Frame {
+                    width,
+                    height,
+                    buffer,
+                    seq,
+                });
             }
         });
 
@@ -377,8 +401,8 @@ impl ClientApp {
         // measure round-trip time.
         let dgram_conn = connection.clone();
         tokio::spawn(async move {
-            use prism_protocol::header::{PrismHeader, HEADER_SIZE};
             use prism_protocol::channel::CHANNEL_CONTROL;
+            use prism_protocol::header::{HEADER_SIZE, PrismHeader};
             use prism_session::control_msg::{PROBE_REQUEST, PROBE_RESPONSE};
 
             while let Ok(data) = dgram_conn.read_datagram().await {
@@ -398,10 +422,8 @@ impl ClientApp {
         });
 
         // ── Clipboard setup ───────────────────────────────────────────────────
-        let mut clipboard: Option<arboard::Clipboard> =
-            arboard::Clipboard::new().ok();
-        let clipboard_echo_guard =
-            prism_protocol::clipboard::ClipboardEchoGuard::new();
+        let mut clipboard: Option<arboard::Clipboard> = arboard::Clipboard::new().ok();
+        let clipboard_echo_guard = prism_protocol::clipboard::ClipboardEchoGuard::new();
         let mut last_clipboard_check = Instant::now();
         let mut last_clipboard_hash: u64 = 0;
 
@@ -471,9 +493,7 @@ impl ClientApp {
                     for dx in 0..8usize {
                         let px = cx + dx;
                         let py = cy + dy;
-                        if px < width && py < height
-                            && (dx == 3 || dx == 4 || dy == 3 || dy == 4)
-                        {
+                        if px < width && py < height && (dx == 3 || dx == 4 || dy == 3 || dy == 4) {
                             current_buffer[py * width + px] = 0x00FFFFFF; // white
                         }
                     }
@@ -488,15 +508,12 @@ impl ClientApp {
 
             for key in window.get_keys_pressed(minifb::KeyRepeat::Yes) {
                 let vk = key as u16;
-                let event =
-                    prism_protocol::input::InputEvent::KeyDown { scancode: vk, vk };
+                let event = prism_protocol::input::InputEvent::KeyDown { scancode: vk, vk };
                 let dgram = input_sender.build_datagram(event);
                 input_tx.send(dgram).ok();
             }
 
-            if let Some((mx, my)) =
-                window.get_mouse_pos(minifb::MouseMode::Clamp)
-            {
+            if let Some((mx, my)) = window.get_mouse_pos(minifb::MouseMode::Clamp) {
                 // Update predictor with raw pixel position for zero-latency feel.
                 cursor_predictor.update_local(mx, my);
                 tracing::trace!(
@@ -505,15 +522,9 @@ impl ClientApp {
                     "cursor prediction"
                 );
 
-                let (nx, ny) = crate::normalize_mouse(
-                    mx,
-                    my,
-                    current_w as u32,
-                    current_h as u32,
-                );
+                let (nx, ny) = crate::normalize_mouse(mx, my, current_w as u32, current_h as u32);
                 if nx != last_mx || ny != last_my {
-                    let event =
-                        prism_protocol::input::InputEvent::MouseMove { x: nx, y: ny };
+                    let event = prism_protocol::input::InputEvent::MouseMove { x: nx, y: ny };
                     let dgram = input_sender.build_datagram(event);
                     input_tx.send(dgram).ok();
                     last_mx = nx;
@@ -572,8 +583,7 @@ impl ClientApp {
                 if let Some(ref mut cb) = clipboard
                     && let Ok(text) = cb.get_text()
                 {
-                    let msg =
-                        prism_protocol::clipboard::ClipboardMessage::text(&text);
+                    let msg = prism_protocol::clipboard::ClipboardMessage::text(&text);
                     if msg.content_hash != last_clipboard_hash
                         && clipboard_echo_guard.should_send(msg.content_hash)
                     {
@@ -631,15 +641,11 @@ fn yuv420_to_rgb<S: YUVSource>(yuv: &S, width: usize, height: usize) -> Vec<u32>
             let u_val = u_plane[uv_row * u_stride + uv_col] as f32;
             let v_val = v_plane[uv_row * v_stride + uv_col] as f32;
 
-            let r = (y_val + 1.402 * (v_val - 128.0))
-                .round()
-                .clamp(0.0, 255.0) as u32;
+            let r = (y_val + 1.402 * (v_val - 128.0)).round().clamp(0.0, 255.0) as u32;
             let g = (y_val - 0.344 * (u_val - 128.0) - 0.714 * (v_val - 128.0))
                 .round()
                 .clamp(0.0, 255.0) as u32;
-            let b = (y_val + 1.772 * (u_val - 128.0))
-                .round()
-                .clamp(0.0, 255.0) as u32;
+            let b = (y_val + 1.772 * (u_val - 128.0)).round().clamp(0.0, 255.0) as u32;
 
             buffer.push((r << 16) | (g << 8) | b);
         }

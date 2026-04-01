@@ -115,7 +115,10 @@ impl CapabilityNegotiator {
             match self.server_channels.get(&client_ch.channel_id) {
                 Some(server_ch) => {
                     let version = client_ch.max_version.min(server_ch.max_version);
-                    channels.push(NegotiatedChannel { channel_id: client_ch.channel_id, version });
+                    channels.push(NegotiatedChannel {
+                        channel_id: client_ch.channel_id,
+                        version,
+                    });
                 }
                 None => {
                     rejected_channels.push(client_ch.channel_id);
@@ -126,19 +129,31 @@ impl CapabilityNegotiator {
         let protocol_version = channels.iter().map(|c| c.version).min().unwrap_or(1);
         let display_codec = self.negotiate_codec(client_caps);
 
-        NegotiationResult { protocol_version, channels, rejected_channels, display_codec }
+        NegotiationResult {
+            protocol_version,
+            channels,
+            rejected_channels,
+            display_codec,
+        }
     }
 
     /// Select the best display codec supported by both sides.
     ///
     /// Priority: h265 > h264 > av1. Falls back to "h264" if no match is found.
     fn negotiate_codec(&self, client: &ClientCapabilities) -> String {
-        let client_codecs: HashSet<_> = client.performance.supported_codecs.iter().cloned().collect();
-        let server_codecs = self.server_channels.get(&CHANNEL_DISPLAY)
-            .and_then(|c| match &c.config {
-                ChannelConfig::Display(d) => Some(&d.supported_codecs),
-                _ => None,
-            });
+        let client_codecs: HashSet<_> = client
+            .performance
+            .supported_codecs
+            .iter()
+            .cloned()
+            .collect();
+        let server_codecs =
+            self.server_channels
+                .get(&CHANNEL_DISPLAY)
+                .and_then(|c| match &c.config {
+                    ChannelConfig::Display(d) => Some(&d.supported_codecs),
+                    _ => None,
+                });
         for codec in ["h265", "h264", "av1"] {
             if client_codecs.contains(codec)
                 && let Some(server) = server_codecs
@@ -170,7 +185,11 @@ mod tests {
     }
 
     fn generic_cap(channel_id: u16, version: u16) -> ChannelCap {
-        ChannelCap { channel_id, max_version: version, config: ChannelConfig::Generic }
+        ChannelCap {
+            channel_id,
+            max_version: version,
+            config: ChannelConfig::Generic,
+        }
     }
 
     fn negotiator_with_display(codecs: Vec<&str>) -> CapabilityNegotiator {
@@ -185,10 +204,18 @@ mod tests {
         let neg = negotiator_with_display(vec!["h264"]);
         let client = ClientCapabilities {
             channels: vec![
-                ClientChannelCap { channel_id: CHANNEL_DISPLAY, max_version: 1 },
-                ClientChannelCap { channel_id: 0x0002, max_version: 2 },
+                ClientChannelCap {
+                    channel_id: CHANNEL_DISPLAY,
+                    max_version: 1,
+                },
+                ClientChannelCap {
+                    channel_id: 0x0002,
+                    max_version: 2,
+                },
             ],
-            performance: ClientPerformance { supported_codecs: vec!["h264".to_string()] },
+            performance: ClientPerformance {
+                supported_codecs: vec!["h264".to_string()],
+            },
         };
         let result = neg.negotiate(&client);
         assert_eq!(result.channels.len(), 2);
@@ -200,11 +227,19 @@ mod tests {
         let neg = negotiator_with_display(vec!["h264"]);
         let client = ClientCapabilities {
             channels: vec![
-                ClientChannelCap { channel_id: CHANNEL_DISPLAY, max_version: 1 },
+                ClientChannelCap {
+                    channel_id: CHANNEL_DISPLAY,
+                    max_version: 1,
+                },
                 // 0x0E1 is not on the server
-                ClientChannelCap { channel_id: 0x0E1, max_version: 1 },
+                ClientChannelCap {
+                    channel_id: 0x0E1,
+                    max_version: 1,
+                },
             ],
-            performance: ClientPerformance { supported_codecs: vec!["h264".to_string()] },
+            performance: ClientPerformance {
+                supported_codecs: vec!["h264".to_string()],
+            },
         };
         let result = neg.negotiate(&client);
         assert_eq!(result.channels.len(), 1);
@@ -219,8 +254,13 @@ mod tests {
         let neg = CapabilityNegotiator::new(map);
 
         let client = ClientCapabilities {
-            channels: vec![ClientChannelCap { channel_id: CHANNEL_DISPLAY, max_version: 1 }],
-            performance: ClientPerformance { supported_codecs: vec!["h264".to_string()] },
+            channels: vec![ClientChannelCap {
+                channel_id: CHANNEL_DISPLAY,
+                max_version: 1,
+            }],
+            performance: ClientPerformance {
+                supported_codecs: vec!["h264".to_string()],
+            },
         };
         let result = neg.negotiate(&client);
         assert_eq!(result.channels[0].version, 1);

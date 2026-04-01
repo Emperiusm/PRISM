@@ -8,10 +8,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use prism_protocol::{
-    channel::CHANNEL_CONTROL,
-    header::PrismHeader,
-};
+use prism_protocol::{channel::CHANNEL_CONTROL, header::PrismHeader};
 use prism_session::{
     control_msg::{HEARTBEAT, PROBE_REQUEST, PROBE_RESPONSE},
     dispatch::{ChannelError, ChannelHandler},
@@ -72,7 +69,9 @@ impl ChannelHandler for ControlChannelHandler {
 
         match header.msg_type {
             HEARTBEAT => {
-                self.stats.heartbeats_received.fetch_add(1, Ordering::Relaxed);
+                self.stats
+                    .heartbeats_received
+                    .fetch_add(1, Ordering::Relaxed);
             }
             PROBE_REQUEST => {
                 self.stats.probes_received.fetch_add(1, Ordering::Relaxed);
@@ -100,7 +99,7 @@ mod tests {
     use bytes::BytesMut;
     use prism_protocol::{
         channel::CHANNEL_CONTROL,
-        header::{PrismHeader, PROTOCOL_VERSION},
+        header::{PROTOCOL_VERSION, PrismHeader},
     };
     use prism_session::control_msg::{HEARTBEAT, PROBE_REQUEST};
     use uuid::Uuid;

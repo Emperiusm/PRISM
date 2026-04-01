@@ -72,9 +72,8 @@ impl ConnectionRateLimiter {
     ///
     /// Call periodically (e.g. once per minute) to prevent unbounded memory growth.
     pub fn gc(&mut self) {
-        self.buckets.retain(|_, bucket| {
-            bucket.last_refill.elapsed() < Duration::from_secs(300)
-        });
+        self.buckets
+            .retain(|_, bucket| bucket.last_refill.elapsed() < Duration::from_secs(300));
     }
 }
 
@@ -150,7 +149,13 @@ mod tests {
 
         // addr_b should still have its own full bucket.
         assert!(rl.check(addr_b), "addr_b should be unaffected");
-        assert!(rl.check(addr_b), "addr_b second connection should be allowed");
-        assert!(!rl.check(addr_b), "addr_b should also exhaust independently");
+        assert!(
+            rl.check(addr_b),
+            "addr_b second connection should be allowed"
+        );
+        assert!(
+            !rl.check(addr_b),
+            "addr_b should also exhaust independently"
+        );
     }
 }

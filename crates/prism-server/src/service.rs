@@ -28,7 +28,9 @@ impl ServiceCommand {
         let args: Vec<String> = std::env::args().collect();
         if args.contains(&"--install-service".to_string()) {
             let binary = std::env::current_exe().unwrap_or_default();
-            Some(ServiceCommand::Install { binary_path: binary })
+            Some(ServiceCommand::Install {
+                binary_path: binary,
+            })
         } else if args.contains(&"--uninstall-service".to_string()) {
             Some(ServiceCommand::Uninstall)
         } else if args.contains(&"--start-service".to_string()) {
@@ -71,15 +73,24 @@ mod tests {
     fn sc_create_command_format() {
         let path = Path::new("C:\\Program Files\\PRISM\\prism-server.exe");
         let cmd = sc_create_command(path);
-        assert!(cmd.contains("sc create PRISMServer"), "expected 'sc create PRISMServer' in: {cmd}");
-        assert!(cmd.contains("prism-server.exe"), "expected binary path in: {cmd}");
+        assert!(
+            cmd.contains("sc create PRISMServer"),
+            "expected 'sc create PRISMServer' in: {cmd}"
+        );
+        assert!(
+            cmd.contains("prism-server.exe"),
+            "expected binary path in: {cmd}"
+        );
     }
 
     #[test]
     fn sc_delete_command_format() {
         let cmd = sc_delete_command();
         assert!(cmd.contains("sc delete"), "expected 'sc delete' in: {cmd}");
-        assert!(cmd.contains("PRISMServer"), "expected 'PRISMServer' in: {cmd}");
+        assert!(
+            cmd.contains("PRISMServer"),
+            "expected 'PRISMServer' in: {cmd}"
+        );
     }
 
     #[test]

@@ -12,8 +12,8 @@
 //!
 //! **Never use in production.**
 
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use prism_security::audit::AuditEvent;
 use prism_security::context::SecurityContext;
@@ -32,7 +32,9 @@ pub struct AllowAllGate {
 
 impl AllowAllGate {
     pub fn new() -> Self {
-        Self { auth_count: AtomicU32::new(0) }
+        Self {
+            auth_count: AtomicU32::new(0),
+        }
     }
 
     /// Number of successful authentications since creation.
@@ -48,11 +50,7 @@ impl Default for AllowAllGate {
 }
 
 impl SecurityGate for AllowAllGate {
-    fn authenticate(
-        &self,
-        _client_key: &[u8; 32],
-        device_identity: &DeviceIdentity,
-    ) -> AuthResult {
+    fn authenticate(&self, _client_key: &[u8; 32], device_identity: &DeviceIdentity) -> AuthResult {
         self.auth_count.fetch_add(1, Ordering::SeqCst);
 
         // Build an all-allow ChannelPermissions.
@@ -95,11 +93,11 @@ impl SecurityGate for AllowAllGate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use prism_security::context::ChannelDecision;
-    use prism_security::gate::AuthResult;
     use prism_protocol::channel::{
         CHANNEL_CAMERA, CHANNEL_CLIPBOARD, CHANNEL_DISPLAY, CHANNEL_INPUT, CHANNEL_SENSOR,
     };
+    use prism_security::context::ChannelDecision;
+    use prism_security::gate::AuthResult;
 
     fn make_identity() -> DeviceIdentity {
         prism_security::identity::LocalIdentity::generate("Test Client").identity
@@ -135,7 +133,10 @@ mod tests {
         let identity = make_identity();
         let ctx = match gate.authenticate(&dummy_key(), &identity) {
             AuthResult::Authenticated(ctx) => ctx,
-            other => panic!("expected Authenticated, got {:?}", std::mem::discriminant(&other)),
+            other => panic!(
+                "expected Authenticated, got {:?}",
+                std::mem::discriminant(&other)
+            ),
         };
 
         // All well-known channels must be AllowAll.
@@ -166,7 +167,9 @@ mod tests {
             device_id: Uuid::nil(),
             reason: "none".to_string(),
         });
-        gate.audit(AuditEvent::ClientDisconnected { device_id: Uuid::nil() });
+        gate.audit(AuditEvent::ClientDisconnected {
+            device_id: Uuid::nil(),
+        });
         // No assertion needed — just must not panic.
     }
 }

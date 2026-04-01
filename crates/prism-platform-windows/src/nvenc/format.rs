@@ -30,9 +30,9 @@ impl NvencBufferFormat {
     /// format (e.g. future formats not yet supported).
     pub fn from_texture_format(fmt: TextureFormat) -> Option<Self> {
         match fmt {
-            TextureFormat::Nv12  => Some(Self::Nv12),
+            TextureFormat::Nv12 => Some(Self::Nv12),
             TextureFormat::Bgra8 => Some(Self::Argb),
-            TextureFormat::P010  => Some(Self::P010),
+            TextureFormat::P010 => Some(Self::P010),
         }
     }
 
@@ -53,9 +53,9 @@ impl NvencBufferFormat {
     /// overhead).  ARGB / ABGR are 4 bytes per pixel.
     pub fn bytes_per_pixel(self) -> f64 {
         match self {
-            Self::Nv12        => 1.5,
+            Self::Nv12 => 1.5,
             Self::Argb | Self::Abgr => 4.0,
-            Self::P010        => 3.0,
+            Self::P010 => 3.0,
         }
     }
 

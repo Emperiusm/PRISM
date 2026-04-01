@@ -3,9 +3,9 @@
 // Licensed under the GNU Affero General Public License v3.0.
 // Commercial licensing available — see LICENSE-COMMERCIAL.md.
 
+use bytes::Bytes;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use bytes::Bytes;
 use uuid::Uuid;
 
 /// Thread-safe store of client QUIC connections for sending frames.
@@ -15,7 +15,9 @@ pub struct ClientConnectionStore {
 
 impl ClientConnectionStore {
     pub fn new() -> Self {
-        Self { connections: Mutex::new(HashMap::new()) }
+        Self {
+            connections: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn add(&self, client_id: Uuid, conn: quinn::Connection) {
@@ -62,7 +64,9 @@ impl ClientConnectionStore {
 }
 
 impl Default for ClientConnectionStore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]

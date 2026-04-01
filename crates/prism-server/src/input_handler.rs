@@ -8,16 +8,16 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use tokio::sync::mpsc::Sender;
 use prism_protocol::{
     channel::CHANNEL_INPUT,
-    header::{PrismHeader, HEADER_SIZE},
-    input::{InputEvent, INPUT_EVENT_SIZE},
+    header::{HEADER_SIZE, PrismHeader},
+    input::{INPUT_EVENT_SIZE, InputEvent},
 };
 use prism_session::{
     dispatch::{ChannelError, ChannelHandler},
     types::ClientId,
 };
+use tokio::sync::mpsc::Sender;
 
 /// Map a 0–65535 normalised coordinate to a screen pixel position.
 ///
@@ -76,18 +76,14 @@ impl InputChannelHandler {
     fn inject(&self, event: InputEvent) -> bool {
         #[cfg(target_os = "windows")]
         {
-            use windows::Win32::UI::Input::KeyboardAndMouse::{
-                SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE,
-                KEYBDINPUT, MOUSEINPUT,
-                KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
-                MOUSEEVENTF_MOVE, MOUSEEVENTF_ABSOLUTE,
-                MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-                MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
-                MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
-                MOUSEEVENTF_WHEEL,
-                VIRTUAL_KEY,
-            };
             use prism_protocol::input::MouseButton;
+            use windows::Win32::UI::Input::KeyboardAndMouse::{
+                INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_KEYUP,
+                KEYEVENTF_UNICODE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
+                MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE,
+                MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT,
+                SendInput, VIRTUAL_KEY,
+            };
 
             let input: INPUT = match event {
                 InputEvent::KeyDown { vk, .. } => INPUT {
@@ -158,8 +154,8 @@ impl InputChannelHandler {
                 },
                 InputEvent::MouseDown { button } => {
                     let flags = match button {
-                        MouseButton::Left   => MOUSEEVENTF_LEFTDOWN,
-                        MouseButton::Right  => MOUSEEVENTF_RIGHTDOWN,
+                        MouseButton::Left => MOUSEEVENTF_LEFTDOWN,
+                        MouseButton::Right => MOUSEEVENTF_RIGHTDOWN,
                         MouseButton::Middle => MOUSEEVENTF_MIDDLEDOWN,
                         // X1/X2 not wired — treat as no-op (return true, no send)
                         _ => return true,
@@ -180,8 +176,8 @@ impl InputChannelHandler {
                 }
                 InputEvent::MouseUp { button } => {
                     let flags = match button {
-                        MouseButton::Left   => MOUSEEVENTF_LEFTUP,
-                        MouseButton::Right  => MOUSEEVENTF_RIGHTUP,
+                        MouseButton::Left => MOUSEEVENTF_LEFTUP,
+                        MouseButton::Right => MOUSEEVENTF_RIGHTUP,
                         MouseButton::Middle => MOUSEEVENTF_MIDDLEUP,
                         _ => return true,
                     };
@@ -288,8 +284,8 @@ mod tests {
     use bytes::BytesMut;
     use prism_protocol::{
         channel::CHANNEL_INPUT,
-        header::{PrismHeader, PROTOCOL_VERSION},
-        input::{InputEvent, INPUT_EVENT_SIZE},
+        header::{PROTOCOL_VERSION, PrismHeader},
+        input::{INPUT_EVENT_SIZE, InputEvent},
     };
     use uuid::Uuid;
 
@@ -320,10 +316,7 @@ mod tests {
     fn normalized_to_screen_center() {
         // 32768 / 65535 * 1920 ≈ 960
         let result = normalized_to_screen(32768, 1920);
-        assert!(
-            (result - 960).abs() <= 1,
-            "expected ~960, got {result}"
-        );
+        assert!((result - 960).abs() <= 1, "expected ~960, got {result}");
     }
 
     // ── 2. normalized_to_screen_edges ───────────────────────────────────────
@@ -348,7 +341,10 @@ mod tests {
     async fn processes_key_down() {
         let handler = InputChannelHandler::new(1920, 1080);
         let stats = handler.stats();
-        let event = InputEvent::KeyDown { scancode: 0x001C, vk: 0x000D };
+        let event = InputEvent::KeyDown {
+            scancode: 0x001C,
+            vk: 0x000D,
+        };
         let data = make_input_datagram(event);
         handler.handle_datagram(client(), data).await.unwrap();
         assert_eq!(stats.events_received.load(Ordering::Relaxed), 1);
@@ -384,7 +380,10 @@ mod tests {
     async fn capture_trigger_fires_on_input() {
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
         let handler = InputChannelHandler::new(1920, 1080).with_capture_trigger(tx);
-        let data = make_input_datagram(InputEvent::KeyDown { scancode: 0x1E, vk: 0x41 });
+        let data = make_input_datagram(InputEvent::KeyDown {
+            scancode: 0x1E,
+            vk: 0x41,
+        });
         handler.handle_datagram(Uuid::nil(), data).await.unwrap();
         assert!(rx.try_recv().is_ok());
     }

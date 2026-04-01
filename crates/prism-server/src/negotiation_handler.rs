@@ -9,11 +9,11 @@
 //   Client → Server: [4B LE len][JSON ClientCapabilities]
 //   Server → Client: [4B LE len][JSON NegotiationResult]
 
-use prism_session::{
-    CapabilityNegotiator, ChannelCap, ChannelConfig, ClientCapabilities,
-    DisplayChannelConfig, NegotiationResult,
-};
 use prism_protocol::channel::{CHANNEL_CONTROL, CHANNEL_DISPLAY, CHANNEL_INPUT};
+use prism_session::{
+    CapabilityNegotiator, ChannelCap, ChannelConfig, ClientCapabilities, DisplayChannelConfig,
+    NegotiationResult,
+};
 use std::collections::HashMap;
 
 /// Maximum number of bytes accepted for the client capabilities payload.
@@ -47,7 +47,8 @@ pub async fn negotiate_on_stream(
 
     // Serialise and send the result.
     let response = serde_json::to_vec(&result)?;
-    send.write_all(&(response.len() as u32).to_le_bytes()).await?;
+    send.write_all(&(response.len() as u32).to_le_bytes())
+        .await?;
     send.write_all(&response).await?;
     let _ = send.finish();
 
@@ -99,8 +100,8 @@ pub fn build_server_negotiator() -> CapabilityNegotiator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use prism_session::{ClientCapabilities, ClientChannelCap, ClientPerformance};
     use prism_protocol::channel::CHANNEL_CLIPBOARD;
+    use prism_session::{ClientCapabilities, ClientChannelCap, ClientPerformance};
 
     fn negotiator() -> CapabilityNegotiator {
         build_server_negotiator()
@@ -110,7 +111,10 @@ mod tests {
         ClientCapabilities {
             channels: channels
                 .iter()
-                .map(|&(id, ver)| ClientChannelCap { channel_id: id, max_version: ver })
+                .map(|&(id, ver)| ClientChannelCap {
+                    channel_id: id,
+                    max_version: ver,
+                })
                 .collect(),
             performance: ClientPerformance {
                 supported_codecs: codecs.iter().map(|s| s.to_string()).collect(),
@@ -134,8 +138,14 @@ mod tests {
 
         // Display and Input granted.
         let granted_ids: Vec<u16> = result.channels.iter().map(|c| c.channel_id).collect();
-        assert!(granted_ids.contains(&CHANNEL_DISPLAY), "Display must be granted");
-        assert!(granted_ids.contains(&CHANNEL_INPUT), "Input must be granted");
+        assert!(
+            granted_ids.contains(&CHANNEL_DISPLAY),
+            "Display must be granted"
+        );
+        assert!(
+            granted_ids.contains(&CHANNEL_INPUT),
+            "Input must be granted"
+        );
 
         // Clipboard rejected.
         assert!(
@@ -152,14 +162,21 @@ mod tests {
         let neg = negotiator();
         let caps = client_caps(&[], &["h264", "h265"]);
         let result = neg.negotiate(&caps);
-        assert_eq!(result.display_codec, "h265", "h265 should be preferred over h264");
+        assert_eq!(
+            result.display_codec, "h265",
+            "h265 should be preferred over h264"
+        );
     }
 
     #[test]
     fn negotiation_result_json_roundtrip() {
         let neg = negotiator();
         let caps = client_caps(
-            &[(CHANNEL_DISPLAY, 2), (CHANNEL_INPUT, 1), (CHANNEL_CONTROL, 1)],
+            &[
+                (CHANNEL_DISPLAY, 2),
+                (CHANNEL_INPUT, 1),
+                (CHANNEL_CONTROL, 1),
+            ],
             &["h265"],
         );
         let result = neg.negotiate(&caps);

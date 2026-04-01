@@ -90,10 +90,13 @@ impl TexturePool {
     ///
     /// Returns `None` when all slots are occupied.
     pub fn acquire_write(&mut self) -> Option<TextureSlot> {
-        self.slots.iter().position(|s| *s == TextureSlotState::Free).map(|i| {
-            self.slots[i] = TextureSlotState::Writing;
-            TextureSlot(i)
-        })
+        self.slots
+            .iter()
+            .position(|s| *s == TextureSlotState::Free)
+            .map(|i| {
+                self.slots[i] = TextureSlotState::Writing;
+                TextureSlot(i)
+            })
     }
 
     /// Transition `slot` from `Writing` to `Ready`.
@@ -132,10 +135,13 @@ impl TexturePool {
     ///
     /// Returns `None` when no committed frame is available yet.
     pub fn acquire_read(&mut self) -> Option<TextureSlot> {
-        self.slots.iter().position(|s| *s == TextureSlotState::Ready).map(|i| {
-            self.slots[i] = TextureSlotState::Reading;
-            TextureSlot(i)
-        })
+        self.slots
+            .iter()
+            .position(|s| *s == TextureSlotState::Ready)
+            .map(|i| {
+                self.slots[i] = TextureSlotState::Reading;
+                TextureSlot(i)
+            })
     }
 
     /// Transition `slot` from `Reading` back to `Free`.
@@ -170,12 +176,18 @@ impl TexturePool {
 
     /// Number of `Free` slots.
     pub fn free_count(&self) -> usize {
-        self.slots.iter().filter(|s| **s == TextureSlotState::Free).count()
+        self.slots
+            .iter()
+            .filter(|s| **s == TextureSlotState::Free)
+            .count()
     }
 
     /// Number of `Ready` slots (captured frames awaiting encode).
     pub fn ready_count(&self) -> usize {
-        self.slots.iter().filter(|s| **s == TextureSlotState::Ready).count()
+        self.slots
+            .iter()
+            .filter(|s| **s == TextureSlotState::Ready)
+            .count()
     }
 
     /// Total number of slots in this pool.
@@ -266,15 +278,15 @@ mod tests {
         let mut pool = pool4();
 
         let wa = pool.acquire_write().unwrap(); // slot 0 → Writing
-        pool.commit_write(wa);                  // slot 0 → Ready
+        pool.commit_write(wa); // slot 0 → Ready
 
-        let ra = pool.acquire_read().unwrap();  // slot 0 → Reading
+        let ra = pool.acquire_read().unwrap(); // slot 0 → Reading
         let wb = pool.acquire_write().unwrap(); // slot 1 → Writing
-        pool.commit_write(wb);                  // slot 1 → Ready
+        pool.commit_write(wb); // slot 1 → Ready
 
         // Encoder finishes slot 0; capture can reuse it.
         // State: slot 0 → Free, slot 1 → Ready, slots 2-3 → Free
-        pool.release_read(ra);                  // slot 0 → Free
+        pool.release_read(ra); // slot 0 → Free
         assert_eq!(pool.free_count(), 3);
         assert_eq!(pool.ready_count(), 1);
 

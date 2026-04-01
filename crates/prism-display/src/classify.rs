@@ -170,7 +170,12 @@ impl Tier1Classifier {
         // Background region: the full screen.  We report it as Static with
         // full confidence.  Callers that need pixel-accurate uncovered areas
         // should subtract window rects themselves.
-        let screen_rect = Rect { x: 0, y: 0, w: screen_w, h: screen_h };
+        let screen_rect = Rect {
+            x: 0,
+            y: 0,
+            w: screen_w,
+            h: screen_h,
+        };
         let is_covered = windows
             .iter()
             .any(|w| w.rect.w == screen_w && w.rect.h == screen_h);
@@ -203,7 +208,12 @@ mod tests {
     fn small_window(hwnd: u64, freq: UpdateFrequency) -> WindowActivity {
         WindowActivity {
             hwnd,
-            rect: Rect { x: 0, y: 0, w: 800, h: 600 },
+            rect: Rect {
+                x: 0,
+                y: 0,
+                w: 800,
+                h: 600,
+            },
             frequency: freq,
         }
     }
@@ -211,10 +221,22 @@ mod tests {
     // 1 ── UpdateFrequency → RegionType mapping
     #[test]
     fn update_frequency_to_region_type() {
-        assert_eq!(RegionType::from_frequency(UpdateFrequency::Static), RegionType::Static);
-        assert_eq!(RegionType::from_frequency(UpdateFrequency::Low), RegionType::Text);
-        assert_eq!(RegionType::from_frequency(UpdateFrequency::High), RegionType::Video);
-        assert_eq!(RegionType::from_frequency(UpdateFrequency::Unknown), RegionType::Uncertain);
+        assert_eq!(
+            RegionType::from_frequency(UpdateFrequency::Static),
+            RegionType::Static
+        );
+        assert_eq!(
+            RegionType::from_frequency(UpdateFrequency::Low),
+            RegionType::Text
+        );
+        assert_eq!(
+            RegionType::from_frequency(UpdateFrequency::High),
+            RegionType::Video
+        );
+        assert_eq!(
+            RegionType::from_frequency(UpdateFrequency::Unknown),
+            RegionType::Uncertain
+        );
     }
 
     // 2 ── A Low-frequency window should produce a Text region.

@@ -157,7 +157,11 @@ mod tests {
 
     #[test]
     fn format_serialize() {
-        let formats = [ClipboardFormat::Text, ClipboardFormat::Html, ClipboardFormat::Image];
+        let formats = [
+            ClipboardFormat::Text,
+            ClipboardFormat::Html,
+            ClipboardFormat::Image,
+        ];
         for fmt in &formats {
             let json = serde_json::to_string(fmt).expect("serialize");
             let back: ClipboardFormat = serde_json::from_str(&json).expect("deserialize");

@@ -42,7 +42,9 @@ impl RateCounter {
         let prev = self.prev_total.swap(total, Ordering::Relaxed);
         let prev_ts = self.prev_timestamp_us.swap(now_us, Ordering::Relaxed);
         let elapsed_us = now_us.saturating_sub(prev_ts);
-        if elapsed_us == 0 { return; }
+        if elapsed_us == 0 {
+            return;
+        }
         let delta = total.saturating_sub(prev);
         let rate = delta * 1_000_000 / elapsed_us;
         self.cached_rate.store(rate, Ordering::Relaxed);
@@ -50,7 +52,9 @@ impl RateCounter {
 }
 
 impl Default for RateCounter {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -76,7 +80,9 @@ mod tests {
     fn rate_computation() {
         let rc = RateCounter::new();
         rc.compute_rate(0);
-        for _ in 0..100 { rc.inc(1); }
+        for _ in 0..100 {
+            rc.inc(1);
+        }
         rc.compute_rate(1_000_000);
         assert_eq!(rc.rate(), 100);
     }
@@ -85,10 +91,14 @@ mod tests {
     fn rate_updates_on_each_compute() {
         let rc = RateCounter::new();
         rc.compute_rate(0);
-        for _ in 0..50 { rc.inc(1); }
+        for _ in 0..50 {
+            rc.inc(1);
+        }
         rc.compute_rate(1_000_000);
         assert_eq!(rc.rate(), 50);
-        for _ in 0..200 { rc.inc(1); }
+        for _ in 0..200 {
+            rc.inc(1);
+        }
         rc.compute_rate(2_000_000);
         assert_eq!(rc.rate(), 200);
     }

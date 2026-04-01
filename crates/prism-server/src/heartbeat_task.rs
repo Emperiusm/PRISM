@@ -6,7 +6,7 @@
 use bytes::{Bytes, BytesMut};
 use prism_protocol::{
     channel::CHANNEL_CONTROL,
-    header::{PrismHeader, HEADER_SIZE, PROTOCOL_VERSION},
+    header::{HEADER_SIZE, PROTOCOL_VERSION, PrismHeader},
 };
 use prism_session::control_msg::HEARTBEAT;
 
@@ -58,7 +58,7 @@ mod tests {
     use super::*;
     use prism_protocol::{
         channel::CHANNEL_CONTROL,
-        header::{PrismHeader, HEADER_SIZE},
+        header::{HEADER_SIZE, PrismHeader},
     };
     use prism_session::control_msg::HEARTBEAT;
 

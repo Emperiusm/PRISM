@@ -15,7 +15,11 @@ pub struct SemVer {
 
 impl SemVer {
     pub fn new(major: u32, minor: u32, patch: u32) -> Self {
-        Self { major, minor, patch }
+        Self {
+            major,
+            minor,
+            patch,
+        }
     }
 
     pub fn parse(s: &str) -> Option<Self> {
@@ -44,8 +48,13 @@ pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Debug, Clone)]
 pub enum UpdateStatus {
     UpToDate,
-    UpdateAvailable { latest: SemVer, download_url: String },
-    CheckFailed { reason: String },
+    UpdateAvailable {
+        latest: SemVer,
+        download_url: String,
+    },
+    CheckFailed {
+        reason: String,
+    },
 }
 
 /// Check if an update is available by comparing versions.
@@ -96,8 +105,12 @@ mod tests {
 
     #[test]
     fn current_version_parses() {
-        let v = SemVer::parse(CURRENT_VERSION)
-            .unwrap_or_else(|| panic!("CURRENT_VERSION '{}' should parse as SemVer", CURRENT_VERSION));
+        let v = SemVer::parse(CURRENT_VERSION).unwrap_or_else(|| {
+            panic!(
+                "CURRENT_VERSION '{}' should parse as SemVer",
+                CURRENT_VERSION
+            )
+        });
         // Sanity: display round-trips
         assert_eq!(v.to_string(), CURRENT_VERSION);
     }

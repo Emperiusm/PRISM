@@ -87,9 +87,11 @@ mod tests {
     fn generates_non_silent_audio() {
         let mut src = SyntheticAudioSource::new();
         let frame = src.generate_frame();
-        let rms = (frame.iter().map(|&s| (s as f64).powi(2)).sum::<f64>()
-            / frame.len() as f64)
-            .sqrt();
-        assert!(rms > 0.1, "RMS {rms:.4} is too low — audio should not be silent");
+        let rms =
+            (frame.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / frame.len() as f64).sqrt();
+        assert!(
+            rms > 0.1,
+            "RMS {rms:.4} is too low — audio should not be silent"
+        );
     }
 }

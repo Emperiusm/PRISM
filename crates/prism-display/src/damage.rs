@@ -114,8 +114,10 @@ pub fn merge_damage_rects(rects: &[Rect], threshold: i32) -> Vec<Rect> {
 /// * Contain every pixel of the original `rect` (i.e. it can only grow, never
 ///   shrink).
 pub fn macroblock_snap(rect: Rect, alignment: i32) -> Rect {
-    debug_assert!(alignment > 0 && (alignment & (alignment - 1)) == 0,
-        "alignment must be a positive power of two");
+    debug_assert!(
+        alignment > 0 && (alignment & (alignment - 1)) == 0,
+        "alignment must be a positive power of two"
+    );
 
     let mask = !(alignment - 1);
 
@@ -164,7 +166,12 @@ mod tests {
     // 2 ── A single rect is returned unchanged.
     #[test]
     fn single_rect_unchanged() {
-        let r = Rect { x: 10, y: 20, w: 50, h: 30 };
+        let r = Rect {
+            x: 10,
+            y: 20,
+            w: 50,
+            h: 30,
+        };
         let out = merge_damage_rects(&[r], 0);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0], r);
@@ -173,19 +180,47 @@ mod tests {
     // 3 ── Two overlapping rects collapse to one.
     #[test]
     fn adjacent_rects_merge() {
-        let a = Rect { x: 0, y: 0, w: 100, h: 100 };
-        let b = Rect { x: 50, y: 50, w: 100, h: 100 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            w: 100,
+            h: 100,
+        };
+        let b = Rect {
+            x: 50,
+            y: 50,
+            w: 100,
+            h: 100,
+        };
         let out = merge_damage_rects(&[a, b], 0);
         assert_eq!(out.len(), 1);
         let m = out[0];
-        assert_eq!(m, Rect { x: 0, y: 0, w: 150, h: 150 });
+        assert_eq!(
+            m,
+            Rect {
+                x: 0,
+                y: 0,
+                w: 150,
+                h: 150
+            }
+        );
     }
 
     // 4 ── Two rects far apart remain separate.
     #[test]
     fn distant_rects_stay_separate() {
-        let a = Rect { x: 0, y: 0, w: 10, h: 10 };
-        let b = Rect { x: 500, y: 500, w: 10, h: 10 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            w: 10,
+            h: 10,
+        };
+        let b = Rect {
+            x: 500,
+            y: 500,
+            w: 10,
+            h: 10,
+        };
         let out = merge_damage_rects(&[a, b], 4);
         assert_eq!(out.len(), 2);
     }
@@ -193,7 +228,12 @@ mod tests {
     // 5 ── macroblock_snap_16 expands to 16-pixel boundaries and covers original.
     #[test]
     fn macroblock_snap_aligns_to_16() {
-        let r = Rect { x: 3, y: 5, w: 45, h: 33 };
+        let r = Rect {
+            x: 3,
+            y: 5,
+            w: 45,
+            h: 33,
+        };
         let s = macroblock_snap_16(r);
 
         assert_eq!(s.x % 16, 0, "x not aligned: {}", s.x);
@@ -212,14 +252,24 @@ mod tests {
     //     (1920×1088 — the H.264-padded height used in practice.)
     #[test]
     fn macroblock_snap_already_aligned() {
-        let r = Rect { x: 0, y: 0, w: 1920, h: 1088 };
+        let r = Rect {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1088,
+        };
         assert_eq!(macroblock_snap_16(r), r);
     }
 
     // 7 ── superblock_snap_64 produces 64-pixel-aligned boundaries.
     #[test]
     fn superblock_snap_64_for_av1() {
-        let r = Rect { x: 1, y: 1, w: 127, h: 65 };
+        let r = Rect {
+            x: 1,
+            y: 1,
+            w: 127,
+            h: 65,
+        };
         let s = superblock_snap_64(r);
 
         assert_eq!(s.x % 64, 0, "x not aligned: {}", s.x);
@@ -238,9 +288,18 @@ mod tests {
     fn many_small_rects_merge_to_few() {
         // 20 adjacent 10×10 rects in a horizontal strip.
         let rects: Vec<Rect> = (0..20)
-            .map(|i| Rect { x: i * 10, y: 0, w: 10, h: 10 })
+            .map(|i| Rect {
+                x: i * 10,
+                y: 0,
+                w: 10,
+                h: 10,
+            })
             .collect();
         let out = merge_damage_rects(&rects, 0);
-        assert!(out.len() < 5, "expected fewer than 5 merged rects, got {}", out.len());
+        assert!(
+            out.len() < 5,
+            "expected fewer than 5 merged rects, got {}",
+            out.len()
+        );
     }
 }

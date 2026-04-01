@@ -8,7 +8,9 @@ use crate::pairing::{ChannelPermissions, PairingEntry, PairingState};
 
 pub fn pair_manually(remote: DeviceIdentity) -> PairingEntry {
     let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
     PairingEntry {
         device: remote,
         state: PairingState::Paired,

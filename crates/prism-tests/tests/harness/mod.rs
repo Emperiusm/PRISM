@@ -52,7 +52,12 @@ impl TestServer {
 
         let addr = addr_rx.await.expect("TestServer must send bound address");
 
-        Self { addr, shutdown_tx, cert_der, task }
+        Self {
+            addr,
+            shutdown_tx,
+            cert_der,
+            task,
+        }
     }
 
     pub fn addr(&self) -> SocketAddr {
@@ -88,7 +93,9 @@ impl TestClient {
         cert_der: &rustls::pki_types::CertificateDer<'static>,
     ) -> Self {
         let mut roots = rustls::RootCertStore::empty();
-        roots.add(cert_der.clone()).expect("root cert add must succeed");
+        roots
+            .add(cert_der.clone())
+            .expect("root cert add must succeed");
 
         let client_crypto = rustls::ClientConfig::builder()
             .with_root_certificates(roots)
@@ -108,7 +115,10 @@ impl TestClient {
             .await
             .expect("client handshake must succeed");
 
-        Self { connection, endpoint }
+        Self {
+            connection,
+            endpoint,
+        }
     }
 
     pub fn connection(&self) -> &quinn::Connection {
@@ -128,7 +138,9 @@ impl TestClient {
     }
 
     pub async fn open_bi(&self) -> (quinn::SendStream, quinn::RecvStream) {
-        timeout_secs(10, self.connection.open_bi()).await.expect("open_bi must succeed")
+        timeout_secs(10, self.connection.open_bi())
+            .await
+            .expect("open_bi must succeed")
     }
 
     pub fn close(self) {

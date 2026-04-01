@@ -102,7 +102,10 @@ mod tests {
 
     fn make_handler(id: u16) -> (Arc<MockHandler>, Arc<AtomicU32>) {
         let counter = Arc::new(AtomicU32::new(0));
-        let h = Arc::new(MockHandler { id, call_count: counter.clone() });
+        let h = Arc::new(MockHandler {
+            id,
+            call_count: counter.clone(),
+        });
         (h, counter)
     }
 
@@ -126,7 +129,8 @@ mod tests {
         let (h, count) = make_handler(0x001);
         disp.register(h);
 
-        disp.dispatch(client(), 0x001, Bytes::from_static(b"hello")).await;
+        disp.dispatch(client(), 0x001, Bytes::from_static(b"hello"))
+            .await;
         assert_eq!(count.load(Ordering::Relaxed), 1);
     }
 
@@ -134,7 +138,8 @@ mod tests {
     async fn dispatch_unknown_channel_ignored() {
         let disp = ChannelDispatcher::new();
         // Should not panic
-        disp.dispatch(client(), 0x999, Bytes::from_static(b"ignored")).await;
+        disp.dispatch(client(), 0x999, Bytes::from_static(b"ignored"))
+            .await;
     }
 
     #[test]

@@ -5,7 +5,7 @@
 
 // Framing layer: encode/decode PRISM packets over transport streams.
 
-use crate::connection::{OwnedSendStream, OwnedRecvStream, TransportError};
+use crate::connection::{OwnedRecvStream, OwnedSendStream, TransportError};
 
 pub const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
 
@@ -21,7 +21,9 @@ impl FramedWriter {
     }
 
     pub async fn send(&mut self, data: &[u8]) -> Result<(), TransportError> {
-        self.stream.write(&(data.len() as u32).to_le_bytes()).await?;
+        self.stream
+            .write(&(data.len() as u32).to_le_bytes())
+            .await?;
         self.stream.write(data).await?;
         Ok(())
     }
@@ -112,7 +114,10 @@ mod tests {
         let recv = OwnedRecvStream::mock(data);
         let mut reader = FramedReader::new(recv);
         let result = reader.recv().await;
-        assert!(matches!(result, Err(TransportError::MessageTooLarge(20_000_000))));
+        assert!(matches!(
+            result,
+            Err(TransportError::MessageTooLarge(20_000_000))
+        ));
     }
 
     #[tokio::test]

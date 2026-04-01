@@ -87,7 +87,10 @@ mod tests {
             device_name: "test-device".to_string(),
         };
         match ev {
-            SessionEvent::ClientConnected { client_id, device_name } => {
+            SessionEvent::ClientConnected {
+                client_id,
+                device_name,
+            } => {
                 assert_eq!(client_id, id);
                 assert_eq!(device_name, "test-device");
             }
@@ -103,7 +106,10 @@ mod tests {
             suggested_reduction: 0.25,
         };
         match ev {
-            ArbiterEvent::ReduceSendRate { client_id, suggested_reduction } => {
+            ArbiterEvent::ReduceSendRate {
+                client_id,
+                suggested_reduction,
+            } => {
                 assert_eq!(client_id, id);
                 assert!((suggested_reduction - 0.25).abs() < f32::EPSILON);
             }

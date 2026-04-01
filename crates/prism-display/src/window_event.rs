@@ -23,7 +23,10 @@ impl WindowEvent {
     /// True when this event should cause the encoder to emit a speculative IDR
     /// on the next frame to minimise visual artefacts.
     pub fn triggers_speculative_idr(&self) -> bool {
-        matches!(self, WindowEvent::ForegroundChanged { .. } | WindowEvent::MinimizeEnd { .. })
+        matches!(
+            self,
+            WindowEvent::ForegroundChanged { .. } | WindowEvent::MinimizeEnd { .. }
+        )
     }
 
     /// Extract the window handle associated with this event.

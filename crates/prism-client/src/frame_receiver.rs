@@ -18,7 +18,7 @@ use std::time::Instant;
 use bytes::Bytes;
 
 use prism_protocol::channel::CHANNEL_DISPLAY;
-use prism_protocol::header::{PrismHeader, HEADER_SIZE};
+use prism_protocol::header::{HEADER_SIZE, PrismHeader};
 
 // ── FrameStats ────────────────────────────────────────────────────────────────
 
@@ -135,8 +135,8 @@ pub fn parse_display_datagram(data: &Bytes) -> Option<(u32, u16)> {
 mod tests {
     use super::*;
     use bytes::BytesMut;
-    use prism_protocol::header::{PrismHeader, PROTOCOL_VERSION, HEADER_SIZE};
     use prism_protocol::channel::{CHANNEL_DISPLAY, CHANNEL_INPUT};
+    use prism_protocol::header::{HEADER_SIZE, PROTOCOL_VERSION, PrismHeader};
 
     // ── FrameStats tests ─────────────────────────────────────────────────────
 

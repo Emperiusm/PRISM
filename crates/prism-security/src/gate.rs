@@ -46,11 +46,20 @@ pub struct DefaultSecurityGate {
 
 impl DefaultSecurityGate {
     pub fn new(pairing: PairingStore, identity: LocalIdentity, audit_log: AuditLog) -> Self {
-        Self { pairing, identity, audit_log, contexts: Mutex::new(HashMap::new()) }
+        Self {
+            pairing,
+            identity,
+            audit_log,
+            contexts: Mutex::new(HashMap::new()),
+        }
     }
 
-    pub fn identity(&self) -> &LocalIdentity { &self.identity }
-    pub fn pairing_store(&self) -> &PairingStore { &self.pairing }
+    pub fn identity(&self) -> &LocalIdentity {
+        &self.identity
+    }
+    pub fn pairing_store(&self) -> &PairingStore {
+        &self.pairing
+    }
 
     pub fn create_server_handshake(&self) -> Result<ServerHandshake, HandshakeError> {
         ServerHandshake::new(&self.identity)
@@ -64,7 +73,10 @@ impl SecurityGate for DefaultSecurityGate {
             Some(entry) => match entry.state {
                 PairingState::Paired => {
                     let ctx = Arc::new(SecurityContext::for_device(entry.clone()));
-                    self.contexts.lock().unwrap().insert(entry.device.device_id, ctx.clone());
+                    self.contexts
+                        .lock()
+                        .unwrap()
+                        .insert(entry.device.device_id, ctx.clone());
                     self.audit(AuditEvent::ClientAuthenticated {
                         device_id: entry.device.device_id,
                         device_name: entry.device.display_name.clone(),
@@ -162,9 +174,9 @@ mod tests {
         let entry = pair_manually(client_id.identity.clone());
         let device_id = entry.device.device_id;
         gate.pairing_store().add(entry).unwrap();
-        if let AuthResult::Authenticated(ctx) = gate.authenticate(
-            &client_id.x25519_public_bytes(), &client_id.identity,
-        ) {
+        if let AuthResult::Authenticated(ctx) =
+            gate.authenticate(&client_id.x25519_public_bytes(), &client_id.identity)
+        {
             let cached = gate.security_context(&device_id).unwrap();
             assert!(Arc::ptr_eq(&ctx, &cached));
         } else {

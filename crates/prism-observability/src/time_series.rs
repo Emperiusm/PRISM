@@ -95,7 +95,10 @@ impl MetricsTimeSeries {
         self.rings
             .entry(name.to_owned())
             .or_insert_with(|| TimeSeriesRing::new(max))
-            .push(TimeSample { timestamp_secs, value });
+            .push(TimeSample {
+                timestamp_secs,
+                value,
+            });
     }
 
     /// Return the ring for `name`, or `None` if no data has been recorded for it.
@@ -120,9 +123,18 @@ mod tests {
     #[test]
     fn record_samples_and_latest() {
         let mut ring = TimeSeriesRing::new(5);
-        ring.push(TimeSample { timestamp_secs: 1, value: 1.0 });
-        ring.push(TimeSample { timestamp_secs: 2, value: 2.0 });
-        ring.push(TimeSample { timestamp_secs: 3, value: 3.0 });
+        ring.push(TimeSample {
+            timestamp_secs: 1,
+            value: 1.0,
+        });
+        ring.push(TimeSample {
+            timestamp_secs: 2,
+            value: 2.0,
+        });
+        ring.push(TimeSample {
+            timestamp_secs: 3,
+            value: 3.0,
+        });
 
         assert_eq!(ring.len(), 3);
         let latest = ring.latest().unwrap();
@@ -134,7 +146,10 @@ mod tests {
     fn eviction_at_capacity() {
         let mut ring = TimeSeriesRing::new(3);
         for i in 0..5u64 {
-            ring.push(TimeSample { timestamp_secs: i, value: i as f64 });
+            ring.push(TimeSample {
+                timestamp_secs: i,
+                value: i as f64,
+            });
         }
 
         // Only the last 3 samples should be retained.
@@ -150,7 +165,7 @@ mod tests {
         let mut ts = MetricsTimeSeries::new(10);
         ts.record("encode_us", 1, 2_000.0);
         ts.record("encode_us", 2, 2_100.0);
-        ts.record("rtt_us",    1, 12_000.0);
+        ts.record("rtt_us", 1, 12_000.0);
 
         let enc = ts.get("encode_us").unwrap();
         assert_eq!(enc.len(), 2);
@@ -167,7 +182,10 @@ mod tests {
         let mut ring = TimeSeriesRing::new(5);
         let values = [10.0f64, 20.0, 30.0, 40.0, 50.0];
         for (i, &v) in values.iter().enumerate() {
-            ring.push(TimeSample { timestamp_secs: i as u64, value: v });
+            ring.push(TimeSample {
+                timestamp_secs: i as u64,
+                value: v,
+            });
         }
 
         let collected: Vec<f64> = ring.samples().iter().map(|s| s.value).collect();

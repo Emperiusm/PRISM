@@ -6,8 +6,8 @@
 use bytes::Bytes;
 use prism_protocol::{
     channel::CHANNEL_INPUT,
-    header::{PrismHeader, HEADER_SIZE, PROTOCOL_VERSION},
-    input::{InputEvent, INPUT_EVENT_SIZE},
+    header::{HEADER_SIZE, PROTOCOL_VERSION, PrismHeader},
+    input::{INPUT_EVENT_SIZE, InputEvent},
 };
 
 /// Map window pixel coordinates to the 0–65535 normalised range used by the
@@ -18,13 +18,17 @@ pub fn normalize_mouse(x: f32, y: f32, window_w: u32, window_h: u32) -> (u16, u1
     let nx = if window_w == 0 {
         0u16
     } else {
-        ((x / window_w as f32) * 65535.0).clamp(0.0, 65535.0).round() as u16
+        ((x / window_w as f32) * 65535.0)
+            .clamp(0.0, 65535.0)
+            .round() as u16
     };
 
     let ny = if window_h == 0 {
         0u16
     } else {
-        ((y / window_h as f32) * 65535.0).clamp(0.0, 65535.0).round() as u16
+        ((y / window_h as f32) * 65535.0)
+            .clamp(0.0, 65535.0)
+            .round() as u16
     };
 
     (nx, ny)
@@ -103,7 +107,7 @@ mod tests {
     use super::*;
     use prism_protocol::{
         channel::CHANNEL_INPUT,
-        header::{PrismHeader, HEADER_SIZE},
+        header::{HEADER_SIZE, PrismHeader},
         input::INPUT_EVENT_SIZE,
     };
 
@@ -112,7 +116,10 @@ mod tests {
     #[test]
     fn build_datagram_correct_size() {
         let mut sender = InputSender::new();
-        let event = InputEvent::KeyDown { scancode: 0x001C, vk: 0x000D };
+        let event = InputEvent::KeyDown {
+            scancode: 0x001C,
+            vk: 0x000D,
+        };
         let dg = sender.build_datagram(event);
         assert_eq!(dg.len(), HEADER_SIZE + INPUT_EVENT_SIZE);
     }

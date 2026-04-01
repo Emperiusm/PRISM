@@ -17,7 +17,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 
 use prism_protocol::channel::CHANNEL_DISPLAY;
-use prism_protocol::header::{PrismHeader, HEADER_SIZE};
+use prism_protocol::header::{HEADER_SIZE, PrismHeader};
 use prism_server::{ConnectionAcceptor, SelfSignedCert, build_display_datagram};
 
 // ── Loopback pair helper ──────────────────────────────────────────────────────
@@ -30,13 +30,15 @@ async fn make_loopback_pair() -> (quinn::Connection, quinn::Connection) {
     let cert = SelfSignedCert::generate().expect("cert generation must succeed");
     let cert_der_for_client = cert.cert_der.clone();
 
-    let acceptor = ConnectionAcceptor::bind("127.0.0.1:0".parse().unwrap(), cert)
-        .expect("server must bind");
+    let acceptor =
+        ConnectionAcceptor::bind("127.0.0.1:0".parse().unwrap(), cert).expect("server must bind");
     let server_addr = acceptor.local_addr();
 
     // Build a client endpoint that trusts only the server's specific cert.
     let mut roots = rustls::RootCertStore::empty();
-    roots.add(cert_der_for_client).expect("root cert add must succeed");
+    roots
+        .add(cert_der_for_client)
+        .expect("root cert add must succeed");
 
     let client_crypto = rustls::ClientConfig::builder()
         .with_root_certificates(roots)
@@ -54,7 +56,10 @@ async fn make_loopback_pair() -> (quinn::Connection, quinn::Connection) {
     let connect_future = client_endpoint
         .connect(server_addr, "localhost")
         .expect("connect must initiate");
-    let incoming = acceptor.accept().await.expect("server must accept a connection");
+    let incoming = acceptor
+        .accept()
+        .await
+        .expect("server must accept a connection");
 
     let (client_conn, server_conn) = tokio::join!(
         async { connect_future.await.expect("client handshake must succeed") },
@@ -90,10 +95,13 @@ async fn server_sends_datagram_client_receives() {
         received.len() >= HEADER_SIZE,
         "datagram must be at least HEADER_SIZE bytes"
     );
-    let header = PrismHeader::decode_from_slice(&received[..HEADER_SIZE])
-        .expect("header must decode");
+    let header =
+        PrismHeader::decode_from_slice(&received[..HEADER_SIZE]).expect("header must decode");
 
-    assert_eq!(header.channel_id, CHANNEL_DISPLAY, "channel must be DISPLAY");
+    assert_eq!(
+        header.channel_id, CHANNEL_DISPLAY,
+        "channel must be DISPLAY"
+    );
     assert_eq!(header.sequence, 0, "sequence must match");
 }
 
@@ -121,9 +129,12 @@ async fn multiple_frames_arrive() {
             .expect("read must not time out")
             .expect("read_datagram must succeed");
 
-        assert!(data.len() >= HEADER_SIZE, "datagram must contain full header");
-        let header = PrismHeader::decode_from_slice(&data[..HEADER_SIZE])
-            .expect("header must decode");
+        assert!(
+            data.len() >= HEADER_SIZE,
+            "datagram must contain full header"
+        );
+        let header =
+            PrismHeader::decode_from_slice(&data[..HEADER_SIZE]).expect("header must decode");
 
         assert_eq!(header.channel_id, CHANNEL_DISPLAY);
         received_seqs.push(header.sequence);
@@ -152,12 +163,14 @@ async fn noise_ik_handshake_over_quic_bi_stream() {
     // the duration of the test so bidirectional streams are not torn down.
     let cert = SelfSignedCert::generate().expect("cert generation must succeed");
     let cert_der_for_client = cert.cert_der.clone();
-    let acceptor = ConnectionAcceptor::bind("127.0.0.1:0".parse().unwrap(), cert)
-        .expect("server must bind");
+    let acceptor =
+        ConnectionAcceptor::bind("127.0.0.1:0".parse().unwrap(), cert).expect("server must bind");
     let server_addr = acceptor.local_addr();
 
     let mut roots = rustls::RootCertStore::empty();
-    roots.add(cert_der_for_client).expect("root cert add must succeed");
+    roots
+        .add(cert_der_for_client)
+        .expect("root cert add must succeed");
     let client_crypto = rustls::ClientConfig::builder()
         .with_root_certificates(roots)
         .with_no_client_auth();
@@ -172,7 +185,10 @@ async fn noise_ik_handshake_over_quic_bi_stream() {
     let connect_future = client_endpoint
         .connect(server_addr, "localhost")
         .expect("connect must initiate");
-    let incoming = acceptor.accept().await.expect("server must accept a connection");
+    let incoming = acceptor
+        .accept()
+        .await
+        .expect("server must accept a connection");
 
     let (server_conn, client_conn) = tokio::join!(
         async { incoming.await.expect("server handshake must succeed") },
@@ -187,13 +203,10 @@ async fn noise_ik_handshake_over_quic_bi_stream() {
     // Run client and server sides concurrently — they need to exchange messages.
     let server_conn_task = server_conn.clone();
     let server_task = tokio::spawn(async move {
-        let (mut send, mut recv) = timeout(
-            Duration::from_secs(2),
-            server_conn_task.accept_bi(),
-        )
-        .await
-        .expect("accept_bi must not time out")
-        .expect("accept_bi must succeed");
+        let (mut send, mut recv) = timeout(Duration::from_secs(2), server_conn_task.accept_bi())
+            .await
+            .expect("accept_bi must not time out")
+            .expect("accept_bi must succeed");
 
         let client_msg = timeout(Duration::from_secs(2), recv.read_to_end(4096))
             .await
@@ -203,28 +216,31 @@ async fn noise_ik_handshake_over_quic_bi_stream() {
         let mut hs = ServerHandshake::new(&server_id).expect("ServerHandshake::new must succeed");
         let response = hs.respond(&client_msg).expect("respond must succeed");
 
-        send.write_all(&response).await.expect("write response must succeed");
+        send.write_all(&response)
+            .await
+            .expect("write response must succeed");
         let _ = send.finish();
 
         let result = hs.finalize().expect("finalize must succeed");
-        result.remote_static.expect("server must have client static key")
+        result
+            .remote_static
+            .expect("server must have client static key")
     });
 
     let client_conn_task = client_conn.clone();
     let client_task = tokio::spawn(async move {
-        let (mut send, mut recv) = timeout(
-            Duration::from_secs(2),
-            client_conn_task.open_bi(),
-        )
-        .await
-        .expect("open_bi must not time out")
-        .expect("open_bi must succeed");
+        let (mut send, mut recv) = timeout(Duration::from_secs(2), client_conn_task.open_bi())
+            .await
+            .expect("open_bi must not time out")
+            .expect("open_bi must succeed");
 
         let mut hs = ClientHandshake::new(&client_id, &server_pubkey)
             .expect("ClientHandshake::new must succeed");
         let init_msg = hs.initiate().expect("initiate must succeed");
 
-        send.write_all(&init_msg).await.expect("write init must succeed");
+        send.write_all(&init_msg)
+            .await
+            .expect("write init must succeed");
         let _ = send.finish();
 
         let server_response = timeout(Duration::from_secs(2), recv.read_to_end(4096))
@@ -232,7 +248,8 @@ async fn noise_ik_handshake_over_quic_bi_stream() {
             .expect("read response must not time out")
             .expect("read response must succeed");
 
-        hs.process_response(&server_response).expect("process_response must succeed");
+        hs.process_response(&server_response)
+            .expect("process_response must succeed");
         hs.finalize().expect("finalize must succeed");
     });
 
@@ -251,15 +268,16 @@ async fn noise_ik_handshake_over_quic_bi_stream() {
 #[tokio::test]
 async fn input_datagram_reaches_server() {
     use prism_protocol::header::HEADER_SIZE;
-    use prism_protocol::input::{InputEvent, INPUT_EVENT_SIZE};
+    use prism_protocol::input::{INPUT_EVENT_SIZE, InputEvent};
 
     let (server_conn, client_conn) = make_loopback_pair().await;
 
     // Build input datagram on the client side.
     let mut input_sender = prism_client::InputSender::new();
-    let datagram = input_sender.build_datagram(
-        InputEvent::KeyDown { scancode: 0x1E, vk: 0x41 },
-    );
+    let datagram = input_sender.build_datagram(InputEvent::KeyDown {
+        scancode: 0x1E,
+        vk: 0x41,
+    });
 
     // Send client → server.
     client_conn
@@ -289,10 +307,15 @@ async fn input_datagram_reaches_server() {
     );
 
     // Deserialise the input event and confirm it matches.
-    let event = InputEvent::from_bytes(&received[HEADER_SIZE..])
-        .expect("InputEvent must parse");
+    let event = InputEvent::from_bytes(&received[HEADER_SIZE..]).expect("InputEvent must parse");
     assert!(
-        matches!(event, InputEvent::KeyDown { scancode: 0x1E, vk: 0x41 }),
+        matches!(
+            event,
+            InputEvent::KeyDown {
+                scancode: 0x1E,
+                vk: 0x41
+            }
+        ),
         "event must be KeyDown {{ scancode: 0x1E, vk: 0x41 }}, got {event:?}"
     );
 }
@@ -324,8 +347,7 @@ fn heartbeat_generator_produces_valid_control_packet() {
 /// notice accessible.
 #[test]
 fn shutdown_coordinator_lifecycle() {
-    let mut coord =
-        prism_server::ShutdownCoordinator::new(std::time::Duration::from_secs(30));
+    let mut coord = prism_server::ShutdownCoordinator::new(std::time::Duration::from_secs(30));
     assert!(!coord.is_shutting_down());
     coord.initiate("test shutdown".into(), false);
     assert!(coord.is_shutting_down());
@@ -350,15 +372,25 @@ fn clipboard_echo_guard_suppresses_echoes() {
 fn quality_cache_starts_optimal_and_updates() {
     let cache = prism_server::QualityCache::new();
     let q = cache.load();
-    assert_eq!(q.recommendation, prism_transport::QualityRecommendation::Optimal);
+    assert_eq!(
+        q.recommendation,
+        prism_transport::QualityRecommendation::Optimal
+    );
 
     let bad = prism_transport::ConnectionQuality::compute(
-        500_000, 100_000, 0.20, 1_000_000, 1_000_000,
+        500_000,
+        100_000,
+        0.20,
+        1_000_000,
+        1_000_000,
         prism_transport::DelayAsymmetry::Symmetric,
     );
     cache.update(bad);
     let q2 = cache.load();
-    assert_ne!(q2.recommendation, prism_transport::QualityRecommendation::Optimal);
+    assert_ne!(
+        q2.recommendation,
+        prism_transport::QualityRecommendation::Optimal
+    );
 }
 
 /// ClipboardSyncState deduplicates and suppresses echo content.
@@ -396,12 +428,21 @@ fn server_config_toml_wiring() {
     assert_eq!(config.max_clients, 2);
 
     // Duration accessors derived from u64-seconds fields.
-    assert_eq!(config.heartbeat_suspend(), std::time::Duration::from_secs(15));
-    assert_eq!(config.heartbeat_tombstone(), std::time::Duration::from_secs(90));
+    assert_eq!(
+        config.heartbeat_suspend(),
+        std::time::Duration::from_secs(15)
+    );
+    assert_eq!(
+        config.heartbeat_tombstone(),
+        std::time::Duration::from_secs(90)
+    );
 
     // Fields not set in the TOML should use serde defaults.
     assert_eq!(config.throughput_addr().port(), 7001);
-    assert_eq!(config.tombstone_max_age(), std::time::Duration::from_secs(300));
+    assert_eq!(
+        config.tombstone_max_age(),
+        std::time::Duration::from_secs(300)
+    );
     assert_eq!(config.total_bandwidth_bps, 100_000_000);
     assert_eq!(config.display_name, "PRISM Server");
 }
@@ -419,7 +460,10 @@ fn server_config_load_or_default_missing_file() {
     // All fields must reflect Default values.
     assert_eq!(config.listen_addr().port(), 7000);
     assert_eq!(config.max_clients, 4);
-    assert_eq!(config.heartbeat_suspend(), std::time::Duration::from_secs(10));
+    assert_eq!(
+        config.heartbeat_suspend(),
+        std::time::Duration::from_secs(10)
+    );
 }
 
 /// Unit-level smoke test: `build_display_datagram` produces a buffer whose
@@ -434,10 +478,12 @@ async fn frame_sender_builds_valid_datagrams() {
         "datagram must be at least HEADER_SIZE bytes"
     );
 
-    let header = PrismHeader::decode_from_slice(&dgram[..HEADER_SIZE])
-        .expect("header must decode");
+    let header = PrismHeader::decode_from_slice(&dgram[..HEADER_SIZE]).expect("header must decode");
 
-    assert_eq!(header.channel_id, CHANNEL_DISPLAY, "channel must be DISPLAY");
+    assert_eq!(
+        header.channel_id, CHANNEL_DISPLAY,
+        "channel must be DISPLAY"
+    );
     assert_eq!(header.sequence, 42, "sequence must match");
     assert_eq!(header.timestamp_us, 99_999, "timestamp must match");
     // MSG_TYPE_SLICE = 0x02

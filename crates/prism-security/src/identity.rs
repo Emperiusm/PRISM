@@ -36,13 +36,21 @@ pub enum Platform {
 impl Platform {
     pub fn current() -> Self {
         #[cfg(target_os = "windows")]
-        { Platform::Windows }
+        {
+            Platform::Windows
+        }
         #[cfg(target_os = "macos")]
-        { Platform::MacOS }
+        {
+            Platform::MacOS
+        }
         #[cfg(target_os = "linux")]
-        { Platform::Linux }
+        {
+            Platform::Linux
+        }
         #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-        { Platform::Linux }
+        {
+            Platform::Linux
+        }
     }
 }
 
@@ -62,16 +70,23 @@ mod hex_key {
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(key: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&hex::encode(key))
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
         if bytes.len() != 32 {
-            return Err(serde::de::Error::custom(format!("expected 32 bytes, got {}", bytes.len())));
+            return Err(serde::de::Error::custom(format!(
+                "expected 32 bytes, got {}",
+                bytes.len()
+            )));
         }
         let mut key = [0u8; 32];
         key.copy_from_slice(&bytes);
@@ -104,10 +119,15 @@ impl LocalIdentity {
         let ed25519_verifying = ed25519_signing.verifying_key();
         let device_id = Uuid::now_v7();
         let created_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
 
         Self {
-            x25519_secret, x25519_public, ed25519_signing, ed25519_verifying,
+            x25519_secret,
+            x25519_public,
+            ed25519_signing,
+            ed25519_verifying,
             identity: DeviceIdentity {
                 device_id,
                 display_name: display_name.to_string(),
@@ -119,7 +139,10 @@ impl LocalIdentity {
         }
     }
 
-    pub fn load_or_generate(path: &std::path::Path, display_name: &str) -> Result<Self, IdentityError> {
+    pub fn load_or_generate(
+        path: &std::path::Path,
+        display_name: &str,
+    ) -> Result<Self, IdentityError> {
         if path.exists() {
             let data = std::fs::read_to_string(path)?;
             let stored: StoredLocalIdentity = serde_json::from_str(&data)?;
@@ -127,7 +150,13 @@ impl LocalIdentity {
             let x25519_public = X25519PublicKey::from(&x25519_secret);
             let ed25519_signing = Ed25519SigningKey::from_bytes(&stored.ed25519_secret);
             let ed25519_verifying = ed25519_signing.verifying_key();
-            Ok(Self { x25519_secret, x25519_public, ed25519_signing, ed25519_verifying, identity: stored.identity })
+            Ok(Self {
+                x25519_secret,
+                x25519_public,
+                ed25519_signing,
+                ed25519_verifying,
+                identity: stored.identity,
+            })
         } else {
             let local = Self::generate(display_name);
             local.save(path)?;
@@ -142,7 +171,9 @@ impl LocalIdentity {
             identity: self.identity.clone(),
         };
         let json = serde_json::to_string_pretty(&stored)?;
-        if let Some(parent) = path.parent() { std::fs::create_dir_all(parent)?; }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         std::fs::write(path, json)?;
         // Restrict file permissions — secret keys should only be readable by owner
         #[cfg(unix)]
@@ -153,11 +184,21 @@ impl LocalIdentity {
         Ok(())
     }
 
-    pub fn x25519_public_bytes(&self) -> [u8; 32] { *self.x25519_public.as_bytes() }
-    pub fn x25519_secret_bytes(&self) -> [u8; 32] { self.x25519_secret.to_bytes() }
-    pub fn ed25519_signing_key(&self) -> &Ed25519SigningKey { &self.ed25519_signing }
-    pub fn ed25519_verifying_bytes(&self) -> [u8; 32] { self.ed25519_verifying.to_bytes() }
-    pub fn device_id(&self) -> Uuid { self.identity.device_id }
+    pub fn x25519_public_bytes(&self) -> [u8; 32] {
+        *self.x25519_public.as_bytes()
+    }
+    pub fn x25519_secret_bytes(&self) -> [u8; 32] {
+        self.x25519_secret.to_bytes()
+    }
+    pub fn ed25519_signing_key(&self) -> &Ed25519SigningKey {
+        &self.ed25519_signing
+    }
+    pub fn ed25519_verifying_bytes(&self) -> [u8; 32] {
+        self.ed25519_verifying.to_bytes()
+    }
+    pub fn device_id(&self) -> Uuid {
+        self.identity.device_id
+    }
 }
 
 #[cfg(test)]

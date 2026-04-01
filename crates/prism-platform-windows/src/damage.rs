@@ -9,7 +9,7 @@
 //! using the Windows `RECT` layout `{left, top, right, bottom}`.  PRISM uses
 //! `{x, y, w, h}`.  This module bridges the two.
 
-use prism_display::{merge_damage_rects, Rect};
+use prism_display::{Rect, merge_damage_rects};
 
 // ── DxgiRect ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +79,12 @@ mod tests {
 
     #[test]
     fn dxgi_to_prism_rect() {
-        let r = DxgiRect { left: 10, top: 20, right: 110, bottom: 70 };
+        let r = DxgiRect {
+            left: 10,
+            top: 20,
+            right: 110,
+            bottom: 70,
+        };
         let p = r.to_prism_rect();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
@@ -90,13 +95,23 @@ mod tests {
     #[test]
     fn empty_rect_clamps_to_zero() {
         // Inverted rect (right < left) → w = 0.
-        let r = DxgiRect { left: 100, top: 50, right: 50, bottom: 100 };
+        let r = DxgiRect {
+            left: 100,
+            top: 50,
+            right: 50,
+            bottom: 100,
+        };
         let p = r.to_prism_rect();
         assert_eq!(p.w, 0);
         assert_eq!(p.h, 50);
 
         // Zero-size rect.
-        let r2 = DxgiRect { left: 5, top: 5, right: 5, bottom: 5 };
+        let r2 = DxgiRect {
+            left: 5,
+            top: 5,
+            right: 5,
+            bottom: 5,
+        };
         let p2 = r2.to_prism_rect();
         assert_eq!(p2.w, 0);
         assert_eq!(p2.h, 0);
@@ -106,8 +121,18 @@ mod tests {
     fn extract_and_merge_nearby_rects() {
         // Two rects within 64 px of each other should be merged into one.
         let rects = vec![
-            DxgiRect { left: 0,   top: 0,   right: 100, bottom: 100 },
-            DxgiRect { left: 120, top: 0,   right: 220, bottom: 100 },
+            DxgiRect {
+                left: 0,
+                top: 0,
+                right: 100,
+                bottom: 100,
+            },
+            DxgiRect {
+                left: 120,
+                top: 0,
+                right: 220,
+                bottom: 100,
+            },
         ];
         let merged = extract_damage(&rects);
         // Gap between x=100 and x=120 is 20 px < 64 threshold → merged.
@@ -123,19 +148,39 @@ mod tests {
 
     #[test]
     fn full_damage_single_fullscreen_rect() {
-        let full = DxgiRect { left: 0, top: 0, right: 1920, bottom: 1080 };
+        let full = DxgiRect {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1080,
+        };
         assert!(is_full_damage(&[full], 1920, 1080));
 
         // A rect that only covers part of the screen is NOT full damage.
-        let partial = DxgiRect { left: 0, top: 0, right: 1000, bottom: 1080 };
+        let partial = DxgiRect {
+            left: 0,
+            top: 0,
+            right: 1000,
+            bottom: 1080,
+        };
         assert!(!is_full_damage(&[partial], 1920, 1080));
     }
 
     #[test]
     fn partial_damage_not_full() {
         // Two separate rects — never matches the single-fullscreen case.
-        let r1 = DxgiRect { left: 0,    top: 0,   right: 960,  bottom: 540 };
-        let r2 = DxgiRect { left: 960,  top: 540, right: 1920, bottom: 1080 };
+        let r1 = DxgiRect {
+            left: 0,
+            top: 0,
+            right: 960,
+            bottom: 540,
+        };
+        let r2 = DxgiRect {
+            left: 960,
+            top: 540,
+            right: 1920,
+            bottom: 1080,
+        };
         assert!(!is_full_damage(&[r1, r2], 1920, 1080));
     }
 }

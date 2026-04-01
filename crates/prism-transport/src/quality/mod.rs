@@ -4,10 +4,10 @@
 // Commercial licensing available — see LICENSE-COMMERCIAL.md.
 
 pub mod bandwidth;
-pub mod one_way_delay;
-pub mod trend;
-pub mod prober;
 pub mod mtu;
+pub mod one_way_delay;
+pub mod prober;
+pub mod trend;
 
 use crate::connection::DelayAsymmetry;
 
@@ -110,7 +110,9 @@ impl ConnectionQuality {
         let recommendation = if score < 0.2 {
             QualityRecommendation::ConnectionUnusable
         } else if (0.02..=0.10).contains(&loss_rate) {
-            QualityRecommendation::EnableFec { ratio: loss_rate * 2.0 }
+            QualityRecommendation::EnableFec {
+                ratio: loss_rate * 2.0,
+            }
         } else if score < 0.4 {
             QualityRecommendation::PauseNonEssential
         } else if score < 0.6 {
@@ -120,7 +122,9 @@ impl ConnectionQuality {
         } else if score < 0.8 {
             QualityRecommendation::ReduceResolution
         } else if score < 0.9 {
-            QualityRecommendation::ReduceBitrate { target_bps: send_bps * 3 / 4 }
+            QualityRecommendation::ReduceBitrate {
+                target_bps: send_bps * 3 / 4,
+            }
         } else {
             QualityRecommendation::Optimal
         };
@@ -128,9 +132,17 @@ impl ConnectionQuality {
         Self {
             score,
             recommendation,
-            probe: ProbeQuality { rtt_us, jitter_us, rtt_score, jitter_score },
+            probe: ProbeQuality {
+                rtt_us,
+                jitter_us,
+                rtt_score,
+                jitter_score,
+            },
             bandwidth: BandwidthQuality { send_bps, recv_bps },
-            loss: LossQuality { loss_rate, loss_score },
+            loss: LossQuality {
+                loss_rate,
+                loss_score,
+            },
             asymmetry,
         }
     }
@@ -142,46 +154,99 @@ mod tests {
 
     #[test]
     fn perfect_quality_scores_1() {
-        let q = ConnectionQuality::compute(1000, 200, 0.0, 100_000_000, 100_000_000, DelayAsymmetry::Symmetric);
+        let q = ConnectionQuality::compute(
+            1000,
+            200,
+            0.0,
+            100_000_000,
+            100_000_000,
+            DelayAsymmetry::Symmetric,
+        );
         assert!((q.score - 1.0).abs() < f32::EPSILON);
         assert_eq!(q.recommendation, QualityRecommendation::Optimal);
     }
 
     #[test]
     fn high_rtt_degrades_score() {
-        let q = ConnectionQuality::compute(200_000, 5000, 0.0, 50_000_000, 50_000_000, DelayAsymmetry::Symmetric);
+        let q = ConnectionQuality::compute(
+            200_000,
+            5000,
+            0.0,
+            50_000_000,
+            50_000_000,
+            DelayAsymmetry::Symmetric,
+        );
         assert!(q.score < 0.5);
     }
 
     #[test]
     fn high_loss_degrades_score() {
-        let q = ConnectionQuality::compute(5000, 500, 0.10, 50_000_000, 50_000_000, DelayAsymmetry::Symmetric);
+        let q = ConnectionQuality::compute(
+            5000,
+            500,
+            0.10,
+            50_000_000,
+            50_000_000,
+            DelayAsymmetry::Symmetric,
+        );
         assert!(q.score < 0.5);
     }
 
     #[test]
     fn high_jitter_degrades_score() {
-        let q = ConnectionQuality::compute(5000, 50_000, 0.0, 50_000_000, 50_000_000, DelayAsymmetry::Symmetric);
+        let q = ConnectionQuality::compute(
+            5000,
+            50_000,
+            0.0,
+            50_000_000,
+            50_000_000,
+            DelayAsymmetry::Symmetric,
+        );
         assert!(q.score < 0.8);
     }
 
     #[test]
     fn very_bad_quality_recommends_unusable() {
-        let q = ConnectionQuality::compute(500_000, 100_000, 0.20, 1_000_000, 1_000_000, DelayAsymmetry::Symmetric);
+        let q = ConnectionQuality::compute(
+            500_000,
+            100_000,
+            0.20,
+            1_000_000,
+            1_000_000,
+            DelayAsymmetry::Symmetric,
+        );
         assert_eq!(q.recommendation, QualityRecommendation::ConnectionUnusable);
     }
 
     #[test]
     fn moderate_loss_recommends_fec() {
-        let q = ConnectionQuality::compute(10_000, 2000, 0.03, 50_000_000, 50_000_000, DelayAsymmetry::Symmetric);
-        assert!(matches!(q.recommendation, QualityRecommendation::EnableFec { .. }));
+        let q = ConnectionQuality::compute(
+            10_000,
+            2000,
+            0.03,
+            50_000_000,
+            50_000_000,
+            DelayAsymmetry::Symmetric,
+        );
+        assert!(matches!(
+            q.recommendation,
+            QualityRecommendation::EnableFec { .. }
+        ));
     }
 
     #[test]
     fn score_is_bounded_0_to_1() {
-        let q = ConnectionQuality::compute(1_000_000, 1_000_000, 1.0, 0, 0, DelayAsymmetry::Unknown);
+        let q =
+            ConnectionQuality::compute(1_000_000, 1_000_000, 1.0, 0, 0, DelayAsymmetry::Unknown);
         assert!(q.score >= 0.0 && q.score <= 1.0);
-        let q = ConnectionQuality::compute(100, 10, 0.0, 1_000_000_000, 1_000_000_000, DelayAsymmetry::Symmetric);
+        let q = ConnectionQuality::compute(
+            100,
+            10,
+            0.0,
+            1_000_000_000,
+            1_000_000_000,
+            DelayAsymmetry::Symmetric,
+        );
         assert!(q.score >= 0.0 && q.score <= 1.0);
     }
 }

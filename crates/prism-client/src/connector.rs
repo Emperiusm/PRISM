@@ -12,8 +12,8 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{DigitallySignedStruct, Error as RustlsError, SignatureScheme};
 use thiserror::Error;
 
@@ -121,8 +121,7 @@ impl ClientConnector {
                 .map_err(|e| ConnectorError::Tls(e.to_string()))?,
         ));
 
-        let mut endpoint =
-            quinn::Endpoint::client("0.0.0.0:0".parse::<SocketAddr>().unwrap())?;
+        let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse::<SocketAddr>().unwrap())?;
         endpoint.set_default_client_config(client_config);
 
         Ok(Self { endpoint })

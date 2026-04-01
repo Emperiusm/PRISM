@@ -22,13 +22,7 @@ impl PipelineTracer {
     }
 
     /// Record a complete frame's pipeline timing.
-    pub fn record_frame(
-        &mut self,
-        frame_seq: u64,
-        capture_us: u64,
-        encode_us: u64,
-        send_us: u64,
-    ) {
+    pub fn record_frame(&mut self, frame_seq: u64, capture_us: u64, encode_us: u64, send_us: u64) {
         let total = capture_us + encode_us + send_us;
         if self.tracer.should_trace(total) {
             let trace = FrameTrace {
@@ -122,10 +116,6 @@ mod tests {
             pt.record_frame(i, FAST_US, 0, 0);
         }
 
-        assert_eq!(
-            pt.trace_count(),
-            10,
-            "ring buffer should cap at max_traces"
-        );
+        assert_eq!(pt.trace_count(), 10, "ring buffer should cap at max_traces");
     }
 }

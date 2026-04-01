@@ -9,12 +9,8 @@
 //! Call [`update_arbiter_from_tracker`] every ~100 ms to refresh allocations,
 //! then read back per-client display budget via [`display_allocation_bps`].
 
-use prism_session::{
-    BandwidthArbiter, BandwidthNeeds, ChannelBandwidthTracker, ClientId,
-};
-use prism_protocol::channel::{
-    ChannelPriority, CHANNEL_AUDIO, CHANNEL_DISPLAY, CHANNEL_INPUT,
-};
+use prism_protocol::channel::{CHANNEL_AUDIO, CHANNEL_DISPLAY, CHANNEL_INPUT, ChannelPriority};
+use prism_session::{BandwidthArbiter, BandwidthNeeds, ChannelBandwidthTracker, ClientId};
 
 /// Update arbiter allocations from current bandwidth usage.
 ///
@@ -87,7 +83,10 @@ mod tests {
         update_arbiter_from_tracker(&mut arbiter, &tracker, client());
 
         let alloc = arbiter.allocation(client(), CHANNEL_DISPLAY);
-        assert!(alloc.is_some(), "display allocation should exist after update");
+        assert!(
+            alloc.is_some(),
+            "display allocation should exist after update"
+        );
     }
 
     // 2. After rebalance, display allocation is > 0.
@@ -123,6 +122,9 @@ mod tests {
         let arbiter = BandwidthArbiter::new(100_000_000);
         // No channels registered — unknown_client has no entry.
         let bps = display_allocation_bps(&arbiter, unknown_client());
-        assert_eq!(bps, 5_000_000, "expected 5 Mbps default for unregistered client");
+        assert_eq!(
+            bps, 5_000_000,
+            "expected 5 Mbps default for unregistered client"
+        );
     }
 }

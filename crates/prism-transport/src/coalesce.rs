@@ -63,7 +63,8 @@ impl DatagramCoalescer {
         let mut msgs = Vec::new();
         let mut pos = 0;
         while pos + 4 <= data.len() {
-            let len = u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]) as usize;
+            let len = u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]])
+                as usize;
             pos += 4;
             if pos + len <= data.len() {
                 msgs.push(&data[pos..pos + len]);

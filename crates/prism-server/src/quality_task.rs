@@ -9,7 +9,7 @@ use arc_swap::ArcSwap;
 use bytes::{Bytes, BytesMut};
 use prism_protocol::{
     channel::CHANNEL_CONTROL,
-    header::{PrismHeader, HEADER_SIZE, PROTOCOL_VERSION},
+    header::{HEADER_SIZE, PROTOCOL_VERSION, PrismHeader},
 };
 use prism_session::control_msg::PROBE_REQUEST;
 use prism_transport::{
@@ -32,11 +32,11 @@ impl QualityCache {
     /// Create a new cache pre-populated with an optimal quality snapshot.
     pub fn new() -> Self {
         let optimal = ConnectionQuality::compute(
-            1_000,          // rtt_us  — 1 ms
-            100,            // jitter_us — 0.1 ms
-            0.0,            // loss_rate
-            1_000_000_000,  // send_bps — 1 Gbps
-            1_000_000_000,  // recv_bps — 1 Gbps
+            1_000,         // rtt_us  — 1 ms
+            100,           // jitter_us — 0.1 ms
+            0.0,           // loss_rate
+            1_000_000_000, // send_bps — 1 Gbps
+            1_000_000_000, // recv_bps — 1 Gbps
             DelayAsymmetry::Symmetric,
         );
         Self {
@@ -131,8 +131,11 @@ mod tests {
     fn cache_update_reflects() {
         let cache = QualityCache::new();
         let bad = ConnectionQuality::compute(
-            500_000, 100_000, 0.20,
-            1_000_000, 1_000_000,
+            500_000,
+            100_000,
+            0.20,
+            1_000_000,
+            1_000_000,
             DelayAsymmetry::Unknown,
         );
         cache.update(bad);
@@ -146,7 +149,10 @@ mod tests {
         use prism_protocol::header::PrismHeader;
         use prism_transport::quality::prober::ProbePayload;
 
-        let payload = ProbePayload { seq: 7, sender_timestamp_us: 123_456_789 };
+        let payload = ProbePayload {
+            seq: 7,
+            sender_timestamp_us: 123_456_789,
+        };
         let dgram = build_probe_datagram(&payload);
 
         // Total length = header (16) + probe payload (12)

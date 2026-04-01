@@ -15,7 +15,10 @@ pub struct KeyframeDecider {
 
 impl KeyframeDecider {
     pub fn new(interval: KeyframeInterval) -> Self {
-        Self { interval, frames_since_idr: 0 }
+        Self {
+            interval,
+            frames_since_idr: 0,
+        }
     }
 
     /// Reset the frame counter (call after emitting an IDR).
@@ -41,7 +44,10 @@ impl KeyframeDecider {
 
         let threshold = match self.interval {
             KeyframeInterval::Fixed(n) => n,
-            KeyframeInterval::Adaptive { min_frames, max_frames } => {
+            KeyframeInterval::Adaptive {
+                min_frames,
+                max_frames,
+            } => {
                 if loss_rate > 0.02 {
                     // High loss → use the short (minimum) interval.
                     min_frames
@@ -102,8 +108,10 @@ mod tests {
     #[test]
     fn adaptive_shortens_on_loss() {
         // High loss → IDR every min_frames=60.
-        let mut decider =
-            KeyframeDecider::new(KeyframeInterval::Adaptive { min_frames: 60, max_frames: 1800 });
+        let mut decider = KeyframeDecider::new(KeyframeInterval::Adaptive {
+            min_frames: 60,
+            max_frames: 1800,
+        });
 
         for _ in 0..59 {
             assert!(!decider.should_force_idr(0.05, false));
@@ -115,8 +123,10 @@ mod tests {
     #[test]
     fn adaptive_extends_on_clean() {
         // Zero loss → IDR every max_frames=1800.
-        let mut decider =
-            KeyframeDecider::new(KeyframeInterval::Adaptive { min_frames: 60, max_frames: 1800 });
+        let mut decider = KeyframeDecider::new(KeyframeInterval::Adaptive {
+            min_frames: 60,
+            max_frames: 1800,
+        });
 
         for _ in 0..1799 {
             assert!(!decider.should_force_idr(0.0, false));

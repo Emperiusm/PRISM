@@ -9,10 +9,10 @@
 // `main.rs` simply constructs a `ServerApp` and calls `run()`.
 
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
-use prism_display::capture::PlatformCapture;
 use crate::hw_encoder::HwEncoder;
+use prism_display::capture::PlatformCapture;
 
 use prism_security::audit::{AuditEvent, AuditLog};
 
@@ -50,13 +50,18 @@ impl ServerApp {
     /// `monitor_index` selects which display output to capture (0 = primary).
     /// Initialise with a pre-loaded configuration (preferred — lets the CLI
     /// apply overrides before construction).
-    pub fn with_config(use_dda: bool, noise_mode: bool, monitor_index: u32, config: ServerConfig) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn with_config(
+        use_dda: bool,
+        noise_mode: bool,
+        monitor_index: u32,
+        config: ServerConfig,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         tracing::info!("=== PRISM Server v{} ===", env!("CARGO_PKG_VERSION"));
 
         // Generate Noise IK server identity (always, so the key is ready if needed).
-        let server_identity = Arc::new(
-            prism_security::identity::LocalIdentity::generate("PRISM Server"),
-        );
+        let server_identity = Arc::new(prism_security::identity::LocalIdentity::generate(
+            "PRISM Server",
+        ));
         if noise_mode {
             tracing::info!(
                 public_key = %hex::encode(server_identity.x25519_public_bytes()),
@@ -152,7 +157,11 @@ impl ServerApp {
 
     /// Convenience constructor that loads `prism-server.toml` from the working
     /// directory (or uses defaults).
-    pub fn new(use_dda: bool, noise_mode: bool, monitor_index: u32) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        use_dda: bool,
+        noise_mode: bool,
+        monitor_index: u32,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let config = ServerConfig::load_or_default(std::path::Path::new("prism-server.toml"));
         Self::with_config(use_dda, noise_mode, monitor_index, config)
     }
@@ -168,7 +177,10 @@ impl ServerApp {
     /// `SocketAddr` once the QUIC endpoint is successfully bound.
     ///
     /// Useful when binding to port 0 in tests.
-    pub fn set_bound_addr_notify(&mut self, tx: tokio::sync::oneshot::Sender<std::net::SocketAddr>) {
+    pub fn set_bound_addr_notify(
+        &mut self,
+        tx: tokio::sync::oneshot::Sender<std::net::SocketAddr>,
+    ) {
         self.bound_addr_tx = Some(tx);
     }
 
@@ -208,7 +220,8 @@ impl ServerApp {
                     ) {
                         Ok(mut tp_server_config) => {
                             tp_server_config.transport_config(Arc::new(tp_transport));
-                            match quinn::Endpoint::server(tp_server_config, throughput_config.addr) {
+                            match quinn::Endpoint::server(tp_server_config, throughput_config.addr)
+                            {
                                 Ok(ep) => {
                                     tracing::info!(
                                         addr = %ep.local_addr().unwrap_or(throughput_config.addr),
@@ -305,7 +318,10 @@ impl ServerApp {
                 use crate::dda_capture::dda_capture::DdaDesktopCapture;
                 match DdaDesktopCapture::new_with_output(monitor_index) {
                     Ok(cap) => {
-                        tracing::info!(monitor_index, "frame sender: DDA capture on selected output");
+                        tracing::info!(
+                            monitor_index,
+                            "frame sender: DDA capture on selected output"
+                        );
                         Some(cap)
                     }
                     Err(e) => {
@@ -372,7 +388,7 @@ impl ServerApp {
             let mut cache_savings = crate::static_cache::CacheSavingsTracker::default();
 
             let mut seq: u32 = 0;
-            let min_interval = std::time::Duration::from_millis(67);  // 15fps max
+            let min_interval = std::time::Duration::from_millis(67); // 15fps max
             let idle_interval = std::time::Duration::from_millis(500); // 2fps idle
             let mut current_interval = min_interval;
             let mut consecutive_empty = 0u32;
@@ -437,9 +453,10 @@ impl ServerApp {
                         // period of no desktop updates — highly likely to be a
                         // scene change (window focus switch, app launch, etc.).
                         // Signal the IDR controller so it can track IDR budget.
-                        let idr_event = prism_display::window_event::WindowEvent::ForegroundChanged {
-                            hwnd: 0xFFFF_DEAD, // synthetic hwnd — distinct from any real window
-                        };
+                        let idr_event =
+                            prism_display::window_event::WindowEvent::ForegroundChanged {
+                                hwnd: 0xFFFF_DEAD, // synthetic hwnd — distinct from any real window
+                            };
                         if idr_controller.process_event(&idr_event) {
                             tracing::debug!(
                                 idrs_triggered = idr_controller.idrs_triggered(),
@@ -482,9 +499,15 @@ impl ServerApp {
                         QualityRecommendation::ReduceResolution => min_interval,
                         QualityRecommendation::EnableFec { .. } => min_interval,
                         QualityRecommendation::SwitchToStreamOnly => min_interval,
-                        QualityRecommendation::ReduceFramerate => std::time::Duration::from_millis(200),
-                        QualityRecommendation::PauseNonEssential => std::time::Duration::from_millis(500),
-                        QualityRecommendation::ConnectionUnusable => std::time::Duration::from_millis(1000),
+                        QualityRecommendation::ReduceFramerate => {
+                            std::time::Duration::from_millis(200)
+                        }
+                        QualityRecommendation::PauseNonEssential => {
+                            std::time::Duration::from_millis(500)
+                        }
+                        QualityRecommendation::ConnectionUnusable => {
+                            std::time::Duration::from_millis(1000)
+                        }
                     };
                     // Only override upward (don't fight the DDA idle detection).
                     if quality_interval > current_interval {
@@ -840,7 +863,8 @@ async fn handle_connection(
                     }
                 };
 
-                let mut hs = match prism_security::handshake::ServerHandshake::new(&server_identity) {
+                let mut hs = match prism_security::handshake::ServerHandshake::new(&server_identity)
+                {
                     Ok(hs) => hs,
                     Err(e) => {
                         tracing::warn!(remote = %remote, error = %e, "Noise: handshake init failed");
@@ -892,8 +916,12 @@ async fn handle_connection(
                 };
                 let negotiator = crate::negotiation_handler::build_server_negotiator();
                 match crate::negotiation_handler::negotiate_on_stream(
-                    &mut cap_send, &mut cap_recv, &negotiator,
-                ).await {
+                    &mut cap_send,
+                    &mut cap_recv,
+                    &negotiator,
+                )
+                .await
+                {
                     Ok(result) => {
                         tracing::info!(
                             remote = %remote,
@@ -983,8 +1011,7 @@ async fn handle_connection(
                     // Keep a quinn Connection handle to wait for close.
                     let quinn_conn_close = hb_conn.clone();
                     tokio::spawn(async move {
-                        let mut interval =
-                            tokio::time::interval(std::time::Duration::from_secs(5));
+                        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
                         loop {
                             interval.tick().await;
                             if hb_conn.send_datagram(hb_gen.packet()).is_err() {
@@ -1021,7 +1048,9 @@ async fn handle_connection(
 
                     // ── Cleanup (NEW: fixes the connection store / session leak) ──
                     conn_store.remove(&client_id);
-                    sm.lock().await.disconnect(client_id, "connection closed".to_string());
+                    sm.lock()
+                        .await
+                        .disconnect(client_id, "connection closed".to_string());
                     // Audit: record client disconnect.
                     audit_log.record(AuditEvent::ClientDisconnected { device_id });
                     tracing::info!(remote = %remote, "client disconnected and cleaned up");

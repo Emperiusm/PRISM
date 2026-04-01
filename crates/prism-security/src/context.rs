@@ -53,7 +53,11 @@ impl SecurityContext {
         }
     }
 
-    fn apply_permission(decisions: &mut [ChannelDecision; 256], channel_id: u16, permission: Permission) {
+    fn apply_permission(
+        decisions: &mut [ChannelDecision; 256],
+        channel_id: u16,
+        permission: Permission,
+    ) {
         decisions[(channel_id & 0xFF) as usize] = match permission {
             Permission::Allow => ChannelDecision::AllowAll,
             Permission::Deny => ChannelDecision::Blocked,
@@ -97,16 +101,31 @@ mod tests {
     #[test]
     fn default_allows_core_channels() {
         let ctx = make_context(ChannelPermissions::default());
-        assert_eq!(ctx.channel_decision(CHANNEL_DISPLAY), ChannelDecision::AllowAll);
-        assert_eq!(ctx.channel_decision(CHANNEL_INPUT), ChannelDecision::AllowAll);
-        assert_eq!(ctx.channel_decision(CHANNEL_CLIPBOARD), ChannelDecision::AllowAll);
+        assert_eq!(
+            ctx.channel_decision(CHANNEL_DISPLAY),
+            ChannelDecision::AllowAll
+        );
+        assert_eq!(
+            ctx.channel_decision(CHANNEL_INPUT),
+            ChannelDecision::AllowAll
+        );
+        assert_eq!(
+            ctx.channel_decision(CHANNEL_CLIPBOARD),
+            ChannelDecision::AllowAll
+        );
     }
 
     #[test]
     fn ask_maps_to_needs_confirmation() {
         let ctx = make_context(ChannelPermissions::default());
-        assert_eq!(ctx.channel_decision(CHANNEL_CAMERA), ChannelDecision::NeedsConfirmation);
-        assert_eq!(ctx.channel_decision(CHANNEL_SENSOR), ChannelDecision::NeedsConfirmation);
+        assert_eq!(
+            ctx.channel_decision(CHANNEL_CAMERA),
+            ChannelDecision::NeedsConfirmation
+        );
+        assert_eq!(
+            ctx.channel_decision(CHANNEL_SENSOR),
+            ChannelDecision::NeedsConfirmation
+        );
     }
 
     #[test]
@@ -114,15 +133,23 @@ mod tests {
         let mut perms = ChannelPermissions::default();
         perms.display = Permission::Deny;
         let ctx = make_context(perms);
-        assert_eq!(ctx.channel_decision(CHANNEL_DISPLAY), ChannelDecision::Blocked);
+        assert_eq!(
+            ctx.channel_decision(CHANNEL_DISPLAY),
+            ChannelDecision::Blocked
+        );
     }
 
     #[test]
     fn zero_rtt_safe_channels() {
         let ctx = make_context(ChannelPermissions::default());
         let h = |ch| PrismHeader {
-            version: 0, channel_id: ch, msg_type: 0,
-            flags: 0, sequence: 0, timestamp_us: 0, payload_length: 0,
+            version: 0,
+            channel_id: ch,
+            msg_type: 0,
+            flags: 0,
+            sequence: 0,
+            timestamp_us: 0,
+            payload_length: 0,
         };
         assert!(ctx.is_0rtt_safe(&h(CHANNEL_DISPLAY)));
         assert!(ctx.is_0rtt_safe(&h(CHANNEL_INPUT)));

@@ -22,14 +22,12 @@ impl ChannelBandwidthTracker {
 
     #[inline(always)]
     pub fn record_send(&self, channel_id: u16, bytes: u32) {
-        self.send_counters[(channel_id & 0xFF) as usize]
-            .fetch_add(bytes as u64, Ordering::Relaxed);
+        self.send_counters[(channel_id & 0xFF) as usize].fetch_add(bytes as u64, Ordering::Relaxed);
     }
 
     #[inline(always)]
     pub fn record_recv(&self, channel_id: u16, bytes: u32) {
-        self.recv_counters[(channel_id & 0xFF) as usize]
-            .fetch_add(bytes as u64, Ordering::Relaxed);
+        self.recv_counters[(channel_id & 0xFF) as usize].fetch_add(bytes as u64, Ordering::Relaxed);
     }
 
     pub fn send_bytes(&self, channel_id: u16) -> u64 {

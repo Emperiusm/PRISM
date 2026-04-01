@@ -5,8 +5,8 @@
 
 //! Platform-level error types for the Windows capture/encode pipeline.
 
-use thiserror::Error;
 use prism_display::{CaptureError, DisplayId, TextureFormat};
+use thiserror::Error;
 
 /// Errors originating from Windows platform subsystems (DXGI, D3D11, NVENC).
 #[derive(Debug, Error)]
@@ -82,7 +82,7 @@ pub fn from_hresult(hr: u32) -> PlatformError {
         0x887A_0021 => PlatformError::AccessLost,
         0x887A_0027 => PlatformError::WaitTimeout,
         0x887A_0022 => PlatformError::DuplicationNotSupported,
-        other       => PlatformError::HResult(other),
+        other => PlatformError::HResult(other),
     }
 }
 
@@ -120,18 +120,30 @@ mod tests {
 
     #[test]
     fn from_hresult_device_removed() {
-        assert!(matches!(from_hresult(0x887A_0005), PlatformError::DeviceLost));
+        assert!(matches!(
+            from_hresult(0x887A_0005),
+            PlatformError::DeviceLost
+        ));
     }
 
     #[test]
     fn from_hresult_device_reset() {
-        assert!(matches!(from_hresult(0x887A_0026), PlatformError::DeviceLost));
+        assert!(matches!(
+            from_hresult(0x887A_0026),
+            PlatformError::DeviceLost
+        ));
     }
 
     #[test]
     fn from_hresult_access_lost_and_timeout() {
-        assert!(matches!(from_hresult(0x887A_0021), PlatformError::AccessLost));
-        assert!(matches!(from_hresult(0x887A_0027), PlatformError::WaitTimeout));
+        assert!(matches!(
+            from_hresult(0x887A_0021),
+            PlatformError::AccessLost
+        ));
+        assert!(matches!(
+            from_hresult(0x887A_0027),
+            PlatformError::WaitTimeout
+        ));
     }
 
     #[test]

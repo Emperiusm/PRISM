@@ -23,7 +23,10 @@ pub enum CaptureMode {
     Window { hwnd: u64 },
     /// Capture a virtual (software-only) display with the given resolution and
     /// refresh rate.
-    Virtual { resolution: (u32, u32), refresh_rate: u8 },
+    Virtual {
+        resolution: (u32, u32),
+        refresh_rate: u8,
+    },
 }
 
 // ── CursorCapture ─────────────────────────────────────────────────────────────
@@ -173,10 +176,7 @@ pub trait PlatformCapture: Send + 'static {
 
     /// Create a new virtual display with the given configuration.  Returns the
     /// [`DisplayId`] of the newly created display.
-    fn create_virtual_display(
-        &mut self,
-        config: DisplayConfig,
-    ) -> Result<DisplayId, CaptureError>;
+    fn create_virtual_display(&mut self, config: DisplayConfig) -> Result<DisplayId, CaptureError>;
 
     /// Destroy a previously created virtual display.
     fn destroy_virtual_display(&mut self, id: DisplayId) -> Result<(), CaptureError>;
@@ -193,7 +193,10 @@ mod tests {
         let modes = [
             CaptureMode::FullDesktop,
             CaptureMode::Window { hwnd: 0xDEAD_BEEF },
-            CaptureMode::Virtual { resolution: (1920, 1080), refresh_rate: 60 },
+            CaptureMode::Virtual {
+                resolution: (1920, 1080),
+                refresh_rate: 60,
+            },
         ];
 
         assert_eq!(modes[0], CaptureMode::FullDesktop);
@@ -204,7 +207,11 @@ mod tests {
             panic!("expected Window variant");
         }
 
-        if let CaptureMode::Virtual { resolution, refresh_rate } = modes[2] {
+        if let CaptureMode::Virtual {
+            resolution,
+            refresh_rate,
+        } = modes[2]
+        {
             assert_eq!(resolution, (1920, 1080));
             assert_eq!(refresh_rate, 60);
         } else {

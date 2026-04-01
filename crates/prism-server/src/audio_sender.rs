@@ -90,7 +90,11 @@ impl AudioFrameHeader {
         let sample_rate = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
         let channels = u16::from_le_bytes(bytes[4..6].try_into().unwrap());
         let frame_duration_ms = u16::from_le_bytes(bytes[6..8].try_into().unwrap());
-        Some(Self { sample_rate, channels, frame_duration_ms })
+        Some(Self {
+            sample_rate,
+            channels,
+            frame_duration_ms,
+        })
     }
 }
 
@@ -117,9 +121,9 @@ mod tests {
         let silent = vec![0.0f32; 64];
         let loud = vec![1.0f32; 64];
         assert!(!det.is_silent(&silent)); // silent_frames = 1
-        assert!(!det.is_silent(&loud));   // loud resets to 0
+        assert!(!det.is_silent(&loud)); // loud resets to 0
         assert!(!det.is_silent(&silent)); // silent_frames = 1 again
-        assert!(det.is_silent(&silent));  // silent_frames = 2 → true
+        assert!(det.is_silent(&silent)); // silent_frames = 2 → true
     }
 
     #[test]

@@ -20,16 +20,23 @@ mod hex_sig {
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(sig: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&hex::encode(sig))
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
         if bytes.len() != 64 {
-            return Err(serde::de::Error::custom(format!("expected 64 bytes, got {}", bytes.len())));
+            return Err(serde::de::Error::custom(format!(
+                "expected 64 bytes, got {}",
+                bytes.len()
+            )));
         }
         let mut sig = [0u8; 64];
         sig.copy_from_slice(&bytes);
@@ -50,7 +57,9 @@ impl KeyRotation {
     pub fn create(identity: &LocalIdentity, new_public_key: [u8; 32]) -> Self {
         let signature = identity.ed25519_signing_key().sign(&new_public_key);
         let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         Self {
             device_id: identity.device_id(),
             new_public_key,

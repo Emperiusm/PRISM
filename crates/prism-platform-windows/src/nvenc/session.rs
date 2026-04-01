@@ -78,8 +78,7 @@ impl NvencStats {
         // Running arithmetic mean: avg_n = avg_{n-1} + (x_n - avg_{n-1}) / n
         let n = self.frames_encoded;
         let delta = encode_time_us as i64 - self.avg_encode_time_us as i64;
-        self.avg_encode_time_us =
-            (self.avg_encode_time_us as i64 + delta / n as i64) as u64;
+        self.avg_encode_time_us = (self.avg_encode_time_us as i64 + delta / n as i64) as u64;
     }
 
     /// Rough average bitrate estimate in bits per second.
@@ -120,13 +119,13 @@ mod tests {
     #[test]
     fn stats_record_frame() {
         let mut s = NvencStats::default();
-        s.record_frame(1000, true,  100);
+        s.record_frame(1000, true, 100);
         s.record_frame(2000, false, 200);
         s.record_frame(3000, false, 300);
 
-        assert_eq!(s.frames_encoded,   3);
+        assert_eq!(s.frames_encoded, 3);
         assert_eq!(s.keyframes_encoded, 1);
-        assert_eq!(s.total_bytes_out,  6000);
+        assert_eq!(s.total_bytes_out, 6000);
         assert_eq!(s.last_encode_time_us, 300);
     }
 

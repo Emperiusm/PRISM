@@ -6,11 +6,11 @@
 // QualityMonitor: integrates transport quality estimators into the degradation ladder.
 
 use prism_display::{DegradationLadder, DegradationLevel};
-use prism_transport::{ConnectionQuality, TransportMetrics};
-use prism_transport::quality::prober::{ActivityState, ConnectionProber};
 use prism_transport::quality::bandwidth::BandwidthEstimator;
 use prism_transport::quality::one_way_delay::OneWayDelayEstimator;
+use prism_transport::quality::prober::{ActivityState, ConnectionProber};
 use prism_transport::quality::trend::{Trend, TrendDetector};
+use prism_transport::{ConnectionQuality, TransportMetrics};
 
 /// A snapshot of quality analysis produced by a single `update()` call.
 #[derive(Debug, Clone)]
@@ -119,7 +119,7 @@ mod tests {
 
     fn good_metrics() -> TransportMetrics {
         TransportMetrics {
-            rtt_us: 2_000,          // 2 ms
+            rtt_us: 2_000, // 2 ms
             rtt_variance_us: 200,
             loss_rate: 0.0,
             ..TransportMetrics::default()
@@ -128,9 +128,9 @@ mod tests {
 
     fn bad_metrics() -> TransportMetrics {
         TransportMetrics {
-            rtt_us: 300_000,        // 300 ms
+            rtt_us: 300_000, // 300 ms
             rtt_variance_us: 50_000,
-            loss_rate: 0.15,        // 15%
+            loss_rate: 0.15, // 15%
             ..TransportMetrics::default()
         }
     }
@@ -140,14 +140,20 @@ mod tests {
         let mut monitor = QualityMonitor::new(DegradationLadder::gaming());
         let update = monitor.update(&good_metrics());
         assert_eq!(update.target_level, 0);
-        assert!(!update.level_changed, "level should not change from initial 0");
+        assert!(
+            !update.level_changed,
+            "level should not change from initial 0"
+        );
     }
 
     #[test]
     fn bad_quality_increases_level() {
         let mut monitor = QualityMonitor::new(DegradationLadder::gaming());
         let update = monitor.update(&bad_metrics());
-        assert!(update.target_level > 0, "bad metrics should push level above 0");
+        assert!(
+            update.target_level > 0,
+            "bad metrics should push level above 0"
+        );
         assert!(update.level_changed, "level should have changed");
     }
 
@@ -157,8 +163,13 @@ mod tests {
         // Start at level 0 (optimal); first update with good metrics keeps us there.
         let update = monitor.update(&good_metrics());
         // current_level_params reflects level 0 before the update resolved.
-        let params = update.current_level_params.expect("should have level params");
-        assert_eq!(params.max_fps, 120, "gaming level 0 should have max_fps=120");
+        let params = update
+            .current_level_params
+            .expect("should have level params");
+        assert_eq!(
+            params.max_fps, 120,
+            "gaming level 0 should have max_fps=120"
+        );
     }
 
     #[test]
@@ -166,9 +177,15 @@ mod tests {
         let mut monitor = QualityMonitor::new(DegradationLadder::gaming());
 
         monitor.set_activity(ActivityState::Idle);
-        assert_eq!(monitor.prober_mut().probe_interval(), Duration::from_secs(60));
+        assert_eq!(
+            monitor.prober_mut().probe_interval(),
+            Duration::from_secs(60)
+        );
 
         monitor.set_activity(ActivityState::ActiveStreaming);
-        assert_eq!(monitor.prober_mut().probe_interval(), Duration::from_secs(2));
+        assert_eq!(
+            monitor.prober_mut().probe_interval(),
+            Duration::from_secs(2)
+        );
     }
 }

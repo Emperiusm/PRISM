@@ -18,11 +18,11 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
-use bytes::{Bytes, BytesMut, BufMut};
+use bytes::{BufMut, Bytes, BytesMut};
 
-use prism_display::packet::{SlicePayloadHeader, SLICE_HEADER_SIZE};
+use prism_display::packet::{SLICE_HEADER_SIZE, SlicePayloadHeader};
 use prism_protocol::channel::CHANNEL_DISPLAY;
-use prism_protocol::header::{PrismHeader, HEADER_SIZE, PROTOCOL_VERSION};
+use prism_protocol::header::{HEADER_SIZE, PROTOCOL_VERSION, PrismHeader};
 use prism_session::routing::RoutingTable;
 
 /// Display channel message type: encoded slice.
@@ -158,9 +158,9 @@ impl FrameSender {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use prism_protocol::header::{PrismHeader, HEADER_SIZE};
     use prism_display::packet::SLICE_HEADER_SIZE;
-    use prism_session::routing::{RoutingMutation, RouteEntry};
+    use prism_protocol::header::{HEADER_SIZE, PrismHeader};
+    use prism_session::routing::{RouteEntry, RoutingMutation};
     use uuid::Uuid;
 
     fn make_routing_table() -> Arc<RoutingTable> {
@@ -192,7 +192,10 @@ mod tests {
         assert_eq!(header.msg_type, MSG_TYPE_SLICE);
         assert_eq!(header.sequence, 7);
         assert_eq!(header.timestamp_us, 12345);
-        assert_eq!(header.payload_length as usize, SLICE_HEADER_SIZE + payload.len());
+        assert_eq!(
+            header.payload_length as usize,
+            SLICE_HEADER_SIZE + payload.len()
+        );
     }
 
     #[test]

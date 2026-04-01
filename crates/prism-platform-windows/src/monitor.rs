@@ -158,13 +158,25 @@ mod tests {
     #[test]
     fn display_id_encoding() {
         // adapter=0, output=0 → DisplayId(0)
-        assert_eq!(make_output(0, 0, OutputRotation::Identity).display_id(), DisplayId(0));
+        assert_eq!(
+            make_output(0, 0, OutputRotation::Identity).display_id(),
+            DisplayId(0)
+        );
         // adapter=0, output=3 → DisplayId(3)
-        assert_eq!(make_output(0, 3, OutputRotation::Identity).display_id(), DisplayId(3));
+        assert_eq!(
+            make_output(0, 3, OutputRotation::Identity).display_id(),
+            DisplayId(3)
+        );
         // adapter=1, output=0 → DisplayId(16)
-        assert_eq!(make_output(1, 0, OutputRotation::Identity).display_id(), DisplayId(16));
+        assert_eq!(
+            make_output(1, 0, OutputRotation::Identity).display_id(),
+            DisplayId(16)
+        );
         // adapter=2, output=5 → DisplayId(37)
-        assert_eq!(make_output(2, 5, OutputRotation::Identity).display_id(), DisplayId(37));
+        assert_eq!(
+            make_output(2, 5, OutputRotation::Identity).display_id(),
+            DisplayId(37)
+        );
     }
 
     #[test]

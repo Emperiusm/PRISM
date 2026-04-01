@@ -200,7 +200,10 @@ mod tests {
         assert_eq!(recovered, original);
 
         // Spot-check the non-trivial values called out in the spec.
-        assert_eq!(recovered.replaces_seq, 70_000, "replaces_seq must survive LE packing");
+        assert_eq!(
+            recovered.replaces_seq, 70_000,
+            "replaces_seq must survive LE packing"
+        );
         assert_eq!(recovered.cursor_x, 32_768, "cursor_x=32768 must survive");
         assert_eq!(recovered.cursor_flags, 0x03, "cursor_flags must survive");
     }

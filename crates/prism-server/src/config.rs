@@ -13,17 +13,39 @@ use serde::Deserialize;
 
 // ── Default-value functions for serde ────────────────────────────────────────
 
-fn default_listen_addr() -> String { "0.0.0.0:7000".to_string() }
-fn default_throughput_addr() -> String { "0.0.0.0:7001".to_string() }
-fn default_identity_path() -> PathBuf { PathBuf::from("identity.key") }
-fn default_pairing_path() -> PathBuf { PathBuf::from("pairing.json") }
-fn default_tombstone_path() -> PathBuf { PathBuf::from("tombstones.json") }
-fn default_display_name() -> String { "PRISM Server".to_string() }
-fn default_max_clients() -> usize { 4 }
-fn default_heartbeat_suspend_secs() -> u64 { 10 }
-fn default_heartbeat_tombstone_secs() -> u64 { 60 }
-fn default_tombstone_max_age_secs() -> u64 { 300 }
-fn default_total_bandwidth_bps() -> u64 { 100 * 1_000_000 }
+fn default_listen_addr() -> String {
+    "0.0.0.0:7000".to_string()
+}
+fn default_throughput_addr() -> String {
+    "0.0.0.0:7001".to_string()
+}
+fn default_identity_path() -> PathBuf {
+    PathBuf::from("identity.key")
+}
+fn default_pairing_path() -> PathBuf {
+    PathBuf::from("pairing.json")
+}
+fn default_tombstone_path() -> PathBuf {
+    PathBuf::from("tombstones.json")
+}
+fn default_display_name() -> String {
+    "PRISM Server".to_string()
+}
+fn default_max_clients() -> usize {
+    4
+}
+fn default_heartbeat_suspend_secs() -> u64 {
+    10
+}
+fn default_heartbeat_tombstone_secs() -> u64 {
+    60
+}
+fn default_tombstone_max_age_secs() -> u64 {
+    300
+}
+fn default_total_bandwidth_bps() -> u64 {
+    100 * 1_000_000
+}
 
 // ── Raw TOML-deserializable representation ───────────────────────────────────
 
@@ -189,7 +211,10 @@ mod tests {
         assert_eq!(cfg.display_name, "My PRISM Node");
         assert_eq!(cfg.identity_path, PathBuf::from("/etc/prism/identity.key"));
         assert_eq!(cfg.pairing_path, PathBuf::from("/etc/prism/pairing.json"));
-        assert_eq!(cfg.tombstone_path, PathBuf::from("/var/lib/prism/tombstones.json"));
+        assert_eq!(
+            cfg.tombstone_path,
+            PathBuf::from("/var/lib/prism/tombstones.json")
+        );
     }
 
     #[test]
