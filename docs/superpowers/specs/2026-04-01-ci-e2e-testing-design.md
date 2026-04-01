@@ -13,6 +13,10 @@
 Single job on `windows-latest` (public repo, unlimited minutes). Triggers on push to `main` and all PRs.
 
 ```yaml
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 Steps:
   1. Checkout
   2. Install Rust stable (with rustfmt + clippy)
@@ -27,6 +31,14 @@ Steps:
 - Windows runner required because `prism-platform-windows` only compiles on Windows.
 - Rust `stable` toolchain, pinned via `dtolnay/rust-toolchain`.
 - Cargo caching via `Swatinem/rust-cache` to avoid rebuilding 30+ dependencies on every run.
+- Concurrency group cancels in-progress runs on the same branch when a new push arrives — avoids wasting minutes on stale commits.
+
+### Post-setup: Branch Protection
+
+After CI is live, enable in GitHub repo Settings > Branches > Branch protection rules for `main`:
+- Require status checks to pass before merging
+- Required check: the CI job name
+- This prevents merging PRs that fail fmt, clippy, or tests.
 
 ---
 
@@ -80,14 +92,7 @@ hex = "0.4"
   - `addr() -> SocketAddr` — for clients to connect
   - `shutdown()` — clean stop
 
-**Problem:** `ServerApp::run()` binds its own QUIC endpoint internally using `config.listen_addr()`. The test harness needs the actual bound address (with resolved `:0` port). Current implementation doesn't expose this.
-
-**Solution:** After `ServerApp::run()` binds, the actual address is logged but not returned. The harness will need to either:
-  - (a) Accept a pre-bound `quinn::Endpoint` (requires refactoring `ServerApp`), or
-  - (b) Use a known port (e.g., `127.0.0.1:17000 + random offset`) — fragile but no refactor needed, or
-  - (c) Add a method `ServerApp::local_addr() -> Option<SocketAddr>` that exposes the bound address after `run()` starts — minimal refactor.
-
-**Recommendation:** Option (c) — store the bound `SocketAddr` in an `Arc<OnceCell>` that `run()` fills after bind. `TestServer` polls it briefly after spawning. Minimal change to production code.
+**Address notification:** `ServerApp::run()` binds to `:0` and resolves to a real port. The test harness needs this address before connecting clients. Solution: `ServerApp` gets a `bound_addr_tx: Option<tokio::sync::oneshot::Sender<SocketAddr>>` field. `run()` sends the bound address through it immediately after `ConnectionAcceptor::bind()`. `TestServer::start()` awaits the oneshot receiver — deterministic, no polling, no race condition.
 
 ### `TestClient`
 
@@ -102,17 +107,18 @@ hex = "0.4"
   - `close()` — clean disconnect
   - `drop_abruptly()` — simulate crash (drops endpoint without close)
 
-**Challenge:** `TestClient` needs to trust the server's self-signed cert. The server generates its cert internally in `ServerApp::run()`.
-
-**Solution:** The harness generates a `SelfSignedCert` externally, passes it into `ServerApp` (requires a `with_cert` parameter or a cert field on `ServerConfig`), and reuses the same cert DER to build the client trust store. This follows the pattern already used in `e2e_frame_flow.rs`.
-
-**Alternative:** Add a `ServerApp::cert_der() -> CertificateDer` accessor. But this requires the cert to be stored on `ServerApp`, which currently creates it transiently.
-
-**Recommendation:** Store the `SelfSignedCert`'s DER on `ServerApp` as a field set during construction. Expose via `cert_der()`. The test harness reads it before spawning the client.
+**Cert trust:** The server currently generates its `SelfSignedCert` transiently in `run()`. To let the test client trust it, move cert generation into `with_config()` and store the `CertificateDer` as a field on `ServerApp`. Expose via `pub fn cert_der(&self) -> CertificateDer`. `run()` clones the stored cert instead of generating a new one. The test harness reads `cert_der()` before spawning the client to build its trust store. This also fixes the current bug where `run()` generates two independent certs (one in `new()` that's unused, one in `run()` that's actually bound).
 
 ### Helper: `timeout_secs(n, future)`
 
-Wraps `tokio::time::timeout(Duration::from_secs(n), future)` with a panic message including the test name. Default 5 seconds.
+Wraps `tokio::time::timeout(Duration::from_secs(n), future)` with a descriptive panic message. Default 10 seconds (generous for CI runners under load).
+
+### Flaky test prevention
+
+- All tests use `#[tokio::test(flavor = "multi_thread")]` to avoid single-thread starvation where server and client tasks compete for the same thread.
+- Timeouts are 10 seconds (not 5) — CI Windows runners can be slow under load.
+- No retry loops — if a test flakes, the test is broken and must be fixed.
+- Each test gets its own `TestServer` on a unique random port — full isolation, no shared state between tests.
 
 ---
 
@@ -178,23 +184,27 @@ Wraps `tokio::time::timeout(Duration::from_secs(n), future)` with a panic messag
 
 Minimal changes to support the test harness:
 
-1. **`ServerApp` — store cert DER as field**
-   - Store `cert_der: CertificateDer` on `ServerApp` during construction
-   - Add `pub fn cert_der(&self) -> &CertificateDer` accessor
+1. **`ServerApp` — move cert generation to construction, store as field**
+   - Generate `SelfSignedCert` in `with_config()` instead of `run()`
+   - Store `cert_der: CertificateDer` on `ServerApp`
+   - `run()` clones the stored cert instead of generating a fresh one
+   - Add `pub fn cert_der(&self) -> CertificateDer` accessor
    - Tests use this to build client trust stores
+   - Fixes existing inconsistency where two independent certs are generated
 
-2. **`ServerApp` — expose bound address**
-   - Add `local_addr: Arc<tokio::sync::OnceCell<SocketAddr>>` field
-   - `run()` fills it after `ConnectionAcceptor::bind()`
-   - Add `pub fn local_addr(&self) -> Option<SocketAddr>` accessor
-   - Tests poll this after spawning to learn the actual port
+2. **`ServerApp` — bound address notification via oneshot**
+   - Add `bound_addr_tx: Option<oneshot::Sender<SocketAddr>>` field
+   - `with_config()` accepts an optional sender (default `None` for production)
+   - `run()` sends the actual bound address through the channel after `ConnectionAcceptor::bind()`
+   - Test harness awaits the receiver — deterministic, no polling, no race
+   - Add convenience constructor: `with_config_and_addr_notify(...)` for tests
 
 3. **`ServerApp` — shutdown handle**
    - `run()` currently blocks. Need a way to stop it from another task.
    - Add `shutdown_tx: tokio::sync::watch::Sender<bool>` that `run()` selects on
    - `pub fn shutdown_handle() -> ShutdownHandle` returns a cloneable trigger
 
-These are small, non-breaking additions to existing structs.
+These are small, non-breaking additions. Production callers are unaffected (all new fields have defaults or are optional).
 
 ---
 
@@ -204,4 +214,4 @@ All E2E tests run as part of `cargo test --workspace` — no special invocation 
 
 Expected total: **648 existing + 9 new = 657 tests**.
 
-Test timeout: 5 seconds per test (via harness helper). Total CI time estimate: ~3-4 minutes (build + test on Windows runner with caching).
+Test timeout: 10 seconds per test (via harness helper). Total CI time estimate: ~3-4 minutes (build + test on Windows runner with caching).
