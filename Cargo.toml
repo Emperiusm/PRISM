@@ -36,7 +36,7 @@ hkdf = "0.12"
 sha2 = "0.10"
 arc-swap = "1"
 tempfile = "3"
-minifb = "0.28"
+pollster = "0.4"
 arboard = "3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }

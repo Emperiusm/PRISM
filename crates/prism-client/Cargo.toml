@@ -20,7 +20,7 @@ thiserror = { workspace = true }
 quinn = { workspace = true }
 tokio = { workspace = true }
 rustls = { workspace = true }
-minifb = { workspace = true }
+pollster.workspace = true
 wgpu.workspace = true
 winit.workspace = true
 glyphon.workspace = true
