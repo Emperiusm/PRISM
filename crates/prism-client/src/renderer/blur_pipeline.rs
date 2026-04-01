@@ -22,6 +22,7 @@ struct BlurUniforms {
 pub struct BlurPipeline {
     h_pipeline: wgpu::RenderPipeline,
     v_pipeline: wgpu::RenderPipeline,
+    bind_group_layout: wgpu::BindGroupLayout,
     intermediate_texture: wgpu::Texture,
     intermediate_view: wgpu::TextureView,
     output_texture: wgpu::Texture,
@@ -124,7 +125,7 @@ impl BlurPipeline {
         // binding 0: texture_2d<f32>
         // binding 1: sampler
         // binding 2: uniform buffer (BlurUniforms)
-        let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("blur-bgl"),
             entries: &[
                 // texture
@@ -169,7 +170,7 @@ impl BlurPipeline {
         // ── Pipeline layout ───────────────────────────────────────────────────
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("blur-pipeline-layout"),
-            bind_group_layouts: &[&bgl],
+            bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -213,7 +214,7 @@ impl BlurPipeline {
         // this stored bind group is unused at runtime but satisfies the struct.
         let h_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("blur-h-bg"),
-            layout: &bgl,
+            layout: &bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -233,7 +234,7 @@ impl BlurPipeline {
         // ── V bind group — reads from intermediate_view ───────────────────────
         let v_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("blur-v-bg"),
-            layout: &bgl,
+            layout: &bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -253,6 +254,7 @@ impl BlurPipeline {
         Self {
             h_pipeline,
             v_pipeline,
+            bind_group_layout,
             intermediate_texture,
             intermediate_view,
             output_texture,
@@ -323,5 +325,31 @@ impl BlurPipeline {
     /// A view into the blurred output texture, ready for compositing.
     pub fn output_view(&self) -> &wgpu::TextureView {
         &self.output_view
+    }
+
+    /// Build the source bind group for the horizontal blur pass.
+    pub fn make_input_bind_group(
+        &self,
+        device: &wgpu::Device,
+        source_view: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("blur-input-bg"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(source_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.h_uniform_buffer.as_entire_binding(),
+                },
+            ],
+        })
     }
 }

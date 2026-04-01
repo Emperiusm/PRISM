@@ -1,26 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Renders PaintContext draw commands (glass quads, glow rects, text) to the screen.
+//! Renders PaintContext draw commands with real blurred glass compositing.
 
 use crate::renderer::text_renderer::TextPipeline;
 use crate::ui::widgets::PaintContext;
 use wgpu::util::DeviceExt;
 
-// ---------------------------------------------------------------------------
-// Quad instance data
-// ---------------------------------------------------------------------------
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct FlatQuadInstance {
+    rect: [f32; 4],
+    color: [f32; 4],
+    corner_radius: f32,
+    _padding: [f32; 3],
+}
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct QuadInstance {
-    rect: [f32; 4],  // x, y, w, h in pixels
-    color: [f32; 4], // rgba
+struct GlassInstance {
+    rect: [f32; 4],
+    blur_rect: [f32; 4],
+    tint: [f32; 4],
+    border_color: [f32; 4],
     corner_radius: f32,
-    _padding: [f32; 3], // align to 48 bytes
+    noise_intensity: f32,
+    _padding: [f32; 2],
 }
-
-// ---------------------------------------------------------------------------
-// Screen uniform
-// ---------------------------------------------------------------------------
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -28,32 +32,28 @@ struct ScreenUniform {
     screen_size: [f32; 2],
 }
 
-// ---------------------------------------------------------------------------
-// Inline WGSL shader for colored rounded-rect quads
-// ---------------------------------------------------------------------------
-
-const QUAD_SHADER: &str = r#"
+const FLAT_SHADER: &str = r#"
 struct ScreenUniforms {
     screen_size: vec2<f32>,
 }
 
 @group(0) @binding(0) var<uniform> screen: ScreenUniforms;
 
-struct QuadInstance {
-    rect: vec4<f32>,         // x, y, w, h in pixels
-    color: vec4<f32>,        // rgba
+struct FlatQuadInstance {
+    rect: vec4<f32>,
+    color: vec4<f32>,
     corner_radius: f32,
     _pad0: f32,
     _pad1: f32,
     _pad2: f32,
 }
 
-@group(1) @binding(0) var<storage, read> instances: array<QuadInstance>;
+@group(1) @binding(0) var<storage, read> instances: array<FlatQuadInstance>;
 
 struct VertexOut {
     @builtin(position) clip_pos: vec4<f32>,
-    @location(0) local_pos: vec2<f32>,    // position within quad (0..w, 0..h)
-    @location(1) quad_size: vec2<f32>,     // w, h
+    @location(0) local_pos: vec2<f32>,
+    @location(1) quad_size: vec2<f32>,
     @location(2) color: vec4<f32>,
     @location(3) corner_radius: f32,
 }
@@ -65,9 +65,6 @@ fn vs_main(
 ) -> VertexOut {
     let inst = instances[iid];
 
-    // 6 vertices per quad (2 triangles)
-    // Triangle 1: 0,1,2  Triangle 2: 3,4,5
-    // Corners: TL, TR, BL, BL, TR, BR
     var corner_x: array<f32, 6> = array<f32, 6>(0.0, 1.0, 0.0, 0.0, 1.0, 1.0);
     var corner_y: array<f32, 6> = array<f32, 6>(0.0, 0.0, 1.0, 1.0, 0.0, 1.0);
 
@@ -77,7 +74,6 @@ fn vs_main(
     let px = inst.rect.x + cx * inst.rect.z;
     let py = inst.rect.y + cy * inst.rect.w;
 
-    // Convert pixel coords to NDC: x: [0, screen_w] -> [-1, 1], y: [0, screen_h] -> [1, -1]
     let ndc_x = (px / screen.screen_size.x) * 2.0 - 1.0;
     let ndc_y = 1.0 - (py / screen.screen_size.y) * 2.0;
 
@@ -95,46 +91,137 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     let r = in.corner_radius;
     let half = in.quad_size * 0.5;
     let p = abs(in.local_pos - half);
-
-    // SDF for rounded rectangle
     let q = p - half + vec2<f32>(r, r);
     let d = length(max(q, vec2<f32>(0.0))) - r;
-
-    // Smooth edge (1px antialiasing)
     let alpha = 1.0 - smoothstep(-0.5, 0.5, d);
-
     return vec4<f32>(in.color.rgb, in.color.a * alpha);
 }
 "#;
 
-// ---------------------------------------------------------------------------
-// UiRenderer
-// ---------------------------------------------------------------------------
+const GLASS_SHADER: &str = r#"
+struct ScreenUniforms {
+    screen_size: vec2<f32>,
+}
 
-const MAX_QUADS: usize = 512;
+@group(0) @binding(0) var<uniform> screen: ScreenUniforms;
 
-/// Renders PaintContext draw commands to the screen using wgpu.
-///
-/// Renders glass quads, glow rects, and text (via glyphon).
+struct GlassInstance {
+    rect: vec4<f32>,
+    blur_rect: vec4<f32>,
+    tint: vec4<f32>,
+    border_color: vec4<f32>,
+    corner_radius: f32,
+    noise_intensity: f32,
+    _pad0: f32,
+    _pad1: f32,
+}
+
+@group(1) @binding(0) var<storage, read> instances: array<GlassInstance>;
+@group(2) @binding(0) var blur_tex: texture_2d<f32>;
+@group(2) @binding(1) var blur_samp: sampler;
+
+struct VertexOut {
+    @builtin(position) clip_pos: vec4<f32>,
+    @location(0) local_pos: vec2<f32>,
+    @location(1) quad_size: vec2<f32>,
+    @location(2) blur_uv: vec2<f32>,
+    @location(3) tint: vec4<f32>,
+    @location(4) border_color: vec4<f32>,
+    @location(5) corner_radius: f32,
+    @location(6) noise_intensity: f32,
+}
+
+fn hash12(p: vec2<f32>) -> f32 {
+    let h = dot(p, vec2<f32>(127.1, 311.7));
+    return fract(sin(h) * 43758.5453123);
+}
+
+@vertex
+fn vs_main(
+    @builtin(vertex_index) vid: u32,
+    @builtin(instance_index) iid: u32,
+) -> VertexOut {
+    let inst = instances[iid];
+
+    var corner_x: array<f32, 6> = array<f32, 6>(0.0, 1.0, 0.0, 0.0, 1.0, 1.0);
+    var corner_y: array<f32, 6> = array<f32, 6>(0.0, 0.0, 1.0, 1.0, 0.0, 1.0);
+
+    let cx = corner_x[vid];
+    let cy = corner_y[vid];
+
+    let px = inst.rect.x + cx * inst.rect.z;
+    let py = inst.rect.y + cy * inst.rect.w;
+    let ndc_x = (px / screen.screen_size.x) * 2.0 - 1.0;
+    let ndc_y = 1.0 - (py / screen.screen_size.y) * 2.0;
+
+    let blur_px = inst.blur_rect.x + cx * inst.blur_rect.z;
+    let blur_py = inst.blur_rect.y + cy * inst.blur_rect.w;
+
+    var out: VertexOut;
+    out.clip_pos = vec4<f32>(ndc_x, ndc_y, 0.0, 1.0);
+    out.local_pos = vec2<f32>(cx * inst.rect.z, cy * inst.rect.w);
+    out.quad_size = vec2<f32>(inst.rect.z, inst.rect.w);
+    out.blur_uv = vec2<f32>(blur_px / screen.screen_size.x, blur_py / screen.screen_size.y);
+    out.tint = inst.tint;
+    out.border_color = inst.border_color;
+    out.corner_radius = inst.corner_radius;
+    out.noise_intensity = inst.noise_intensity;
+    return out;
+}
+
+@fragment
+fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
+    let r = in.corner_radius;
+    let half = in.quad_size * 0.5;
+    let p = abs(in.local_pos - half);
+    let q = p - half + vec2<f32>(r, r);
+    let d = length(max(q, vec2<f32>(0.0))) - r;
+
+    let edge_alpha = 1.0 - smoothstep(-0.5, 0.5, d);
+    if (edge_alpha <= 0.001) {
+        discard;
+    }
+
+    var color = textureSample(blur_tex, blur_samp, in.blur_uv).rgb;
+    color = mix(color, in.tint.rgb, in.tint.a);
+
+    if (in.noise_intensity > 0.001) {
+        let noise = hash12(floor(in.local_pos * 0.5));
+        color += (noise - 0.5) * in.noise_intensity;
+    }
+
+    let border_band = (1.0 - smoothstep(0.0, 1.5, abs(d + 0.75))) * in.border_color.a;
+    let top_glint = mix(1.45, 1.0, in.local_pos.y / max(in.quad_size.y, 1.0));
+    color = mix(color, in.border_color.rgb * top_glint, border_band);
+
+    return vec4<f32>(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), edge_alpha);
+}
+"#;
+
+const MAX_FLAT_QUADS: usize = 512;
+const MAX_GLASS_QUADS: usize = 512;
+
+/// Renders glass quads, glow rects, and text on top of a blurred backdrop.
 pub struct UiRenderer {
-    quad_pipeline: wgpu::RenderPipeline,
-    quad_instance_buffer: wgpu::Buffer,
+    flat_pipeline: wgpu::RenderPipeline,
+    glass_pipeline: wgpu::RenderPipeline,
+    flat_instance_buffer: wgpu::Buffer,
+    glass_instance_buffer: wgpu::Buffer,
     screen_uniform_buffer: wgpu::Buffer,
     screen_bind_group: wgpu::BindGroup,
-    #[allow(dead_code)]
-    instance_bind_group_layout: wgpu::BindGroupLayout,
-    instance_bind_group: wgpu::BindGroup,
+    flat_instance_bind_group: wgpu::BindGroup,
+    glass_instance_bind_group: wgpu::BindGroup,
+    backdrop_bind_group_layout: wgpu::BindGroupLayout,
+    backdrop_sampler: wgpu::Sampler,
     text_pipeline: TextPipeline,
 }
 
 impl UiRenderer {
-    /// Create a new `UiRenderer` for the given device and surface format.
     pub fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         surface_format: wgpu::TextureFormat,
     ) -> Self {
-        // ── Screen uniform buffer ─────────────────────────────────────────
         let screen_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("ui-screen-uniforms"),
             contents: bytemuck::bytes_of(&ScreenUniform {
@@ -166,61 +253,135 @@ impl UiRenderer {
             }],
         });
 
-        // ── Instance storage buffer ───────────────────────────────────────
-        let instance_buf_size = (MAX_QUADS * std::mem::size_of::<QuadInstance>()) as u64;
-        let quad_instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("ui-quad-instances"),
-            size: instance_buf_size,
+        let flat_buf_size = (MAX_FLAT_QUADS * std::mem::size_of::<FlatQuadInstance>()) as u64;
+        let flat_instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("ui-flat-quad-instances"),
+            size: flat_buf_size,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
-        let instance_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("ui-instance-bgl"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
+        let glass_buf_size = (MAX_GLASS_QUADS * std::mem::size_of::<GlassInstance>()) as u64;
+        let glass_instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("ui-glass-instances"),
+            size: glass_buf_size,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
-        let instance_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("ui-instance-bg"),
-            layout: &instance_bgl,
+        let flat_instance_bgl =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("ui-flat-instance-bgl"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let glass_instance_bgl =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("ui-glass-instance-bgl"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let flat_instance_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("ui-flat-instance-bg"),
+            layout: &flat_instance_bgl,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: quad_instance_buffer.as_entire_binding(),
+                resource: flat_instance_buffer.as_entire_binding(),
             }],
         });
 
-        // ── Quad shader + pipeline ────────────────────────────────────────
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("ui-quad-shader"),
-            source: wgpu::ShaderSource::Wgsl(QUAD_SHADER.into()),
+        let glass_instance_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("ui-glass-instance-bg"),
+            layout: &glass_instance_bgl,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: glass_instance_buffer.as_entire_binding(),
+            }],
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("ui-quad-pipeline-layout"),
-            bind_group_layouts: &[&screen_bgl, &instance_bgl],
+        let backdrop_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("ui-backdrop-bgl"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+
+        let backdrop_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("ui-backdrop-sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
+        let flat_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("ui-flat-shader"),
+            source: wgpu::ShaderSource::Wgsl(FLAT_SHADER.into()),
+        });
+        let glass_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("ui-glass-shader"),
+            source: wgpu::ShaderSource::Wgsl(GLASS_SHADER.into()),
+        });
+
+        let flat_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("ui-flat-pipeline-layout"),
+            bind_group_layouts: &[&screen_bgl, &flat_instance_bgl],
+            push_constant_ranges: &[],
+        });
+        let glass_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("ui-glass-pipeline-layout"),
+            bind_group_layouts: &[&screen_bgl, &glass_instance_bgl, &backdrop_bind_group_layout],
             push_constant_ranges: &[],
         });
 
-        let quad_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("ui-quad-pipeline"),
-            layout: Some(&pipeline_layout),
+        let flat_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("ui-flat-pipeline"),
+            layout: Some(&flat_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: &flat_shader,
                 entry_point: Some("vs_main"),
                 buffers: &[],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: &flat_shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
@@ -239,22 +400,52 @@ impl UiRenderer {
             cache: None,
         });
 
-        // ── Text pipeline (glyphon) ───────────────────────────────────────
+        let glass_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("ui-glass-pipeline"),
+            layout: Some(&glass_layout),
+            vertex: wgpu::VertexState {
+                module: &glass_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &glass_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
         let text_pipeline = TextPipeline::new(device, queue, surface_format);
 
         Self {
-            quad_pipeline,
-            quad_instance_buffer,
+            flat_pipeline,
+            glass_pipeline,
+            flat_instance_buffer,
+            glass_instance_buffer,
             screen_uniform_buffer,
             screen_bind_group,
-            instance_bind_group_layout: instance_bgl,
-            instance_bind_group,
+            flat_instance_bind_group,
+            glass_instance_bind_group,
+            backdrop_bind_group_layout,
+            backdrop_sampler,
             text_pipeline,
         }
     }
 
-    /// Render all draw commands from `paint_ctx` into the given render target.
-    /// The target view should already have been cleared.
     #[allow(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
@@ -262,11 +453,11 @@ impl UiRenderer {
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         target_view: &wgpu::TextureView,
+        backdrop_view: &wgpu::TextureView,
         screen_width: u32,
         screen_height: u32,
         paint_ctx: &PaintContext,
     ) {
-        // Update screen uniforms
         queue.write_buffer(
             &self.screen_uniform_buffer,
             0,
@@ -275,76 +466,66 @@ impl UiRenderer {
             }),
         );
 
-        // ── Collect quad instances ────────────────────────────────────────
-        let mut instances: Vec<QuadInstance> =
-            Vec::with_capacity(paint_ctx.glass_quads.len() + paint_ctx.glow_rects.len());
-
-        for gq in &paint_ctx.glass_quads {
-            instances.push(QuadInstance {
+        let glass_instances: Vec<GlassInstance> = paint_ctx
+            .glass_quads
+            .iter()
+            .take(MAX_GLASS_QUADS)
+            .map(|gq| GlassInstance {
                 rect: [gq.rect.x, gq.rect.y, gq.rect.w, gq.rect.h],
-                color: gq.tint,
+                blur_rect: [gq.blur_rect.x, gq.blur_rect.y, gq.blur_rect.w, gq.blur_rect.h],
+                tint: gq.tint,
+                border_color: gq.border_color,
                 corner_radius: gq.corner_radius,
-                _padding: [0.0; 3],
-            });
+                noise_intensity: gq.noise_intensity,
+                _padding: [0.0; 2],
+            })
+            .collect();
 
-            // Draw a 1px border if border_color has visible alpha
-            if gq.border_color[3] > 0.01 {
-                // Top edge
-                instances.push(QuadInstance {
-                    rect: [gq.rect.x, gq.rect.y, gq.rect.w, 1.0],
-                    color: gq.border_color,
-                    corner_radius: 0.0,
-                    _padding: [0.0; 3],
-                });
-                // Bottom edge
-                instances.push(QuadInstance {
-                    rect: [gq.rect.x, gq.rect.y + gq.rect.h - 1.0, gq.rect.w, 1.0],
-                    color: gq.border_color,
-                    corner_radius: 0.0,
-                    _padding: [0.0; 3],
-                });
-                // Left edge
-                instances.push(QuadInstance {
-                    rect: [gq.rect.x, gq.rect.y, 1.0, gq.rect.h],
-                    color: gq.border_color,
-                    corner_radius: 0.0,
-                    _padding: [0.0; 3],
-                });
-                // Right edge
-                instances.push(QuadInstance {
-                    rect: [gq.rect.x + gq.rect.w - 1.0, gq.rect.y, 1.0, gq.rect.h],
-                    color: gq.border_color,
-                    corner_radius: 0.0,
-                    _padding: [0.0; 3],
-                });
-            }
-        }
-
-        for gr in &paint_ctx.glow_rects {
-            instances.push(QuadInstance {
+        let flat_instances: Vec<FlatQuadInstance> = paint_ctx
+            .glow_rects
+            .iter()
+            .take(MAX_FLAT_QUADS)
+            .map(|gr| FlatQuadInstance {
                 rect: [gr.rect.x, gr.rect.y, gr.rect.w, gr.rect.h],
                 color: gr.color,
                 corner_radius: 0.0,
                 _padding: [0.0; 3],
-            });
-        }
+            })
+            .collect();
 
-        let num_quads = instances.len().min(MAX_QUADS);
-
-        // Upload instances
-        if num_quads > 0 {
+        if !glass_instances.is_empty() {
             queue.write_buffer(
-                &self.quad_instance_buffer,
+                &self.glass_instance_buffer,
                 0,
-                bytemuck::cast_slice(&instances[..num_quads]),
+                bytemuck::cast_slice(&glass_instances),
+            );
+        }
+        if !flat_instances.is_empty() {
+            queue.write_buffer(
+                &self.flat_instance_buffer,
+                0,
+                bytemuck::cast_slice(&flat_instances),
             );
         }
 
-        // ── Prepare text for rendering ───────────────────────────────────
         self.text_pipeline
             .prepare(device, queue, screen_width, screen_height, paint_ctx);
 
-        // ── Render pass ───────────────────────────────────────────────────
+        let backdrop_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("ui-backdrop-bg"),
+            layout: &self.backdrop_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(backdrop_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.backdrop_sampler),
+                },
+            ],
+        });
+
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("UI Render Pass"),
@@ -352,7 +533,7 @@ impl UiRenderer {
                     view: target_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load, // don't clear, render on top
+                        load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -360,15 +541,21 @@ impl UiRenderer {
                 ..Default::default()
             });
 
-            // Draw quads
-            if num_quads > 0 {
-                pass.set_pipeline(&self.quad_pipeline);
+            if !glass_instances.is_empty() {
+                pass.set_pipeline(&self.glass_pipeline);
                 pass.set_bind_group(0, &self.screen_bind_group, &[]);
-                pass.set_bind_group(1, &self.instance_bind_group, &[]);
-                pass.draw(0..6, 0..num_quads as u32);
+                pass.set_bind_group(1, &self.glass_instance_bind_group, &[]);
+                pass.set_bind_group(2, &backdrop_bind_group, &[]);
+                pass.draw(0..6, 0..glass_instances.len() as u32);
             }
 
-            // Draw text (glyphon)
+            if !flat_instances.is_empty() {
+                pass.set_pipeline(&self.flat_pipeline);
+                pass.set_bind_group(0, &self.screen_bind_group, &[]);
+                pass.set_bind_group(1, &self.flat_instance_bind_group, &[]);
+                pass.draw(0..6, 0..flat_instances.len() as u32);
+            }
+
             if !paint_ctx.text_runs.is_empty()
                 && let Err(e) = self.text_pipeline.render(&mut pass)
             {
@@ -378,16 +565,17 @@ impl UiRenderer {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn quad_instance_is_48_bytes() {
-        assert_eq!(std::mem::size_of::<QuadInstance>(), 48);
+    fn flat_quad_instance_is_48_bytes() {
+        assert_eq!(std::mem::size_of::<FlatQuadInstance>(), 48);
+    }
+
+    #[test]
+    fn glass_instance_is_80_bytes() {
+        assert_eq!(std::mem::size_of::<GlassInstance>(), 80);
     }
 }
