@@ -342,7 +342,9 @@ impl Widget for ServerCard {
                         address: self.address.clone(),
                         noise_key: None,
                     }),
-                    MouseButton::Right => EventResponse::Action(UiAction::EditServer(self.server_id)),
+                    MouseButton::Right => {
+                        EventResponse::Action(UiAction::EditServer(self.server_id))
+                    }
                     _ => EventResponse::Ignored,
                 }
             }

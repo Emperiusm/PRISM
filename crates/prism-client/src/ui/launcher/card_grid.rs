@@ -85,11 +85,7 @@ impl CardGrid {
     }
 
     fn toolbar_height(&self) -> f32 {
-        if self.show_filters {
-            TOOLBAR_H
-        } else {
-            0.0
-        }
+        if self.show_filters { TOOLBAR_H } else { 0.0 }
     }
 
     fn visible_card_count(&self) -> usize {
@@ -160,8 +156,8 @@ impl CardGrid {
                 cards_per_row
             };
 
-            let row_pixel_w =
-                items_in_row as f32 * CARD_WIDTH + (items_in_row.saturating_sub(1)) as f32 * CARD_GAP;
+            let row_pixel_w = items_in_row as f32 * CARD_WIDTH
+                + (items_in_row.saturating_sub(1)) as f32 * CARD_GAP;
             let x_offset = ((self.grid_width - row_pixel_w) / 2.0).max(0.0);
 
             self.positions.push(Rect::new(

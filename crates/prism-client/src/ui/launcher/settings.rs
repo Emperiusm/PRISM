@@ -92,7 +92,9 @@ impl SettingsPanel {
             .default_profile_dropdown
             .set_selected_by_text(&prefs.default_profile)
         {
-            let _ = self.default_profile_dropdown.set_selected_by_text("Balanced");
+            let _ = self
+                .default_profile_dropdown
+                .set_selected_by_text("Balanced");
         }
 
         self.exclusive_keyboard_toggle

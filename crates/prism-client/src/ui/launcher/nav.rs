@@ -164,9 +164,7 @@ impl Widget for LauncherNav {
                 }
 
                 if self.settings_item.contains(*x, *y) {
-                    return EventResponse::Action(UiAction::OpenLauncherTab(
-                        LauncherTab::Settings,
-                    ));
+                    return EventResponse::Action(UiAction::OpenLauncherTab(LauncherTab::Settings));
                 }
 
                 EventResponse::Ignored
