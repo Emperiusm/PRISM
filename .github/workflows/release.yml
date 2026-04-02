@@ -44,7 +44,17 @@ jobs:
           </assembly>
           '@ | Out-File -Encoding utf8 server.manifest
           # Embed manifest into the compiled exe using mt.exe (Windows SDK)
-          mt.exe -manifest server.manifest -outputresource:"target/release/prism-server.exe;#1"
+          # mt.exe lives in the Windows SDK bin directory — find it dynamically
+          $mt = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "mt.exe" |
+                Where-Object { $_.FullName -match "x64" } |
+                Sort-Object FullName -Descending |
+                Select-Object -First 1 -ExpandProperty FullName
+          if ($mt) {
+            Write-Host "Found mt.exe at: $mt"
+            & $mt -manifest server.manifest "-outputresource:target/release/prism-server.exe;#1"
+          } else {
+            Write-Warning "mt.exe not found — skipping admin manifest embedding"
+          }
 
       - name: Prepare artifacts
         shell: pwsh
