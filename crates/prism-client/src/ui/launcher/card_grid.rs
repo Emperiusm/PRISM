@@ -1,73 +1,150 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Responsive flow grid of server cards plus an "+ Add Server" card.
+//! Responsive saved-connections grid with filter chips.
 
-use super::server_card::ServerCard;
+use super::server_card::{CardFilter, ServerCard};
 use crate::config::servers::SavedServer;
 use crate::ui::theme;
 use crate::ui::widgets::{
     EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const CARD_WIDTH: f32 = ServerCard::WIDTH;
 const CARD_HEIGHT: f32 = ServerCard::HEIGHT;
 const CARD_GAP: f32 = 20.0;
-
-// ---------------------------------------------------------------------------
-// CardGrid
-// ---------------------------------------------------------------------------
+const FILTER_H: f32 = 32.0;
+const FILTER_GAP: f32 = 10.0;
+const TOOLBAR_H: f32 = 52.0;
 
 pub struct CardGrid {
     cards: Vec<ServerCard>,
+    visible_indices: Vec<usize>,
     positions: Vec<Rect>,
+    filter_chip_rects: Vec<(CardFilter, Rect)>,
+    active_filter: CardFilter,
+    hovered_filter: Option<CardFilter>,
     grid_width: f32,
     rect: Rect,
+    visible_limit: Option<usize>,
+    show_add_card: bool,
+    show_filters: bool,
 }
 
 impl CardGrid {
     pub fn new() -> Self {
         Self {
             cards: Vec::new(),
+            visible_indices: Vec::new(),
             positions: Vec::new(),
+            filter_chip_rects: Vec::new(),
+            active_filter: CardFilter::All,
+            hovered_filter: None,
             grid_width: 800.0,
             rect: Rect::new(0.0, 0.0, 800.0, 600.0),
+            visible_limit: None,
+            show_add_card: true,
+            show_filters: false,
         }
     }
 
     pub fn set_servers(&mut self, servers: &[SavedServer]) {
-        self.cards = servers.iter().map(ServerCard::from_saved).collect();
-        self.positions.clear(); // invalidate
+        let mut ordered = servers.to_vec();
+        ordered.sort_by(|a, b| {
+            b.last_connected
+                .unwrap_or(b.created_at)
+                .cmp(&a.last_connected.unwrap_or(a.created_at))
+        });
+        self.cards = ordered.iter().map(ServerCard::from_saved).collect();
+        self.positions.clear();
     }
 
-    pub fn cards(&self) -> &[ServerCard] {
-        &self.cards
+    pub fn set_visible_limit(&mut self, limit: Option<usize>) {
+        if self.visible_limit != limit {
+            self.visible_limit = limit;
+            self.positions.clear();
+        }
     }
 
-    // -----------------------------------------------------------------------
-    // Private
-    // -----------------------------------------------------------------------
+    pub fn set_show_add_card(&mut self, show_add_card: bool) {
+        if self.show_add_card != show_add_card {
+            self.show_add_card = show_add_card;
+            self.positions.clear();
+        }
+    }
+
+    pub fn set_show_filters(&mut self, show_filters: bool) {
+        if self.show_filters != show_filters {
+            self.show_filters = show_filters;
+            self.positions.clear();
+            self.filter_chip_rects.clear();
+        }
+    }
+
+    fn toolbar_height(&self) -> f32 {
+        if self.show_filters {
+            TOOLBAR_H
+        } else {
+            0.0
+        }
+    }
+
+    fn visible_card_count(&self) -> usize {
+        self.visible_limit
+            .map(|limit| limit.min(self.visible_indices.len()))
+            .unwrap_or(self.visible_indices.len())
+    }
+
+    fn total_items(&self) -> usize {
+        self.visible_card_count() + usize::from(self.show_add_card)
+    }
+
+    fn recompute_visible_indices(&mut self) {
+        self.visible_indices = self
+            .cards
+            .iter()
+            .enumerate()
+            .filter_map(|(index, card)| card.matches_filter(self.active_filter).then_some(index))
+            .collect();
+    }
+
+    fn recompute_filter_chip_rects(&mut self) {
+        self.filter_chip_rects.clear();
+        if !self.show_filters {
+            return;
+        }
+
+        let mut x = self.rect.x;
+        let y = self.rect.y;
+        for filter in [
+            CardFilter::All,
+            CardFilter::Recent,
+            CardFilter::Dormant,
+            CardFilter::New,
+        ] {
+            let label = filter.label(self.cards.len());
+            let w = theme::text_width(&label, 11.0) + 28.0;
+            let rect = Rect::new(x, y, w, FILTER_H);
+            self.filter_chip_rects.push((filter, rect));
+            x += w + FILTER_GAP;
+        }
+    }
 
     fn recompute_layout(&mut self) {
         self.positions.clear();
+        self.recompute_visible_indices();
+        self.recompute_filter_chip_rects();
 
-        // How many cards fit per row
         let cards_per_row = ((self.grid_width + CARD_GAP) / (CARD_WIDTH + CARD_GAP))
             .floor()
             .max(1.0) as usize;
-
-        // Total items = cards + 1 add-card
-        let total = self.cards.len() + 1;
+        let total = self.total_items();
+        if total == 0 {
+            return;
+        }
 
         for idx in 0..total {
             let col = idx % cards_per_row;
             let row = idx / cards_per_row;
-
-            // Number of cards in this row (to center it)
             let items_in_row = if row == total / cards_per_row {
-                // last (possibly partial) row
                 let remainder = total % cards_per_row;
                 if remainder == 0 {
                     cards_per_row
@@ -78,32 +155,57 @@ impl CardGrid {
                 cards_per_row
             };
 
-            // Row width and x offset to center
-            let row_pixel_w = items_in_row as f32 * CARD_WIDTH
-                + (items_in_row.saturating_sub(1)) as f32 * CARD_GAP;
+            let row_pixel_w =
+                items_in_row as f32 * CARD_WIDTH + (items_in_row.saturating_sub(1)) as f32 * CARD_GAP;
             let x_offset = ((self.grid_width - row_pixel_w) / 2.0).max(0.0);
 
-            let x = self.rect.x + x_offset + col as f32 * (CARD_WIDTH + CARD_GAP);
-            let y = self.rect.y + row as f32 * (CARD_HEIGHT + CARD_GAP);
+            self.positions.push(Rect::new(
+                self.rect.x + x_offset + col as f32 * (CARD_WIDTH + CARD_GAP),
+                self.rect.y + self.toolbar_height() + row as f32 * (CARD_HEIGHT + CARD_GAP),
+                CARD_WIDTH,
+                CARD_HEIGHT,
+            ));
+        }
 
-            self.positions
-                .push(Rect::new(x, y, CARD_WIDTH, CARD_HEIGHT));
+        let visible = self.visible_card_count();
+        for (card_index, pos) in self
+            .visible_indices
+            .iter()
+            .take(visible)
+            .zip(self.positions.iter().take(visible))
+        {
+            self.cards[*card_index].layout(*pos);
         }
     }
 
-    /// Total height occupied by all rows.
     fn total_height(&self) -> f32 {
-        let total = self.cards.len() + 1;
+        let total = self.total_items();
+        if total == 0 {
+            return self.toolbar_height();
+        }
+
         let cards_per_row = ((self.grid_width + CARD_GAP) / (CARD_WIDTH + CARD_GAP))
             .floor()
             .max(1.0) as usize;
         let rows = total.div_ceil(cards_per_row);
-        rows as f32 * CARD_HEIGHT + (rows.saturating_sub(1)) as f32 * CARD_GAP
+        self.toolbar_height()
+            + rows as f32 * CARD_HEIGHT
+            + (rows.saturating_sub(1)) as f32 * CARD_GAP
     }
 
-    /// Rect for the "+Add" card (last position).
     fn add_card_rect(&self) -> Option<Rect> {
-        self.positions.last().copied()
+        self.show_add_card
+            .then(|| self.positions.last().copied())
+            .flatten()
+    }
+
+    fn empty_state_rect(&self) -> Rect {
+        Rect::new(
+            self.rect.x,
+            self.rect.y + self.toolbar_height() + 18.0,
+            self.rect.w,
+            48.0,
+        )
     }
 }
 
@@ -118,97 +220,96 @@ impl Widget for CardGrid {
         self.rect = available;
         self.grid_width = available.w;
         self.recompute_layout();
-
-        let h = self.total_height();
-        Size { w: available.w, h }
+        Size {
+            w: available.w,
+            h: self.total_height(),
+        }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        // Paint each server card at its cached position
-        for (card, &pos) in self.cards.iter().zip(self.positions.iter()) {
-            // Cards are painted via their own paint method; we forward the
-            // positioned rect by temporarily reading their stored rect.
-            // Since ServerCard::paint reads self.rect set during layout, and
-            // layout was called per-card via handle_event routing, we need to
-            // paint at the grid position. We call paint after the card's rect
-            // was stored during layout. Here we do a local context trick:
-            // push offset glass quad matching card position, then call paint.
-            // Actually, the cleaner approach: we set a translated sub-context.
-            // Since PaintContext just collects commands, we call paint directly —
-            // the card's internal rect was set during layout; our grid layout
-            // stores positions separately. We need to align them.
-            //
-            // The simplest correct approach: draw the card commands at the
-            // grid-assigned position by directly pushing the draw commands
-            // instead of calling card.paint(). But that duplicates logic.
-            //
-            // Instead, we use a sub-context and translate draw commands.
-            let mut sub = PaintContext::new();
-            card.paint(&mut sub);
-
-            // Compute translation from card's own rect origin to grid position.
-            // card.rect is set during layout(available) where available = grid pos.
-            // Since we don't call layout on cards here (only set_servers does not
-            // call layout), we need to reconcile. The paint approach below
-            // renders at `pos` by translating all sub-context items.
-            let card_rect = {
-                // Read the card's painted origin from the first glass_quad if available
-                if let Some(gq) = sub.glass_quads.first() {
-                    gq.rect
-                } else {
-                    Rect::new(pos.x, pos.y, CARD_WIDTH, CARD_HEIGHT)
-                }
-            };
-            let dx = pos.x - card_rect.x;
-            let dy = pos.y - card_rect.y;
-
-            for mut gq in sub.glass_quads {
-                gq.rect.x += dx;
-                gq.rect.y += dy;
-                gq.blur_rect.x += dx;
-                gq.blur_rect.y += dy;
-                ctx.push_glass_quad(gq);
-            }
-            for mut gr in sub.glow_rects {
-                gr.rect.x += dx;
-                gr.rect.y += dy;
-                ctx.push_glow_rect(gr);
-            }
-            for mut tr in sub.text_runs {
-                tr.x += dx;
-                tr.y += dy;
-                ctx.push_text_run(tr);
+        if self.show_filters {
+            for (filter, rect) in &self.filter_chip_rects {
+                let active = *filter == self.active_filter;
+                let hovered = self.hovered_filter == Some(*filter);
+                ctx.push_glass_quad(theme::glass_quad(
+                    *rect,
+                    if active {
+                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.20]
+                    } else if hovered {
+                        [1.0, 1.0, 1.0, 0.08]
+                    } else {
+                        [1.0, 1.0, 1.0, 0.04]
+                    },
+                    if active {
+                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.26]
+                    } else {
+                        [1.0, 1.0, 1.0, 0.10]
+                    },
+                    theme::CHIP_RADIUS,
+                ));
+                ctx.push_text_run(TextRun {
+                    x: rect.x + 14.0,
+                    y: rect.y + 8.0,
+                    text: filter.label(self.cards.len()),
+                    font_size: 11.0,
+                    color: if active {
+                        theme::TEXT_PRIMARY
+                    } else {
+                        theme::TEXT_SECONDARY
+                    },
+                    monospace: false,
+                });
             }
         }
 
-        // Paint the "+ Add Server" card
+        for card_index in self.visible_indices.iter().take(self.visible_card_count()) {
+            self.cards[*card_index].paint(ctx);
+        }
+
+        if self.visible_indices.is_empty() {
+            let empty = self.empty_state_rect();
+            ctx.push_text_run(TextRun {
+                x: empty.x,
+                y: empty.y,
+                text: "No saved desktops match this filter.".to_string(),
+                font_size: 12.0,
+                color: theme::TEXT_MUTED,
+                monospace: false,
+            });
+        }
+
         if let Some(add_rect) = self.add_card_rect() {
-            ctx.push_glass_quad(theme::card_surface(add_rect));
+            ctx.push_glass_quad(theme::glass_quad(
+                add_rect,
+                [1.0, 1.0, 1.0, 0.05],
+                [1.0, 1.0, 1.0, 0.16],
+                theme::CARD_RADIUS,
+            ));
 
             let plus = "+";
             ctx.push_text_run(TextRun {
                 x: add_rect.x + (CARD_WIDTH - theme::text_width(plus, 32.0)) * 0.5,
-                y: add_rect.y + 50.0,
+                y: add_rect.y + 58.0,
                 text: plus.to_string(),
                 font_size: 32.0,
                 color: theme::TEXT_SECONDARY,
                 monospace: false,
             });
 
-            let title = "Add server";
+            let title = "Add Connection";
             ctx.push_text_run(TextRun {
-                x: add_rect.x + (CARD_WIDTH - theme::text_width(title, 14.0)) * 0.5,
-                y: add_rect.y + 102.0,
+                x: add_rect.x + (CARD_WIDTH - theme::text_width(title, 15.0)) * 0.5,
+                y: add_rect.y + 114.0,
                 text: title.to_string(),
-                font_size: 14.0,
+                font_size: 15.0,
                 color: theme::TEXT_PRIMARY,
                 monospace: false,
             });
 
-            let body = "Save a new desktop";
+            let body = "Manual IP or quick setup";
             ctx.push_text_run(TextRun {
                 x: add_rect.x + (CARD_WIDTH - theme::text_width(body, 12.0)) * 0.5,
-                y: add_rect.y + 124.0,
+                y: add_rect.y + 138.0,
                 text: body.to_string(),
                 font_size: 12.0,
                 color: theme::TEXT_MUTED,
@@ -218,7 +319,33 @@ impl Widget for CardGrid {
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
-        // Check the Add card first for click events
+        match event {
+            UiEvent::MouseMove { x, y } => {
+                self.hovered_filter = self
+                    .filter_chip_rects
+                    .iter()
+                    .find_map(|(filter, rect)| rect.contains(*x, *y).then_some(*filter));
+            }
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
+                if let Some((filter, _)) = self
+                    .filter_chip_rects
+                    .iter()
+                    .find(|(_, rect)| rect.contains(*x, *y))
+                {
+                    if self.active_filter != *filter {
+                        self.active_filter = *filter;
+                        self.recompute_layout();
+                    }
+                    return EventResponse::Consumed;
+                }
+            }
+            _ => {}
+        }
+
         if let UiEvent::MouseDown {
             x,
             y,
@@ -230,61 +357,49 @@ impl Widget for CardGrid {
             return EventResponse::Action(UiAction::AddServer);
         }
 
-        // Route to individual cards based on cached position
-        let n = self.cards.len();
-        for i in 0..n {
-            let pos = self.positions.get(i).copied();
-            if let Some(pos) = pos {
-                // Translate the event to the card's local space
-                let translated = match event {
-                    UiEvent::MouseMove { x, y } => {
-                        // Always propagate MouseMove to all cards for hover tracking
-                        let resp = self.cards[i].handle_event(&UiEvent::MouseMove { x: *x, y: *y });
-                        // We've already handled it inline, continue loop
-                        let _ = resp;
-                        continue;
-                    }
-                    UiEvent::MouseDown { x, y, button } => {
-                        if pos.contains(*x, *y) {
-                            UiEvent::MouseDown {
-                                x: *x,
-                                y: *y,
-                                button: button.clone(),
-                            }
-                        } else {
-                            continue;
-                        }
-                    }
-                    UiEvent::MouseUp { x, y, button } => {
-                        if pos.contains(*x, *y) {
-                            UiEvent::MouseUp {
-                                x: *x,
-                                y: *y,
-                                button: button.clone(),
-                            }
-                        } else {
-                            continue;
-                        }
-                    }
-                    other => {
-                        let resp = self.cards[i].handle_event(other);
+        let visible = self.visible_card_count();
+        for (card_index, pos) in self
+            .visible_indices
+            .iter()
+            .take(visible)
+            .zip(self.positions.iter().take(visible))
+        {
+            let card = &mut self.cards[*card_index];
+            match event {
+                UiEvent::MouseMove { x, y } => {
+                    let _ = card.handle_event(&UiEvent::MouseMove { x: *x, y: *y });
+                }
+                UiEvent::MouseDown { x, y, button } => {
+                    if pos.contains(*x, *y) {
+                        let resp = card.handle_event(&UiEvent::MouseDown {
+                            x: *x,
+                            y: *y,
+                            button: button.clone(),
+                        });
                         if !matches!(resp, EventResponse::Ignored) {
                             return resp;
                         }
-                        continue;
                     }
-                };
-
-                let resp = self.cards[i].handle_event(&translated);
-                if !matches!(resp, EventResponse::Ignored) {
-                    return resp;
+                }
+                UiEvent::MouseUp { x, y, button } => {
+                    if pos.contains(*x, *y) {
+                        let resp = card.handle_event(&UiEvent::MouseUp {
+                            x: *x,
+                            y: *y,
+                            button: button.clone(),
+                        });
+                        if !matches!(resp, EventResponse::Ignored) {
+                            return resp;
+                        }
+                    }
+                }
+                other => {
+                    let resp = card.handle_event(other);
+                    if !matches!(resp, EventResponse::Ignored) {
+                        return resp;
+                    }
                 }
             }
-        }
-
-        // MouseMove for all cards (handled inline above via continue)
-        if let UiEvent::MouseMove { .. } = event {
-            // Already propagated above
         }
 
         EventResponse::Ignored
@@ -297,19 +412,29 @@ impl Widget for CardGrid {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::servers::SavedServer;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn make_servers(n: usize) -> Vec<SavedServer> {
-        (0..n)
-            .map(|i| SavedServer::new(format!("Server {}", i), format!("10.0.0.{}:4000", i)))
-            .collect()
+    fn make_server(name: &str, address: &str, connected_offset: Option<u64>) -> SavedServer {
+        let mut server = SavedServer::new(name, address);
+        server.last_connected = connected_offset.map(|offset| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .saturating_sub(offset)
+        });
+        server
+    }
+
+    fn make_servers() -> Vec<SavedServer> {
+        vec![
+            make_server("Recent", "10.0.0.1:4000", Some(60 * 30)),
+            make_server("Dormant", "10.0.0.2:4000", Some(10 * 24 * 60 * 60)),
+            make_server("New", "10.0.0.3:4000", None),
+        ]
     }
 
     #[test]
@@ -320,63 +445,62 @@ mod tests {
         let mut ctx = PaintContext::new();
         grid.paint(&mut ctx);
 
-        assert!(
-            ctx.glass_quads.len() >= 1,
-            "expected at least 1 glass quad (the add card)"
-        );
+        assert!(ctx.glass_quads.len() >= 1);
     }
 
     #[test]
     fn grid_layout_wraps() {
         let mut grid = CardGrid::new();
-        let servers = make_servers(5);
-        grid.set_servers(&servers);
+        grid.set_servers(&make_servers());
         grid.layout(Rect::new(0.0, 0.0, 600.0, 800.0));
 
-        // cards_per_row = floor((600 + 16) / (240 + 16)) = floor(616 / 256) = 2
-        // total items = 5 cards + 1 add = 6
-        // rows = ceil(6 / 2) = 3
-        assert_eq!(
-            grid.positions.len(),
-            6,
-            "expected 6 positions (5 cards + add)"
-        );
-
-        // Verify row wrapping: item at index 2 should be in row 1
-        let row_1_item = grid.positions[2];
-        let row_0_item = grid.positions[0];
-        assert!(
-            row_1_item.y > row_0_item.y,
-            "item 2 should be in a lower row than item 0"
-        );
-
-        // Item at index 4 should be in row 2
-        let row_2_item = grid.positions[4];
-        assert!(
-            row_2_item.y > row_1_item.y,
-            "item 4 should be in a lower row than item 2"
-        );
+        assert_eq!(grid.positions.len(), 4);
+        assert!(grid.positions[2].y > grid.positions[0].y);
     }
 
     #[test]
     fn grid_click_add() {
         let mut grid = CardGrid::new();
         grid.layout(Rect::new(0.0, 0.0, 800.0, 600.0));
-
-        // The add card is the last (and only) position
         let add_rect = grid.add_card_rect().expect("add card rect exists");
 
-        // Click in the center of the add card
         let resp = grid.handle_event(&UiEvent::MouseDown {
             x: add_rect.x + CARD_WIDTH / 2.0,
             y: add_rect.y + CARD_HEIGHT / 2.0,
             button: MouseButton::Left,
         });
 
-        assert!(
-            matches!(resp, EventResponse::Action(UiAction::AddServer)),
-            "expected AddServer action, got {:?}",
-            resp
-        );
+        assert!(matches!(resp, EventResponse::Action(UiAction::AddServer)));
+    }
+
+    #[test]
+    fn grid_can_limit_cards_and_hide_add_card() {
+        let mut grid = CardGrid::new();
+        grid.set_servers(&make_servers());
+        grid.set_visible_limit(Some(2));
+        grid.set_show_add_card(false);
+        grid.layout(Rect::new(0.0, 0.0, 900.0, 800.0));
+
+        assert_eq!(grid.positions.len(), 2);
+        assert!(grid.add_card_rect().is_none());
+    }
+
+    #[test]
+    fn clicking_filter_updates_active_filter() {
+        let mut grid = CardGrid::new();
+        grid.set_servers(&make_servers());
+        grid.set_show_filters(true);
+        grid.layout(Rect::new(0.0, 0.0, 900.0, 800.0));
+        let recent_rect = grid.filter_chip_rects[1].1;
+
+        let resp = grid.handle_event(&UiEvent::MouseDown {
+            x: recent_rect.x + 4.0,
+            y: recent_rect.y + 4.0,
+            button: MouseButton::Left,
+        });
+
+        assert!(matches!(resp, EventResponse::Consumed));
+        assert_eq!(grid.active_filter, CardFilter::Recent);
+        assert_eq!(grid.visible_card_count(), 1);
     }
 }

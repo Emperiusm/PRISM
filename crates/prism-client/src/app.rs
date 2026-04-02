@@ -19,7 +19,11 @@ use crate::renderer::stream_texture::StreamTexture;
 use crate::renderer::ui_renderer::UiRenderer;
 use crate::session_bridge::SessionBridge;
 use crate::ui::launcher::card_grid::CardGrid;
+use crate::ui::launcher::nav::LauncherNav;
+use crate::ui::launcher::profiles::ProfilesPanel;
 use crate::ui::launcher::quick_connect::QuickConnect;
+use crate::ui::launcher::settings::SettingsPanel;
+use crate::ui::launcher::LauncherTab;
 use crate::ui::overlay::conn_panel::ConnPanel;
 use crate::ui::overlay::display_panel::DisplayPanel;
 use crate::ui::overlay::perf_panel::PerfPanel;
@@ -44,8 +48,12 @@ pub struct PrismApp {
     paint_ctx: PaintContext,
     bridge: SessionBridge,
     // Launcher widgets
+    launcher_nav: LauncherNav,
+    launcher_tab: LauncherTab,
     quick_connect: QuickConnect,
     card_grid: CardGrid,
+    profiles_panel: ProfilesPanel,
+    settings_panel: SettingsPanel,
     server_store: Option<ServerStore>,
     // Overlay widgets
     stats_bar: StatsBar,
@@ -84,6 +92,7 @@ struct SceneTarget {
 impl PrismApp {
     pub fn new(config: ClientConfig) -> Self {
         let ui_state = UiState::initial(config.launch_mode);
+        let identity_path = config.identity_path.display().to_string();
 
         // Try to open the server store
         let server_store = ServerStore::open(&config.servers_dir).ok();
@@ -103,8 +112,15 @@ impl PrismApp {
             coalescer: InputCoalescer::new(),
             paint_ctx: PaintContext::new(),
             bridge: SessionBridge::new(),
+            launcher_nav: LauncherNav::new(),
+            launcher_tab: LauncherTab::Home,
             quick_connect: QuickConnect::new(),
             card_grid,
+            profiles_panel: ProfilesPanel::new(),
+            settings_panel: SettingsPanel::new(
+                identity_path,
+                env!("CARGO_PKG_VERSION").to_string(),
+            ),
             server_store,
             stats_bar: StatsBar::new(),
             perf_panel: PerfPanel::new(),
@@ -509,18 +525,82 @@ impl PrismApp {
         Ok(bridge)
     }
 
+    fn configure_launcher_widgets(&mut self) {
+        match self.launcher_tab {
+            LauncherTab::Home => {
+                self.card_grid.set_visible_limit(Some(3));
+                self.card_grid.set_show_add_card(false);
+                self.card_grid.set_show_filters(false);
+            }
+            LauncherTab::SavedConnections => {
+                self.card_grid.set_visible_limit(None);
+                self.card_grid.set_show_add_card(true);
+                self.card_grid.set_show_filters(true);
+            }
+            LauncherTab::Profiles | LauncherTab::Settings => {
+                self.card_grid.set_visible_limit(None);
+                self.card_grid.set_show_add_card(false);
+                self.card_grid.set_show_filters(false);
+            }
+        }
+    }
+
+    fn launcher_sidebar_rect(screen_h: f32) -> Rect {
+        Rect::new(28.0, 28.0, 224.0, (screen_h - 56.0).max(280.0))
+    }
+
+    fn launcher_content_rect(sidebar_rect: Rect, screen_w: f32, screen_h: f32) -> Rect {
+        let content_x = sidebar_rect.x + sidebar_rect.w + 28.0;
+        Rect::new(
+            content_x,
+            42.0,
+            (screen_w - content_x - 28.0).max(320.0),
+            (screen_h - 70.0).max(320.0),
+        )
+    }
+
+    fn route_launcher_event(&mut self, event: &UiEvent) -> EventResponse {
+        self.configure_launcher_widgets();
+
+        let resp = self.launcher_nav.handle_event(event);
+        if !matches!(resp, EventResponse::Ignored) {
+            return resp;
+        }
+
+        match self.launcher_tab {
+            LauncherTab::Home => {
+                let resp = self.quick_connect.handle_event(event);
+                if !matches!(resp, EventResponse::Ignored) {
+                    return resp;
+                }
+                self.card_grid.handle_event(event)
+            }
+            LauncherTab::SavedConnections => self.card_grid.handle_event(event),
+            LauncherTab::Profiles => self.profiles_panel.handle_event(event),
+            LauncherTab::Settings => self.settings_panel.handle_event(event),
+        }
+    }
+
     /// Handle a UiAction from widget events.
     fn handle_action(&mut self, action: UiAction) {
         match action {
             UiAction::Connect { address, .. } => {
+                self.launcher_tab = LauncherTab::Home;
                 self.start_connection(&address);
+            }
+            UiAction::OpenLauncherTab(tab) => {
+                self.launcher_tab = tab;
             }
             UiAction::Disconnect => {
                 self.bridge = SessionBridge::new();
                 self.stream_texture = None;
                 self.stream_bind_group = None;
                 self.ui_state = UiState::Launcher;
+                self.launcher_tab = LauncherTab::Home;
                 self.stats_bar.hide();
+            }
+            UiAction::OpenSettings => {
+                self.launcher_tab = LauncherTab::Settings;
             }
             UiAction::CloseOverlay => {
                 self.ui_state = UiState::Stream;
@@ -627,10 +707,9 @@ impl PrismApp {
             );
         }
 
-        let scene = match self.scene_target.as_ref() {
-            Some(scene) => scene,
-            None => return,
-        };
+        if self.scene_target.is_none() {
+            return;
+        }
 
         // ── Stream rendering (Stream and Overlay states) ─────────────────
         if self.ui_state.shows_stream() {
@@ -676,6 +755,7 @@ impl PrismApp {
         }
 
         {
+            let scene = self.scene_target.as_ref().expect("scene target");
             let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -699,6 +779,7 @@ impl PrismApp {
         if self.ui_state.shows_stream()
             && let Some(bg) = &self.stream_bind_group
         {
+            let scene = self.scene_target.as_ref().expect("scene target");
             let renderer = self.renderer.as_ref().expect("renderer exists");
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Stream Pass"),
@@ -719,11 +800,15 @@ impl PrismApp {
             pass.draw(0..3, 0..1);
         }
 
-        scene
-            .blur_pipeline
-            .run(&mut encoder, &scene.blur_bind_group);
+        {
+            let scene = self.scene_target.as_ref().expect("scene target");
+            scene
+                .blur_pipeline
+                .run(&mut encoder, &scene.blur_bind_group);
+        }
 
         {
+            let scene = self.scene_target.as_ref().expect("scene target");
             let renderer = self.renderer.as_ref().expect("renderer exists");
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Composite Pass"),
@@ -800,12 +885,18 @@ impl PrismApp {
 
             // Render overlay UI on top of stream
             if let Some(ui_renderer) = &mut self.ui_renderer {
+                let backdrop_view = self
+                    .scene_target
+                    .as_ref()
+                    .expect("scene target")
+                    .blur_pipeline
+                    .output_view();
                 ui_renderer.render(
                     &renderer.device,
                     &renderer.queue,
                     &mut encoder,
                     &view,
-                    scene.blur_pipeline.output_view(),
+                    backdrop_view,
                     renderer.width(),
                     renderer.height(),
                     &self.paint_ctx,
@@ -815,49 +906,44 @@ impl PrismApp {
 
         // ── Launcher UI ──────────────────────────────────────────────────
         if self.ui_state.shows_launcher() {
-            let renderer = self.renderer.as_ref().expect("renderer exists");
-            let screen_w = renderer.width() as f32;
-            let screen_h = renderer.height() as f32;
+            let (screen_w, screen_h) = {
+                let renderer = self.renderer.as_ref().expect("renderer exists");
+                (renderer.width() as f32, renderer.height() as f32)
+            };
+            let sidebar_rect = Self::launcher_sidebar_rect(screen_h);
+            let content_rect = Self::launcher_content_rect(sidebar_rect, screen_w, screen_h);
 
-            // Layout widgets
-            let content_w = (screen_w - 96.0).min(1040.0);
-            let content_x = (screen_w - content_w) * 0.5;
-            let quick_y = 150.0;
-            let section_y = quick_y + 130.0;
-            let card_y = section_y + 34.0;
+            self.configure_launcher_widgets();
+            self.launcher_nav.set_active_tab(self.launcher_tab);
+            self.launcher_nav.layout(sidebar_rect);
 
-            self.quick_connect
-                .layout(Rect::new(content_x, quick_y, content_w, 94.0));
-            self.card_grid.layout(Rect::new(
-                content_x,
-                card_y,
-                content_w,
-                (screen_h - card_y - 40.0).max(0.0),
-            ));
-
-            // Paint into PaintContext
             self.paint_ctx.clear();
+            self.launcher_nav.paint(&mut self.paint_ctx);
 
+            let title_x = content_rect.x;
+            let title_y = content_rect.y + 6.0;
             self.paint_ctx.push_text_run(TextRun {
-                x: content_x,
-                y: 52.0,
-                text: "PRISM".to_string(),
-                font_size: 44.0,
+                x: title_x,
+                y: title_y,
+                text: self.launcher_tab.title().to_string(),
+                font_size: 30.0,
                 color: theme::TEXT_PRIMARY,
                 monospace: false,
             });
 
             self.paint_ctx.push_text_run(TextRun {
-                x: content_x,
-                y: 104.0,
-                text: "Connect instantly or reopen the desktops you use most.".to_string(),
+                x: title_x,
+                y: title_y + 40.0,
+                text: self.launcher_tab.subtitle().to_string(),
                 font_size: 14.0,
                 color: theme::TEXT_SECONDARY,
                 monospace: false,
             });
 
             if self.ui_state == UiState::Connecting {
-                let status_rect = Rect::new(content_x + 268.0, 56.0, 148.0, 28.0);
+                let chip_w = theme::text_width("Connecting...", 12.0) + 28.0;
+                let status_rect =
+                    Rect::new(content_rect.x + content_rect.w - chip_w, title_y + 2.0, chip_w, 28.0);
                 self.paint_ctx.push_glass_quad(theme::glass_quad(
                     status_rect,
                     [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.12],
@@ -874,33 +960,81 @@ impl PrismApp {
                 });
             }
 
-            self.quick_connect.paint(&mut self.paint_ctx);
+            match self.launcher_tab {
+                LauncherTab::Home => {
+                    let quick_y = content_rect.y + 92.0;
+                    let section_y = quick_y + 132.0;
+                    let card_y = section_y + 34.0;
 
-            self.paint_ctx.push_text_run(TextRun {
-                x: content_x,
-                y: section_y,
-                text: "Saved desktops".to_string(),
-                font_size: 12.0,
-                color: theme::TEXT_MUTED,
-                monospace: false,
-            });
-            self.paint_ctx.push_glass_quad(theme::separator(Rect::new(
-                content_x,
-                section_y + 20.0,
-                content_w,
-                1.0,
-            )));
-
-            self.card_grid.paint(&mut self.paint_ctx);
+                    self.quick_connect
+                        .layout(Rect::new(content_rect.x, quick_y, content_rect.w, 94.0));
+                    self.card_grid.layout(Rect::new(
+                        content_rect.x,
+                        card_y,
+                        content_rect.w,
+                        (content_rect.y + content_rect.h - card_y).max(0.0),
+                    ));
+                    self.quick_connect.paint(&mut self.paint_ctx);
+                    self.paint_ctx.push_text_run(TextRun {
+                        x: content_rect.x,
+                        y: section_y,
+                        text: "Recent connections".to_string(),
+                        font_size: 12.0,
+                        color: theme::TEXT_MUTED,
+                        monospace: false,
+                    });
+                    self.paint_ctx.push_glass_quad(theme::separator(Rect::new(
+                        content_rect.x,
+                        section_y + 20.0,
+                        content_rect.w,
+                        1.0,
+                    )));
+                    self.card_grid.paint(&mut self.paint_ctx);
+                }
+                LauncherTab::SavedConnections => {
+                    self.card_grid.layout(Rect::new(
+                        content_rect.x,
+                        content_rect.y + 92.0,
+                        content_rect.w,
+                        (content_rect.h - 92.0).max(0.0),
+                    ));
+                    self.card_grid.paint(&mut self.paint_ctx);
+                }
+                LauncherTab::Profiles => {
+                    self.profiles_panel.layout(Rect::new(
+                        content_rect.x,
+                        content_rect.y + 92.0,
+                        content_rect.w,
+                        (content_rect.h - 92.0).max(0.0),
+                    ));
+                    self.profiles_panel.paint(&mut self.paint_ctx);
+                }
+                LauncherTab::Settings => {
+                    self.settings_panel.layout(Rect::new(
+                        content_rect.x,
+                        content_rect.y + 92.0,
+                        content_rect.w,
+                        (content_rect.h - 92.0).max(0.0),
+                    ));
+                    self.settings_panel.paint(&mut self.paint_ctx);
+                }
+            }
 
             // Render UI
             if let Some(ui_renderer) = &mut self.ui_renderer {
+                let renderer = self.renderer.as_ref().expect("renderer exists");
+                let backdrop_view = self
+                    .scene_target
+                    .as_ref()
+                    .expect("scene target")
+                    .blur_pipeline
+                    .output_view();
                 ui_renderer.render(
                     &renderer.device,
                     &renderer.queue,
                     &mut encoder,
                     &view,
-                    scene.blur_pipeline.output_view(),
+                    backdrop_view,
                     renderer.width(),
                     renderer.height(),
                     &self.paint_ctx,
@@ -1003,8 +1137,7 @@ impl ApplicationHandler for PrismApp {
                         x: self.mouse_x,
                         y: self.mouse_y,
                     };
-                    let _ = self.quick_connect.handle_event(&event);
-                    let _ = self.card_grid.handle_event(&event);
+                    let _ = self.route_launcher_event(&event);
                 }
                 if self.ui_state.shows_overlay() {
                     let event = UiEvent::MouseMove {
@@ -1035,16 +1168,7 @@ impl ApplicationHandler for PrismApp {
                 };
 
                 if self.ui_state.shows_launcher() {
-                    // Route to launcher widgets and handle actions
-                    match self.quick_connect.handle_event(&ui_event) {
-                        EventResponse::Action(action) => {
-                            self.handle_action(action);
-                            return;
-                        }
-                        EventResponse::Consumed => return,
-                        EventResponse::Ignored => {}
-                    }
-                    match self.card_grid.handle_event(&ui_event) {
+                    match self.route_launcher_event(&ui_event) {
                         EventResponse::Action(action) => {
                             self.handle_action(action);
                             return;
@@ -1145,13 +1269,11 @@ impl ApplicationHandler for PrismApp {
                     };
                     if let Some(key) = ui_key {
                         let ev = UiEvent::KeyDown { key };
-                        match self.quick_connect.handle_event(&ev) {
+                        match self.route_launcher_event(&ev) {
                             EventResponse::Action(action) => {
                                 self.handle_action(action);
                             }
-                            _ => {
-                                let _ = self.card_grid.handle_event(&ev);
-                            }
+                            _ => {}
                         }
                     }
 
@@ -1160,7 +1282,7 @@ impl ApplicationHandler for PrismApp {
                         for c in ch.chars() {
                             if !c.is_control() {
                                 let ev = UiEvent::TextInput { ch: c };
-                                let _ = self.quick_connect.handle_event(&ev);
+                                let _ = self.route_launcher_event(&ev);
                             }
                         }
                     }
