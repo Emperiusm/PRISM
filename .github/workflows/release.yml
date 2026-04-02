@@ -23,6 +23,8 @@ jobs:
           key: release
 
       - name: Build release binaries
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
         run: cargo build --release -p prism-server -p prism-client
 
       - name: Prepare artifacts
