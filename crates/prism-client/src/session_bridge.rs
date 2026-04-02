@@ -13,7 +13,7 @@ use crate::ui::overlay::stats_bar::SessionStats;
 // ---------------------------------------------------------------------------
 
 /// Commands from UI → Network
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ControlCommand {
     SwitchProfile(String),
     UpdateQuality {
@@ -279,6 +279,28 @@ mod tests {
 
         let cmd = network.control_rx.try_recv().unwrap();
         assert!(matches!(cmd, ControlCommand::SwitchProfile(ref s) if s == "Coding"));
+    }
+
+    #[test]
+    fn bridge_quality_command() {
+        let (bridge, mut network) = SessionBridge::create_connected();
+        bridge.send_control(ControlCommand::UpdateQuality {
+            encoder_preset: Some("Balanced".into()),
+            max_fps: Some(90),
+            lossless_text: Some(true),
+            region_detection: Some(false),
+        });
+
+        let cmd = network.control_rx.try_recv().unwrap();
+        assert_eq!(
+            cmd,
+            ControlCommand::UpdateQuality {
+                encoder_preset: Some("Balanced".into()),
+                max_fps: Some(90),
+                lossless_text: Some(true),
+                region_detection: Some(false),
+            }
+        );
     }
 
     #[test]

@@ -33,8 +33,8 @@ impl ServerForm {
             address_input: TextInput::new("host:port"),
             noise_key_input: TextInput::new("Noise public key (optional)"),
             profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0),
-            save_button: Button::new("Save", UiAction::AddServer).with_style(ButtonStyle::Primary),
-            cancel_button: Button::new("Cancel", UiAction::CloseOverlay)
+            save_button: Button::new("Save", UiAction::SaveServer).with_style(ButtonStyle::Primary),
+            cancel_button: Button::new("Cancel", UiAction::CancelModal)
                 .with_style(ButtonStyle::Secondary),
             editing_id: None,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
@@ -52,6 +52,10 @@ impl ServerForm {
 
     pub fn is_visible(&self) -> bool {
         self.visible
+    }
+
+    pub fn editing_id(&self) -> Option<uuid::Uuid> {
+        self.editing_id
     }
 
     /// Populate fields from an existing saved server for editing.
@@ -184,17 +188,16 @@ impl Widget for ServerForm {
             return EventResponse::Ignored;
         }
 
-        // Cancel button → hide
+        // Cancel button -> parent handles modal dismissal.
         let cancel_resp = self.cancel_button.handle_event(event);
-        if matches!(cancel_resp, EventResponse::Action(UiAction::CloseOverlay)) {
-            self.visible = false;
-            return EventResponse::Consumed;
+        if !matches!(cancel_resp, EventResponse::Ignored) {
+            return cancel_resp;
         }
 
-        // Save button → signal parent
+        // Save button -> parent persists the form.
         let save_resp = self.save_button.handle_event(event);
-        if matches!(save_resp, EventResponse::Action(_)) {
-            return EventResponse::Consumed;
+        if !matches!(save_resp, EventResponse::Ignored) {
+            return save_resp;
         }
 
         // Remaining sub-widgets

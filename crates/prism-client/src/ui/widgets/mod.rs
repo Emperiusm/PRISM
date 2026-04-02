@@ -10,6 +10,9 @@ pub mod separator;
 pub mod slider;
 pub mod sparkline;
 pub mod text_input;
+pub mod toggle;
+
+use crate::ui::launcher::LauncherTab;
 
 // ---------------------------------------------------------------------------
 // Geometry
@@ -188,6 +191,7 @@ pub enum UiAction {
         address: String,
         noise_key: Option<String>,
     },
+    OpenLauncherTab(LauncherTab),
     Disconnect,
     SwitchServer {
         address: String,
@@ -208,7 +212,9 @@ pub enum UiAction {
     EditServer(uuid::Uuid),
     DeleteServer(uuid::Uuid),
     AddServer,
-    OpenSettings,
+    SaveServer,
+    CancelModal,
+    ConfirmDeleteServer(uuid::Uuid),
 }
 
 // ---------------------------------------------------------------------------
