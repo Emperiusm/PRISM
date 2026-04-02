@@ -10,6 +10,7 @@ use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
 use crate::config::ClientConfig;
+use crate::config::client_config_prefs::UserPrefs;
 use crate::config::profiles::ProfileStore;
 use crate::config::servers::ServerStore;
 use crate::input::InputCoalescer;
@@ -106,12 +107,25 @@ impl PrismApp {
         if let Some(store) = &profile_store {
             profiles_panel.set_profile_store(store.clone());
         }
+        let mut settings_panel = SettingsPanel::new(identity_path, env!("CARGO_PKG_VERSION").to_string());
+        if let Some(store) = &profile_store
+            && let Ok(guard) = store.lock()
+        {
+            let names = guard
+                .list()
+                .iter()
+                .map(|profile| profile.name.clone())
+                .collect::<Vec<_>>();
+            settings_panel.set_profile_names(names);
+        }
+        let user_prefs = Arc::new(Mutex::new(UserPrefs::load(&config.servers_dir)));
+        settings_panel.set_user_prefs(user_prefs, config.servers_dir.clone());
         let launcher_shell = LauncherShell::new(
             LauncherNav::new(),
             QuickConnect::new(),
             card_grid,
             profiles_panel,
-            SettingsPanel::new(identity_path, env!("CARGO_PKG_VERSION").to_string()),
+            settings_panel,
             ServerForm::new(),
         );
 
