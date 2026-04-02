@@ -79,6 +79,11 @@ impl CardGrid {
         }
     }
 
+    pub fn reset_filter(&mut self) {
+        self.active_filter = CardFilter::All;
+        self.recompute_layout();
+    }
+
     fn toolbar_height(&self) -> f32 {
         if self.show_filters {
             TOOLBAR_H
