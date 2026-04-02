@@ -12,7 +12,7 @@ use winit::window::{Window, WindowId};
 use crate::config::ClientConfig;
 use crate::config::client_config_prefs::UserPrefs;
 use crate::config::profiles::{ProfileConfig, ProfileStore};
-use crate::config::servers::ServerStore;
+use crate::config::servers::{SavedServer, ServerStore};
 use crate::input::InputCoalescer;
 use crate::input::double_tap::DoubleTapDetector;
 use crate::renderer::PrismRenderer;
@@ -25,13 +25,12 @@ use crate::ui::launcher::nav::LauncherNav;
 use crate::ui::launcher::profiles::ProfilesPanel;
 use crate::ui::launcher::quick_connect::QuickConnect;
 use crate::ui::launcher::server_form::ServerForm;
-use crate::ui::launcher::shell::LauncherShell;
 use crate::ui::launcher::settings::SettingsPanel;
+use crate::ui::launcher::shell::LauncherShell;
 use crate::ui::launcher::{ActiveModal, FormMode, LauncherTab};
 use crate::ui::overlay::capsule::OverlayCapsule;
 use crate::ui::widgets::{
-    EventResponse, MouseButton as UiMouseButton, PaintContext, Rect, UiAction, UiEvent,
-    Widget,
+    EventResponse, MouseButton as UiMouseButton, PaintContext, Rect, UiAction, UiEvent, Widget,
 };
 use crate::ui::{UiState, theme};
 
@@ -101,7 +100,8 @@ impl PrismApp {
         if let Some(store) = &profile_store {
             profiles_panel.set_profile_store(store.clone());
         }
-        let mut settings_panel = SettingsPanel::new(identity_path, env!("CARGO_PKG_VERSION").to_string());
+        let mut settings_panel =
+            SettingsPanel::new(identity_path, env!("CARGO_PKG_VERSION").to_string());
         if let Some(store) = &profile_store
             && let Ok(guard) = store.lock()
         {
@@ -233,7 +233,9 @@ impl PrismApp {
             store
                 .servers()
                 .iter()
-                .find(|server| server.address == raw_address || server.address == normalized_address)
+                .find(|server| {
+                    server.address == raw_address || server.address == normalized_address
+                })
                 .map(|server| server.default_profile.clone())
         });
         let profile_name = preferred_profile.unwrap_or_else(|| "Balanced".to_string());
@@ -266,6 +268,64 @@ impl PrismApp {
         });
         self.bridge
             .send_control(ControlCommand::SetBandwidthLimit(profile.bitrate_bps));
+    }
+
+    fn ensure_server_store(&mut self) -> Option<&mut ServerStore> {
+        if self.server_store.is_none() {
+            self.server_store = ServerStore::open(&self.config.servers_dir).ok();
+        }
+        self.server_store.as_mut()
+    }
+
+    fn refresh_saved_servers(&mut self) {
+        if let Some(store) = &self.server_store {
+            self.launcher_shell.set_servers(store.servers());
+        } else {
+            self.launcher_shell.set_servers(&[]);
+        }
+    }
+
+    fn save_server_from_modal(&mut self) {
+        let Some((display_name, address, noise_key, default_profile)) =
+            self.launcher_shell.server_form_data()
+        else {
+            return;
+        };
+        let display_name = display_name.trim();
+        let address = address.trim();
+        if display_name.is_empty() || address.is_empty() {
+            tracing::warn!("server form requires non-empty name and address");
+            return;
+        }
+
+        let editing_id = self.launcher_shell.server_form_editing_id();
+        let mut save_error: Option<std::io::Error> = None;
+        if let Some(store) = self.ensure_server_store() {
+            let result = if let Some(server_id) = editing_id {
+                store.update(server_id, |server| {
+                    server.display_name = display_name.to_string();
+                    server.address = address.to_string();
+                    server.noise_public_key = noise_key.clone();
+                    server.default_profile = default_profile.clone();
+                })
+            } else {
+                let mut server = SavedServer::new(display_name, address);
+                server.noise_public_key = noise_key;
+                server.default_profile = default_profile;
+                store.add(server)
+            };
+            if let Err(err) = result {
+                save_error = Some(err);
+            }
+        }
+
+        if let Some(err) = save_error {
+            tracing::error!(%err, "failed to persist saved server");
+            return;
+        }
+
+        self.refresh_saved_servers();
+        self.launcher_shell.dismiss_modal();
     }
 
     /// Initiate an async connection to the given server address on a background
@@ -432,8 +492,8 @@ impl PrismApp {
             use prism_protocol::channel::CHANNEL_CONTROL;
             use prism_protocol::header::{HEADER_SIZE, PrismHeader};
             use prism_session::control_msg::{
-                MONITOR_LAYOUT, PROFILE_SWITCH, QUALITY_UPDATE, SESSION_INFO, ProfileSwitchPayload,
-                QualityUpdatePayload,
+                MONITOR_LAYOUT, PROFILE_SWITCH, ProfileSwitchPayload, QUALITY_UPDATE,
+                QualityUpdatePayload, SESSION_INFO,
             };
 
             let mut sequence = 1_u32;
@@ -696,6 +756,10 @@ impl PrismApp {
                 self.launcher_shell.set_tab(LauncherTab::Home);
                 self.start_connection(&address);
             }
+            UiAction::SwitchServer { address } => {
+                self.launcher_shell.set_tab(LauncherTab::Home);
+                self.start_connection(&address);
+            }
             UiAction::OpenLauncherTab(tab) => {
                 self.launcher_shell.set_tab(tab);
             }
@@ -713,14 +777,66 @@ impl PrismApp {
                     mode: FormMode::Add,
                 });
             }
+            UiAction::SaveServer => {
+                self.save_server_from_modal();
+            }
             UiAction::CancelModal => {
+                self.launcher_shell.dismiss_modal();
+            }
+            UiAction::EditServer(server_id) => {
+                let server = self
+                    .server_store
+                    .as_ref()
+                    .and_then(|store| store.get(server_id))
+                    .cloned();
+                if let Some(server) = server {
+                    self.launcher_shell.set_server_form_editing(&server);
+                    self.launcher_shell.show_modal(ActiveModal::ServerForm {
+                        mode: FormMode::Edit { server_id },
+                    });
+                }
+            }
+            UiAction::DeleteServer(server_id) => {
+                let server = self
+                    .server_store
+                    .as_ref()
+                    .and_then(|store| store.get(server_id))
+                    .cloned();
+                if let Some(server) = server {
+                    self.launcher_shell.show_modal(ActiveModal::ConfirmDelete {
+                        server_id,
+                        name: server.display_name,
+                    });
+                }
+            }
+            UiAction::ConfirmDeleteServer(server_id) => {
+                let mut delete_error: Option<std::io::Error> = None;
+                if let Some(store) = self.ensure_server_store()
+                    && let Err(err) = store.delete(server_id)
+                {
+                    delete_error = Some(err);
+                }
+
+                if let Some(err) = delete_error {
+                    tracing::error!(%err, "failed to delete saved server");
+                } else {
+                    self.refresh_saved_servers();
+                }
                 self.launcher_shell.dismiss_modal();
             }
             UiAction::CloseOverlay => {
                 self.ui_state = UiState::Stream;
                 self.overlay_capsule.hide();
             }
-            UiAction::OpenPanel(_) | UiAction::ClosePanel(_) | UiAction::TogglePinStatsBar => {}
+            UiAction::OpenPanel(_) => {
+                // Overlay capsule handles panel expansion internally.
+            }
+            UiAction::ClosePanel(_) => {
+                // Overlay capsule handles panel collapse internally.
+            }
+            UiAction::TogglePinStatsBar => {
+                // Pinning is currently local to the overlay widget.
+            }
             UiAction::SwitchProfile(profile_name) => {
                 self.bridge
                     .send_control(ControlCommand::SwitchProfile(profile_name));
@@ -745,10 +861,6 @@ impl PrismApp {
             UiAction::SelectMonitor(index) => {
                 self.bridge
                     .send_control(ControlCommand::SelectMonitor(index));
-            }
-            _ => {
-                // Other actions not yet wired
-                tracing::debug!(?action, "unhandled UI action");
             }
         }
     }
@@ -1228,11 +1340,8 @@ impl ApplicationHandler for PrismApp {
                     };
                     if let Some(key) = ui_key {
                         let ev = UiEvent::KeyDown { key };
-                        match self.route_launcher_event(&ev) {
-                            EventResponse::Action(action) => {
-                                self.handle_action(action);
-                            }
-                            _ => {}
+                        if let EventResponse::Action(action) = self.route_launcher_event(&ev) {
+                            self.handle_action(action);
                         }
                     }
 

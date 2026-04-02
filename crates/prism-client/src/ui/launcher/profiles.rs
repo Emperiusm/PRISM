@@ -149,11 +149,21 @@ impl ProfilesPanel {
     }
 
     fn fps_options() -> Vec<String> {
-        vec!["30".into(), "45".into(), "60".into(), "90".into(), "120".into()]
+        vec![
+            "30".into(),
+            "45".into(),
+            "60".into(),
+            "90".into(),
+            "120".into(),
+        ]
     }
 
     fn encoder_options() -> Vec<String> {
-        vec!["UltraLowLatency".into(), "Balanced".into(), "Quality".into()]
+        vec![
+            "UltraLowLatency".into(),
+            "Balanced".into(),
+            "Quality".into(),
+        ]
     }
 
     fn audio_options() -> Vec<String> {
@@ -359,7 +369,8 @@ impl Widget for ProfilesPanel {
         self.auto_reconnect_toggle.layout(Rect::new(x, y, w, 22.0));
 
         let buttons_y = (editor.y + editor.h - 48.0).max(y + 16.0);
-        self.discard_button.layout(Rect::new(x, buttons_y, 132.0, 40.0));
+        self.discard_button
+            .layout(Rect::new(x, buttons_y, 132.0, 40.0));
         self.save_button
             .layout(Rect::new(x + 146.0, buttons_y, 132.0, 40.0));
 

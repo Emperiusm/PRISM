@@ -3,6 +3,7 @@
 
 use super::{ActiveModal, FormMode, LauncherTab};
 use crate::config::servers::SavedServer;
+use crate::ui::UiState;
 use crate::ui::launcher::card_grid::CardGrid;
 use crate::ui::launcher::nav::LauncherNav;
 use crate::ui::launcher::profiles::ProfilesPanel;
@@ -13,7 +14,6 @@ use crate::ui::theme;
 use crate::ui::widgets::{
     EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
-use crate::ui::UiState;
 
 const SIDEBAR_W: f32 = 224.0;
 const SIDEBAR_PAD: f32 = 28.0;
@@ -115,6 +115,28 @@ impl LauncherShell {
 
     pub fn has_modal(&self) -> bool {
         self.active_modal.is_some()
+    }
+
+    pub fn active_modal(&self) -> Option<&ActiveModal> {
+        self.active_modal.as_ref()
+    }
+
+    pub fn set_server_form_editing(&mut self, server: &SavedServer) {
+        self.server_form.set_editing(server);
+    }
+
+    pub fn server_form_data(&self) -> Option<(String, String, Option<String>, String)> {
+        matches!(
+            self.active_modal,
+            Some(ActiveModal::ServerForm {
+                mode: FormMode::Add | FormMode::Edit { .. }
+            })
+        )
+        .then(|| self.server_form.form_data())
+    }
+
+    pub fn server_form_editing_id(&self) -> Option<uuid::Uuid> {
+        self.server_form.editing_id()
     }
 
     fn configure_widgets(&mut self) {
@@ -281,6 +303,17 @@ impl LauncherShell {
         )
     }
 
+    fn delete_modal_buttons(panel: Rect) -> (Rect, Rect) {
+        let button_y = panel.y + panel.h - 58.0;
+        let button_w = 128.0;
+        let gap = 14.0;
+        let total_w = button_w * 2.0 + gap;
+        let start_x = panel.x + (panel.w - total_w) * 0.5;
+        let cancel = Rect::new(start_x, button_y, button_w, 34.0);
+        let confirm = Rect::new(start_x + button_w + gap, button_y, button_w, 34.0);
+        (cancel, confirm)
+    }
+
     fn paint_modal_layer(&self, ctx: &mut PaintContext) {
         if let Some(modal) = &self.active_modal {
             ctx.push_glass_quad(theme::modal_scrim(self.screen_rect));
@@ -305,6 +338,39 @@ impl LauncherShell {
                         text: format!("Are you sure you want to remove \"{name}\"?"),
                         font_size: theme::FONT_BODY,
                         color: theme::TEXT_SECONDARY,
+                        monospace: false,
+                    });
+                    let (cancel_rect, confirm_rect) = Self::delete_modal_buttons(panel);
+                    ctx.push_glass_quad(theme::glass_quad(
+                        cancel_rect,
+                        [1.0, 1.0, 1.0, 0.06],
+                        [1.0, 1.0, 1.0, 0.12],
+                        theme::CHIP_RADIUS,
+                    ));
+                    ctx.push_glass_quad(theme::glass_quad(
+                        confirm_rect,
+                        [theme::DANGER[0], theme::DANGER[1], theme::DANGER[2], 0.18],
+                        [theme::DANGER[0], theme::DANGER[1], theme::DANGER[2], 0.24],
+                        theme::CHIP_RADIUS,
+                    ));
+                    let cancel_label = "Cancel";
+                    let delete_label = "Delete";
+                    ctx.push_text_run(TextRun {
+                        x: cancel_rect.x
+                            + (cancel_rect.w - theme::text_width(cancel_label, 12.0)) * 0.5,
+                        y: cancel_rect.y + 9.0,
+                        text: cancel_label.to_string(),
+                        font_size: 12.0,
+                        color: theme::TEXT_SECONDARY,
+                        monospace: false,
+                    });
+                    ctx.push_text_run(TextRun {
+                        x: confirm_rect.x
+                            + (confirm_rect.w - theme::text_width(delete_label, 12.0)) * 0.5,
+                        y: confirm_rect.y + 9.0,
+                        text: delete_label.to_string(),
+                        font_size: 12.0,
+                        color: theme::TEXT_PRIMARY,
                         monospace: false,
                     });
                 }
@@ -342,6 +408,23 @@ impl Widget for LauncherShell {
                 let resp = self.server_form.handle_event(event);
                 if !matches!(resp, EventResponse::Ignored) {
                     return resp;
+                }
+            }
+
+            if let Some(ActiveModal::ConfirmDelete { server_id, .. }) = &self.active_modal
+                && let UiEvent::MouseDown {
+                    x,
+                    y,
+                    button: MouseButton::Left,
+                } = event
+            {
+                let panel = self.modal_panel_rect();
+                let (cancel_rect, confirm_rect) = Self::delete_modal_buttons(panel);
+                if cancel_rect.contains(*x, *y) {
+                    return EventResponse::Action(UiAction::CancelModal);
+                }
+                if confirm_rect.contains(*x, *y) {
+                    return EventResponse::Action(UiAction::ConfirmDeleteServer(*server_id));
                 }
             }
 

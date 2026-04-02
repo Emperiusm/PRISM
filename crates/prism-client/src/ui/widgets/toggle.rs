@@ -3,9 +3,7 @@
 
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
-use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, UiEvent, Widget,
-};
+use crate::ui::widgets::{EventResponse, MouseButton, PaintContext, Rect, Size, UiEvent, Widget};
 
 const TRACK_W: f32 = 44.0;
 const TRACK_H: f32 = 22.0;

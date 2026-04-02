@@ -6,7 +6,9 @@ use super::display_panel::DisplayPanel;
 use super::perf_panel::PerfPanel;
 use super::quality_panel::QualityPanel;
 use super::stats_bar::{SessionStats, StatsBar};
-use crate::ui::widgets::{EventResponse, MouseButton, PaintContext, Rect, Size, UiAction, UiEvent, Widget};
+use crate::ui::widgets::{
+    EventResponse, MouseButton, PaintContext, Rect, Size, UiAction, UiEvent, Widget,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CapsulePanel {
@@ -101,7 +103,7 @@ impl Widget for OverlayCapsule {
             return Size { w: 0.0, h: 0.0 };
         }
 
-        let capsule_w = (available.w - 40.0).min(660.0).max(320.0);
+        let capsule_w = (available.w - 40.0).clamp(320.0, 660.0);
         let capsule_x = available.x + (available.w - capsule_w) * 0.5;
         self.capsule_rect = Rect::new(capsule_x, available.y + 18.0, capsule_w, 48.0);
         self.stats_bar.layout(self.capsule_rect);

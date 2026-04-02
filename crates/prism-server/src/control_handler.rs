@@ -14,8 +14,8 @@ use prism_protocol::{
 };
 use prism_session::{
     control_msg::{
-        HEARTBEAT, PROBE_REQUEST, PROBE_RESPONSE, PROFILE_SWITCH, QUALITY_UPDATE,
-        ProfileSwitchPayload, QualityUpdatePayload,
+        HEARTBEAT, PROBE_REQUEST, PROBE_RESPONSE, PROFILE_SWITCH, ProfileSwitchPayload,
+        QUALITY_UPDATE, QualityUpdatePayload,
     },
     dispatch::{ChannelError, ChannelHandler},
     types::ClientId,
@@ -118,7 +118,7 @@ mod tests {
         header::{PROTOCOL_VERSION, PrismHeader},
     };
     use prism_session::control_msg::{
-        HEARTBEAT, PROBE_REQUEST, PROFILE_SWITCH, QUALITY_UPDATE, ProfileSwitchPayload,
+        HEARTBEAT, PROBE_REQUEST, PROFILE_SWITCH, ProfileSwitchPayload, QUALITY_UPDATE,
         QualityUpdatePayload,
     };
     use uuid::Uuid;
