@@ -22,6 +22,7 @@ pub const PANEL_RADIUS: f32 = 22.0;
 pub const CARD_RADIUS: f32 = 20.0;
 pub const CONTROL_RADIUS: f32 = 14.0;
 pub const CHIP_RADIUS: f32 = 12.0;
+pub const SIDEBAR_RADIUS: f32 = 28.0;
 
 pub fn glass_quad(
     rect: Rect,
@@ -63,6 +64,36 @@ pub fn floating_surface(rect: Rect) -> GlassQuad {
         [0.12, 0.16, 0.22, 0.78],
         [1.0, 1.0, 1.0, 0.16],
         PANEL_RADIUS,
+    )
+}
+
+pub fn sidebar_surface(rect: Rect) -> GlassQuad {
+    glass_quad(
+        rect,
+        [0.10, 0.14, 0.19, 0.84],
+        [1.0, 1.0, 1.0, 0.10],
+        SIDEBAR_RADIUS,
+    )
+}
+
+pub fn nav_item_surface(rect: Rect, active: bool, hovered: bool) -> GlassQuad {
+    glass_quad(
+        rect,
+        if active {
+            [ACCENT[0], ACCENT[1], ACCENT[2], 0.18]
+        } else if hovered {
+            [1.0, 1.0, 1.0, 0.06]
+        } else {
+            [1.0, 1.0, 1.0, 0.0]
+        },
+        if active {
+            [ACCENT[0], ACCENT[1], ACCENT[2], 0.22]
+        } else if hovered {
+            [1.0, 1.0, 1.0, 0.08]
+        } else {
+            [0.0, 0.0, 0.0, 0.0]
+        },
+        CONTROL_RADIUS,
     )
 }
 

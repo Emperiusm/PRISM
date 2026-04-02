@@ -34,7 +34,7 @@ LauncherShell::handle_event(event) -> EventResponse
 Event routing order: modal first (if active) -> nav -> active tab widget. This gives modals automatic input capture.
 
 **Navigation consolidation:**
-- Remove `UiAction::OpenSettings` entirely
+- Migrate all settings navigation to `UiAction::OpenLauncherTab(LauncherTab::Settings)`, then remove `UiAction::OpenSettings`
 - All tab switches go through `UiAction::OpenLauncherTab(LauncherTab)`
 - Delete the `OpenSettings` handler at `app.rs:602`; the handler at `app.rs:591` for `OpenLauncherTab` is sufficient
 
@@ -84,17 +84,17 @@ When active, shell renders a semi-transparent scrim over the content area, then 
 
 **New actions in `UiAction`:**
 ```rust
-SaveServer { mode: FormMode, server: SavedServer }
+SaveServer
 CancelModal
-ConfirmDeleteServer { server_id: Uuid }
+ConfirmDeleteServer(uuid::Uuid)
 ```
 
 **Wiring:**
 - `AddServer` -> shell opens `ActiveModal::ServerForm { mode: Add }`
 - `EditServer(id)` -> shell looks up server from store, opens `ActiveModal::ServerForm { mode: Edit { id } }` pre-filled
 - `DeleteServer(id)` -> shell opens `ActiveModal::ConfirmDelete { id, name }`
-- `SaveServer` -> app.rs calls `server_store.add()` or `server_store.update()`, then `card_grid.reload()`
-- `ConfirmDeleteServer` -> app.rs calls `server_store.delete()`, then `card_grid.reload()`
+- `SaveServer` -> app.rs calls `server_store.add()` or `server_store.update()`, then refreshes the grid from store data (for example, `card_grid.set_servers(store.servers())`)
+- `ConfirmDeleteServer` -> app.rs calls `server_store.delete()`, then refreshes the grid from store data
 - `CancelModal` -> shell dismisses modal
 
 **server_form.rs upgrade:**
@@ -185,7 +185,7 @@ In `app.rs::start_connection()`:
 2. Resolve `default_profile` string -> `ProfileConfig` via `ProfileStore::get_by_name()`
 3. Build a `ControlCommand::UpdateQuality` from the profile's fields
 4. After `SessionBridge` is established, immediately send the profile as the first control command
-5. Server receives it and applies to `ClientSession.profile` + reconfigures encoder
+5. Server receives it and applies to `ClientSession.profile` intent/state immediately; full encoder runtime reconfiguration is handled in a follow-up phase
 
 ### Pipeline Wiring — Runtime Switching
 
@@ -197,8 +197,8 @@ Wire existing but unhandled actions in `app.rs::handle_action()`:
 
 In `prism-server`:
 - `client_session.rs`: handle `ControlCommand::SwitchProfile` and `UpdateQuality` — update `ClientSession.profile` fields
-- `encode_pool.rs`: accept runtime reconfiguration — new bitrate, fps, preset applied to active encoder
-- This is the deepest change: encoder reconfiguration mid-stream
+- `encode_pool.rs`: runtime reconfiguration is phase 2 follow-up after protocol/UI wiring is complete
+- This remains the deepest change and is intentionally sequenced later
 
 ---
 
@@ -232,13 +232,13 @@ Single scrollable page with grouped sections (no sub-navigation this round). Sid
 5. **About**
    - Client Version: `env!("CARGO_PKG_VERSION")`
 
-### ClientConfig Persistence
+### UserPrefs Persistence
 
-**New file: `config/client_config.rs`**
+**New file: `config/client_config_prefs.rs`**
 
-Simple JSON at `~/.prism/client_config.json`:
+Simple JSON at `~/.prism/user_prefs.json`:
 ```rust
-struct ClientConfig {
+struct UserPrefs {
     default_profile: String,
     exclusive_keyboard: bool,
     relative_mouse: bool,
@@ -350,9 +350,9 @@ Centralizes magic numbers currently scattered across widgets. No visual change.
 
 ## 7. Reusable Widget Components
 
-Three new widgets in `ui/widgets/`, needed by Profiles, Settings, and overlay panels:
+Three widgets in `ui/widgets/`, needed by Profiles, Settings, and overlay panels (one new, two expanded):
 
-### Slider (`ui/widgets/slider.rs`)
+### Slider (`ui/widgets/slider.rs`, existing — expanded)
 - Horizontal drag control with configurable range and step
 - Shows current value label
 - Emits value-changed callback
@@ -363,7 +363,7 @@ Three new widgets in `ui/widgets/`, needed by Profiles, Settings, and overlay pa
 - Emits toggled callback
 - Uses `toggle_track`, `toggle_thumb` theme tokens
 
-### Dropdown (`ui/widgets/dropdown.rs`)
+### Dropdown (`ui/widgets/dropdown.rs`, existing — expanded)
 - Click to expand options list, click to select, collapse
 - Supports string labels and associated values
 - Emits selection-changed callback
@@ -386,31 +386,31 @@ Three new widgets in `ui/widgets/`, needed by Profiles, Settings, and overlay pa
 | `ui/launcher/mod.rs` | **Expand** | Add modal types, consolidate exports |
 | `ui/overlay/capsule.rs` | **Create** | Top metrics bar + dropdown panels |
 | `ui/overlay/mod.rs` | **Expand** | Replace drawer with capsule system |
-| `ui/widgets/slider.rs` | **Create** | Reusable slider control |
+| `ui/widgets/slider.rs` | **Expand** | Reusable slider control (existing file) |
 | `ui/widgets/toggle.rs` | **Create** | Reusable toggle switch |
-| `ui/widgets/dropdown.rs` | **Create** | Reusable dropdown control |
+| `ui/widgets/dropdown.rs` | **Expand** | Reusable dropdown control (existing file) |
 | `ui/widgets/mod.rs` | **Edit** | Remove `OpenSettings`, add new actions |
 | `ui/theme.rs` | **Expand** | All new surface/control/typography tokens |
 | `config/profiles.rs` | **Create** | ProfileStore + ProfileConfig persistence |
-| `config/client_config.rs` | **Create** | ClientConfig persistence |
+| `config/client_config_prefs.rs` | **Create** | UserPrefs persistence |
 | `config/mod.rs` | **Edit** | Export new config modules |
 | `app.rs` | **Major refactor** | Extract launcher to shell, wire all actions |
 | `session_bridge.rs` | **Minor** | Ensure ControlCommand variants complete |
 | `prism-server/client_session.rs` | **Edit** | Handle SwitchProfile + UpdateQuality |
-| `prism-server/encode_pool.rs` | **Edit** | Runtime encoder reconfiguration |
+| `prism-server/encode_pool.rs` | **Edit (Phase 2)** | Runtime encoder reconfiguration |
 
 ---
 
 ## 9. Build Order
 
 1. **Theme tokens** — add all new surface functions, typography constants, control tokens. Zero functional change.
-2. **Reusable widgets** — slider, toggle, dropdown in `ui/widgets/`. Unit-testable in isolation.
+2. **Reusable widgets** — toggle plus slider/dropdown enhancements in `ui/widgets/`. Unit-testable in isolation.
 3. **Shell extraction** — create `shell.rs`, move layout/routing/header out of app.rs. Consolidate `OpenSettings` into `OpenLauncherTab`. Fix Home filter reset bug.
 4. **Modal system** — add modal layer to shell, wire `server_form.rs` for Add/Edit, add delete confirmation. Wire `SaveServer`/`ConfirmDeleteServer`/`CancelModal` in app.rs.
 5. **ProfileStore** — create `config/profiles.rs` with persistence, default presets, CRUD operations.
 6. **Profiles screen** — rewrite `profiles.rs` with interactive controls backed by `ProfileStore`.
-7. **Profile pipeline wiring** — connect time: resolve profile -> send `UpdateQuality`. Runtime: wire `SwitchProfile`/`UpdateQuality` through bridge. Server-side: handle commands, reconfigure encoder.
-8. **ClientConfig + Settings** — create `config/client_config.rs`, expand `settings.rs` with grouped sections, functional controls for streaming defaults and input.
+7. **Profile pipeline wiring** — connect time: resolve profile -> send `UpdateQuality`. Runtime: wire `SwitchProfile`/`UpdateQuality` through bridge. Server-side: handle commands first; encoder reconfiguration lands in phase 2.
+8. **UserPrefs + Settings** — create `config/client_config_prefs.rs`, expand `settings.rs` with grouped sections, functional controls for streaming defaults and input.
 9. **Overlay capsule** — create `capsule.rs`, replace drawer layout, migrate stats/quality/perf panel content into dropdown panels. Remove old overlay structure.
 10. **Integration pass** — verify all actions wired end-to-end, no unhandled actions, all tab transitions clean.
 

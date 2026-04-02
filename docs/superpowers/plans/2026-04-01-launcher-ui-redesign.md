@@ -23,8 +23,8 @@
 | `crates/prism-client/src/ui/launcher/server_card.rs` | Edit | Add delete button emitting `DeleteServer` |
 | `crates/prism-client/src/ui/launcher/server_form.rs` | Edit | Emit `SaveServer`/`CancelModal` instead of `AddServer`/`CloseOverlay` |
 | `crates/prism-client/src/config/profiles.rs` | Create | `ProfileStore` + `ProfileConfig` with append-only log persistence |
-| `crates/prism-client/src/config/client_config.rs` | Create | `UserPrefs` JSON persistence for settings |
-| `crates/prism-client/src/config/mod.rs` | Edit | Export `profiles` and `client_config` modules |
+| `crates/prism-client/src/config/client_config_prefs.rs` | Create | `UserPrefs` JSON persistence for settings |
+| `crates/prism-client/src/config/mod.rs` | Edit | Export `profiles` and `client_config_prefs` modules |
 | `crates/prism-client/src/ui/launcher/profiles.rs` | Rewrite | Interactive two-column profile editor backed by `ProfileStore` |
 | `crates/prism-client/src/ui/launcher/settings.rs` | Rewrite | Multi-section settings with functional toggles/dropdowns |
 | `crates/prism-client/src/ui/overlay/capsule.rs` | Create | Top floating metrics capsule replacing stats_bar + drawer |
@@ -439,8 +439,8 @@ pub enum FormMode {
 
 - [ ] **Step 3: Run compilation check**
 
-Run: `cargo check -p prism-client 2>&1 | head -30`
-Expected: Compilation errors referencing `OpenSettings` in `app.rs` — these are fixed in Task 4.
+Run: `cargo check -p prism-client`
+Expected: Compiles cleanly. Do not introduce an intentional temporary compile break while migrating `OpenSettings`.
 
 - [ ] **Step 4: Commit**
 
@@ -465,7 +465,7 @@ In `card_grid.rs`, add after `set_show_filters` method (find the last setter, ad
 ```rust
     pub fn reset_filter(&mut self) {
         self.active_filter = CardFilter::All;
-        self.recompute_visible();
+        self.recompute_layout();
     }
 ```
 
@@ -2045,7 +2045,12 @@ Expected: All tests pass
 
 - [ ] **Step 2: Check for unhandled actions**
 
-Run: `cargo check --workspace 2>&1 | grep -i "unhandled\|unreachable\|match"`
+Run:
+```powershell
+cargo check --workspace
+Get-ChildItem -Recurse -Path crates -Filter *.rs |
+  Select-String -Pattern 'unhandled UI action|_ => \{'
+```
 Verify: No unhandled `UiAction` variants in any match arm. The catch-all `_ =>` in handle_action should be removed — all actions should have explicit handlers.
 
 - [ ] **Step 3: Run clippy**

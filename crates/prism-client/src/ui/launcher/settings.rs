@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Minimal settings panel showing identity path and version.
+//! Launcher settings page.
 
 use crate::ui::theme;
 use crate::ui::widgets::{EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
 
-// ---------------------------------------------------------------------------
-// SettingsPanel
-// ---------------------------------------------------------------------------
-
 pub struct SettingsPanel {
     rect: Rect,
-    visible: bool,
     identity_path: String,
     version: String,
 }
@@ -19,77 +14,95 @@ impl SettingsPanel {
     pub fn new(identity_path: String, version: String) -> Self {
         Self {
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
-            visible: false,
             identity_path,
             version,
         }
-    }
-
-    pub fn show(&mut self) {
-        self.visible = true;
-    }
-
-    pub fn hide(&mut self) {
-        self.visible = false;
-    }
-
-    pub fn is_visible(&self) -> bool {
-        self.visible
     }
 }
 
 impl Widget for SettingsPanel {
     fn layout(&mut self, available: Rect) -> Size {
-        if !self.visible {
-            return Size { w: 0.0, h: 0.0 };
-        }
-
-        let panel_w = 300.0;
-        let panel_h = 200.0;
-        self.rect = Rect::new(available.x, available.y, panel_w, panel_h);
+        self.rect = available;
         Size {
-            w: panel_w,
-            h: panel_h,
+            w: available.w,
+            h: available.h,
         }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        if !self.visible {
-            return;
+        let section = Rect::new(self.rect.x, self.rect.y + 58.0, self.rect.w, self.rect.h - 58.0);
+        ctx.push_glass_quad(theme::floating_surface(section));
+
+        ctx.push_text_run(TextRun {
+            x: self.rect.x,
+            y: self.rect.y + 10.0,
+            text: "Client Settings".into(),
+            font_size: 13.0,
+            color: theme::TEXT_MUTED,
+            monospace: false,
+        });
+
+        let rows = [
+            (
+                "Identity Path",
+                self.identity_path.as_str(),
+                "Used to load the local client identity and device trust information.",
+            ),
+            (
+                "Streaming Default",
+                "Balanced",
+                "Applied when a saved desktop does not have a more specific profile.",
+            ),
+            (
+                "Input Capture",
+                "Exclusive keyboard capture",
+                "Prevents local shortcuts from leaking when a remote session is active.",
+            ),
+            (
+                "Audio Route",
+                "Internal audio engine",
+                "Plays remote audio locally and keeps microphone passthrough available.",
+            ),
+            (
+                "Client Version",
+                self.version.as_str(),
+                "Current PRISM client build.",
+            ),
+        ];
+
+        for (index, (title, value, body)) in rows.iter().enumerate() {
+            let row = Rect::new(
+                section.x + 18.0,
+                section.y + 20.0 + index as f32 * 88.0,
+                section.w - 36.0,
+                70.0,
+            );
+            ctx.push_glass_quad(theme::card_surface(row));
+            ctx.push_text_run(TextRun {
+                x: row.x + 18.0,
+                y: row.y + 14.0,
+                text: (*title).to_string(),
+                font_size: 13.0,
+                color: theme::TEXT_MUTED,
+                monospace: false,
+            });
+            ctx.push_text_run(TextRun {
+                x: row.x + 18.0,
+                y: row.y + 34.0,
+                text: (*value).to_string(),
+                font_size: 14.0,
+                color: theme::TEXT_PRIMARY,
+                monospace: false,
+            });
+            ctx.push_text_run(TextRun {
+                x: row.x + 18.0,
+                y: row.y + 54.0,
+                text: (*body).to_string(),
+                font_size: 11.0,
+                color: theme::TEXT_SECONDARY,
+                monospace: false,
+            });
         }
-
-        // Glass panel background
-        ctx.push_glass_quad(theme::floating_surface(self.rect));
-
-        // Title
-        ctx.push_text_run(TextRun {
-            x: self.rect.x + 12.0,
-            y: self.rect.y + 16.0,
-            text: "Settings".to_string(),
-            font_size: 16.0,
-            color: theme::TEXT_PRIMARY,
-            monospace: false,
-        });
-
-        // Identity path label
-        ctx.push_text_run(TextRun {
-            x: self.rect.x + 12.0,
-            y: self.rect.y + 60.0,
-            text: format!("Identity: {}", self.identity_path),
-            font_size: 13.0,
-            color: theme::TEXT_SECONDARY,
-            monospace: true,
-        });
-
-        // Version label
-        ctx.push_text_run(TextRun {
-            x: self.rect.x + 12.0,
-            y: self.rect.y + 90.0,
-            text: format!("Version: {}", self.version),
-            font_size: 13.0,
-            color: theme::TEXT_SECONDARY,
-            monospace: false,
-        });
     }
 
     fn handle_event(&mut self, _event: &UiEvent) -> EventResponse {
@@ -99,45 +112,22 @@ impl Widget for SettingsPanel {
     fn animate(&mut self, _dt_ms: f32) {}
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn available() -> Rect {
-        Rect::new(0.0, 0.0, 600.0, 400.0)
-    }
-
     #[test]
-    fn settings_hidden_by_default() {
+    fn settings_panel_paints_rows() {
         let mut panel = SettingsPanel::new(
-            "/home/user/.prism/identity".to_string(),
+            "/home/user/.prism/client_identity.json".to_string(),
             "0.1.0".to_string(),
         );
-        let size = panel.layout(available());
-        assert_eq!(size.h, 0.0, "settings panel should be hidden by default");
-    }
-
-    #[test]
-    fn settings_visible_paints() {
-        let mut panel = SettingsPanel::new(
-            "/home/user/.prism/identity".to_string(),
-            "0.1.0".to_string(),
-        );
-        panel.show();
-        panel.layout(available());
+        panel.layout(Rect::new(0.0, 0.0, 900.0, 520.0));
 
         let mut ctx = PaintContext::new();
         panel.paint(&mut ctx);
 
-        assert!(
-            ctx.glass_quads.len() > 0,
-            "expected glass quads when panel is visible"
-        );
-        // Should have title + 2 labels
-        assert!(ctx.text_runs.len() >= 3, "expected at least 3 text runs");
+        assert!(ctx.glass_quads.len() >= 6);
+        assert!(ctx.text_runs.len() >= 10);
     }
 }
