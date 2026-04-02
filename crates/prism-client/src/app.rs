@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Main application — winit event loop, wgpu renderer, UI state machine.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -10,6 +10,7 @@ use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
 use crate::config::ClientConfig;
+use crate::config::profiles::ProfileStore;
 use crate::config::servers::ServerStore;
 use crate::input::InputCoalescer;
 use crate::input::double_tap::DoubleTapDetector;
@@ -98,11 +99,18 @@ impl PrismApp {
         if let Some(store) = &server_store {
             card_grid.set_servers(store.servers());
         }
+        let profile_store = ProfileStore::open(&config.servers_dir)
+            .ok()
+            .map(|store| Arc::new(Mutex::new(store)));
+        let mut profiles_panel = ProfilesPanel::new();
+        if let Some(store) = &profile_store {
+            profiles_panel.set_profile_store(store.clone());
+        }
         let launcher_shell = LauncherShell::new(
             LauncherNav::new(),
             QuickConnect::new(),
             card_grid,
-            ProfilesPanel::new(),
+            profiles_panel,
             SettingsPanel::new(identity_path, env!("CARGO_PKG_VERSION").to_string()),
             ServerForm::new(),
         );
