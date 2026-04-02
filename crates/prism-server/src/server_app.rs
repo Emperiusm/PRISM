@@ -206,6 +206,8 @@ impl ServerApp {
         if let Some(tx) = self.bound_addr_tx.take() {
             let _ = tx.send(acceptor.local_addr());
         }
+        // Print all local IP addresses so the user knows what to connect to
+        print_connect_addresses(acceptor.local_addr().port());
         tracing::info!("waiting for connections…");
 
         // ── Throughput endpoint (Cubic, AF11, large windows) ─────────────────
@@ -1128,5 +1130,46 @@ fn ensure_firewall_rule(port: u16) {
         Err(e) => {
             tracing::warn!(%e, "failed to run netsh — firewall rule not created");
         }
+    }
+}
+
+/// Print all local network addresses so the user knows what to type in the client.
+fn print_connect_addresses(port: u16) {
+    use std::net::IpAddr;
+
+    let mut addrs: Vec<(String, IpAddr)> = Vec::new();
+
+    // Get all network interfaces via hostname lookup
+    if let Ok(hostname) = hostname::get() {
+        let host = hostname.to_string_lossy().to_string();
+        if let Ok(resolved) = std::net::ToSocketAddrs::to_socket_addrs(&(host.as_str(), 0)) {
+            for sa in resolved {
+                if sa.ip().is_ipv4() && !sa.ip().is_loopback() {
+                    addrs.push(("network".into(), sa.ip()));
+                }
+            }
+        }
+    }
+
+    // Fallback: discover primary local IP by connecting a UDP socket
+    if addrs.is_empty()
+        && let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0")
+        && let Ok(()) = socket.connect("8.8.8.8:80")
+        && let Ok(local) = socket.local_addr()
+        && !local.ip().is_loopback()
+    {
+        addrs.push(("primary".into(), local.ip()));
+    }
+
+    if addrs.is_empty() {
+        tracing::info!("connect from client: prism-client <this-machine's-IP>:{port}");
+    } else {
+        tracing::info!("──────────────────────────────────────────");
+        tracing::info!("Connect from another computer using:");
+        for (label, ip) in &addrs {
+            tracing::info!("  prism-client {ip}:{port}    ({label})");
+        }
+        tracing::info!("  prism-client 127.0.0.1:{port}    (same machine)");
+        tracing::info!("──────────────────────────────────────────");
     }
 }
