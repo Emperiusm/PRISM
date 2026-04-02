@@ -196,6 +196,9 @@ impl ServerApp {
     /// Spawns the activity processor, frame sender, and heartbeat timeout tasks
     /// before blocking on `accept()`.  Returns when the endpoint is closed.
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Ensure Windows Firewall allows inbound UDP on our port
+        ensure_firewall_rule(self.config.listen_addr().port());
+
         // QUIC endpoint — reuse the cert generated at construction time.
         let cert = self.cert.clone();
         let acceptor = ConnectionAcceptor::bind(self.config.listen_addr(), cert)?;
@@ -1062,6 +1065,68 @@ async fn handle_connection(
         }
         Err(e) => {
             tracing::error!(error = %e, "incoming connection error");
+        }
+    }
+}
+
+/// Ensure a Windows Firewall rule exists for PRISM's UDP port.
+///
+/// Checks if a rule named "PRISM Server" already exists. If not, attempts to
+/// create one. This requires admin privileges — if we can't create the rule,
+/// log a warning with the command the user can run manually.
+fn ensure_firewall_rule(port: u16) {
+    // Check if rule already exists
+    let check = std::process::Command::new("netsh")
+        .args([
+            "advfirewall",
+            "firewall",
+            "show",
+            "rule",
+            "name=PRISM Server",
+        ])
+        .output();
+
+    match check {
+        Ok(output) if output.status.success() => {
+            tracing::info!("firewall rule \"PRISM Server\" already exists");
+            return;
+        }
+        _ => {} // Rule doesn't exist or netsh failed — try to create it
+    }
+
+    tracing::info!(port, "creating firewall rule for UDP port {port}");
+
+    let result = std::process::Command::new("netsh")
+        .args([
+            "advfirewall",
+            "firewall",
+            "add",
+            "rule",
+            "name=PRISM Server",
+            "dir=in",
+            "action=allow",
+            "protocol=UDP",
+            &format!("localport={port}"),
+            "profile=any",
+            "description=Allow inbound QUIC connections to PRISM remote desktop server",
+        ])
+        .output();
+
+    match result {
+        Ok(output) if output.status.success() => {
+            tracing::info!("firewall rule created successfully");
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            tracing::warn!("could not create firewall rule (run as administrator): {stderr}");
+            tracing::warn!(
+                "run this manually in an admin terminal:\n  \
+                 netsh advfirewall firewall add rule name=\"PRISM Server\" \
+                 dir=in action=allow protocol=UDP localport={port} profile=any"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(%e, "failed to run netsh — firewall rule not created");
         }
     }
 }
