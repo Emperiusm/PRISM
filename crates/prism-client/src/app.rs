@@ -200,10 +200,16 @@ impl PrismApp {
     /// Initiate an async connection to the given server address on a background
     /// tokio runtime. The result is communicated back via `connect_result_rx`.
     fn start_connection(&mut self, address: &str) {
-        let addr: std::net::SocketAddr = match address.parse() {
+        // Default to port 7000 if the user didn't specify one
+        let addr_str = if address.contains(':') {
+            address.to_string()
+        } else {
+            format!("{address}:7000")
+        };
+        let addr: std::net::SocketAddr = match addr_str.parse() {
             Ok(a) => a,
             Err(e) => {
-                tracing::error!(%e, "invalid server address: {address}");
+                tracing::error!(%e, "invalid server address: {addr_str}");
                 return;
             }
         };
