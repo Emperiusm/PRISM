@@ -27,6 +27,25 @@ jobs:
           RUSTFLAGS: "-C target-feature=+crt-static"
         run: cargo build --release -p prism-server -p prism-client
 
+      - name: Embed admin manifest in server exe
+        shell: pwsh
+        run: |
+          # Create manifest requesting admin elevation (UAC prompt on launch)
+          @'
+          <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+            <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+              <security>
+                <requestedPrivileges>
+                  <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+                </requestedPrivileges>
+              </security>
+            </trustInfo>
+          </assembly>
+          '@ | Out-File -Encoding utf8 server.manifest
+          # Embed manifest into the compiled exe using mt.exe (Windows SDK)
+          mt.exe -manifest server.manifest -outputresource:"target/release/prism-server.exe;#1"
+
       - name: Prepare artifacts
         shell: pwsh
         run: |
