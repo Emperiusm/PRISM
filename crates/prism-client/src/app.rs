@@ -22,15 +22,17 @@ use crate::ui::launcher::card_grid::CardGrid;
 use crate::ui::launcher::nav::LauncherNav;
 use crate::ui::launcher::profiles::ProfilesPanel;
 use crate::ui::launcher::quick_connect::QuickConnect;
+use crate::ui::launcher::server_form::ServerForm;
+use crate::ui::launcher::shell::LauncherShell;
 use crate::ui::launcher::settings::SettingsPanel;
-use crate::ui::launcher::LauncherTab;
+use crate::ui::launcher::{ActiveModal, FormMode, LauncherTab};
 use crate::ui::overlay::conn_panel::ConnPanel;
 use crate::ui::overlay::display_panel::DisplayPanel;
 use crate::ui::overlay::perf_panel::PerfPanel;
 use crate::ui::overlay::quality_panel::QualityPanel;
 use crate::ui::overlay::stats_bar::StatsBar;
 use crate::ui::widgets::{
-    EventResponse, MouseButton as UiMouseButton, PaintContext, Rect, TextRun, UiAction, UiEvent,
+    EventResponse, MouseButton as UiMouseButton, PaintContext, Rect, UiAction, UiEvent,
     Widget,
 };
 use crate::ui::{UiState, theme};
@@ -48,12 +50,7 @@ pub struct PrismApp {
     paint_ctx: PaintContext,
     bridge: SessionBridge,
     // Launcher widgets
-    launcher_nav: LauncherNav,
-    launcher_tab: LauncherTab,
-    quick_connect: QuickConnect,
-    card_grid: CardGrid,
-    profiles_panel: ProfilesPanel,
-    settings_panel: SettingsPanel,
+    launcher_shell: LauncherShell,
     server_store: Option<ServerStore>,
     // Overlay widgets
     stats_bar: StatsBar,
@@ -101,6 +98,14 @@ impl PrismApp {
         if let Some(store) = &server_store {
             card_grid.set_servers(store.servers());
         }
+        let launcher_shell = LauncherShell::new(
+            LauncherNav::new(),
+            QuickConnect::new(),
+            card_grid,
+            ProfilesPanel::new(),
+            SettingsPanel::new(identity_path, env!("CARGO_PKG_VERSION").to_string()),
+            ServerForm::new(),
+        );
 
         Self {
             config,
@@ -112,15 +117,7 @@ impl PrismApp {
             coalescer: InputCoalescer::new(),
             paint_ctx: PaintContext::new(),
             bridge: SessionBridge::new(),
-            launcher_nav: LauncherNav::new(),
-            launcher_tab: LauncherTab::Home,
-            quick_connect: QuickConnect::new(),
-            card_grid,
-            profiles_panel: ProfilesPanel::new(),
-            settings_panel: SettingsPanel::new(
-                identity_path,
-                env!("CARGO_PKG_VERSION").to_string(),
-            ),
+            launcher_shell,
             server_store,
             stats_bar: StatsBar::new(),
             perf_panel: PerfPanel::new(),
@@ -525,79 +522,44 @@ impl PrismApp {
         Ok(bridge)
     }
 
-    fn configure_launcher_widgets(&mut self) {
-        match self.launcher_tab {
-            LauncherTab::Home => {
-                self.card_grid.set_visible_limit(Some(3));
-                self.card_grid.set_show_add_card(false);
-                self.card_grid.set_show_filters(false);
-            }
-            LauncherTab::SavedConnections => {
-                self.card_grid.set_visible_limit(None);
-                self.card_grid.set_show_add_card(true);
-                self.card_grid.set_show_filters(true);
-            }
-            LauncherTab::Profiles | LauncherTab::Settings => {
-                self.card_grid.set_visible_limit(None);
-                self.card_grid.set_show_add_card(false);
-                self.card_grid.set_show_filters(false);
-            }
-        }
-    }
-
-    fn launcher_sidebar_rect(screen_h: f32) -> Rect {
-        Rect::new(28.0, 28.0, 224.0, (screen_h - 56.0).max(280.0))
-    }
-
-    fn launcher_content_rect(sidebar_rect: Rect, screen_w: f32, screen_h: f32) -> Rect {
-        let content_x = sidebar_rect.x + sidebar_rect.w + 28.0;
-        Rect::new(
-            content_x,
-            42.0,
-            (screen_w - content_x - 28.0).max(320.0),
-            (screen_h - 70.0).max(320.0),
-        )
-    }
-
     fn route_launcher_event(&mut self, event: &UiEvent) -> EventResponse {
-        self.configure_launcher_widgets();
-
-        let resp = self.launcher_nav.handle_event(event);
-        if !matches!(resp, EventResponse::Ignored) {
-            return resp;
+        if let Some(renderer) = self.renderer.as_ref() {
+            self.launcher_shell.set_ui_state(self.ui_state);
+            self.launcher_shell.layout(Rect::new(
+                0.0,
+                0.0,
+                renderer.width() as f32,
+                renderer.height() as f32,
+            ));
         }
-
-        match self.launcher_tab {
-            LauncherTab::Home => {
-                let resp = self.quick_connect.handle_event(event);
-                if !matches!(resp, EventResponse::Ignored) {
-                    return resp;
-                }
-                self.card_grid.handle_event(event)
-            }
-            LauncherTab::SavedConnections => self.card_grid.handle_event(event),
-            LauncherTab::Profiles => self.profiles_panel.handle_event(event),
-            LauncherTab::Settings => self.settings_panel.handle_event(event),
-        }
+        self.launcher_shell.handle_event(event)
     }
 
     /// Handle a UiAction from widget events.
     fn handle_action(&mut self, action: UiAction) {
         match action {
             UiAction::Connect { address, .. } => {
-                self.launcher_tab = LauncherTab::Home;
+                self.launcher_shell.set_tab(LauncherTab::Home);
                 self.start_connection(&address);
             }
             UiAction::OpenLauncherTab(tab) => {
-                self.launcher_tab = tab;
+                self.launcher_shell.set_tab(tab);
             }
             UiAction::Disconnect => {
                 self.bridge = SessionBridge::new();
                 self.stream_texture = None;
                 self.stream_bind_group = None;
                 self.ui_state = UiState::Launcher;
-                self.launcher_tab = LauncherTab::Home;
+                self.launcher_shell.set_tab(LauncherTab::Home);
                 self.stats_bar.hide();
+            }
+            UiAction::AddServer => {
+                self.launcher_shell.show_modal(ActiveModal::ServerForm {
+                    mode: FormMode::Add,
+                });
+            }
+            UiAction::CancelModal => {
+                self.launcher_shell.dismiss_modal();
             }
             UiAction::CloseOverlay => {
                 self.ui_state = UiState::Stream;
@@ -907,115 +869,11 @@ impl PrismApp {
                 let renderer = self.renderer.as_ref().expect("renderer exists");
                 (renderer.width() as f32, renderer.height() as f32)
             };
-            let sidebar_rect = Self::launcher_sidebar_rect(screen_h);
-            let content_rect = Self::launcher_content_rect(sidebar_rect, screen_w, screen_h);
-
-            self.configure_launcher_widgets();
-            self.launcher_nav.set_active_tab(self.launcher_tab);
-            self.launcher_nav.layout(sidebar_rect);
-
             self.paint_ctx.clear();
-            self.launcher_nav.paint(&mut self.paint_ctx);
-
-            let title_x = content_rect.x;
-            let title_y = content_rect.y + 6.0;
-            self.paint_ctx.push_text_run(TextRun {
-                x: title_x,
-                y: title_y,
-                text: self.launcher_tab.title().to_string(),
-                font_size: 30.0,
-                color: theme::TEXT_PRIMARY,
-                monospace: false,
-            });
-
-            self.paint_ctx.push_text_run(TextRun {
-                x: title_x,
-                y: title_y + 40.0,
-                text: self.launcher_tab.subtitle().to_string(),
-                font_size: 14.0,
-                color: theme::TEXT_SECONDARY,
-                monospace: false,
-            });
-
-            if self.ui_state == UiState::Connecting {
-                let chip_w = theme::text_width("Connecting...", 12.0) + 28.0;
-                let status_rect =
-                    Rect::new(content_rect.x + content_rect.w - chip_w, title_y + 2.0, chip_w, 28.0);
-                self.paint_ctx.push_glass_quad(theme::glass_quad(
-                    status_rect,
-                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.12],
-                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.18],
-                    theme::CHIP_RADIUS,
-                ));
-                self.paint_ctx.push_text_run(TextRun {
-                    x: status_rect.x + 14.0,
-                    y: status_rect.y + 6.0,
-                    text: "Connecting...".to_string(),
-                    font_size: 12.0,
-                    color: theme::TEXT_PRIMARY,
-                    monospace: false,
-                });
-            }
-
-            match self.launcher_tab {
-                LauncherTab::Home => {
-                    let quick_y = content_rect.y + 92.0;
-                    let section_y = quick_y + 132.0;
-                    let card_y = section_y + 34.0;
-
-                    self.quick_connect
-                        .layout(Rect::new(content_rect.x, quick_y, content_rect.w, 94.0));
-                    self.card_grid.layout(Rect::new(
-                        content_rect.x,
-                        card_y,
-                        content_rect.w,
-                        (content_rect.y + content_rect.h - card_y).max(0.0),
-                    ));
-                    self.quick_connect.paint(&mut self.paint_ctx);
-                    self.paint_ctx.push_text_run(TextRun {
-                        x: content_rect.x,
-                        y: section_y,
-                        text: "Recent connections".to_string(),
-                        font_size: 12.0,
-                        color: theme::TEXT_MUTED,
-                        monospace: false,
-                    });
-                    self.paint_ctx.push_glass_quad(theme::separator(Rect::new(
-                        content_rect.x,
-                        section_y + 20.0,
-                        content_rect.w,
-                        1.0,
-                    )));
-                    self.card_grid.paint(&mut self.paint_ctx);
-                }
-                LauncherTab::SavedConnections => {
-                    self.card_grid.layout(Rect::new(
-                        content_rect.x,
-                        content_rect.y + 92.0,
-                        content_rect.w,
-                        (content_rect.h - 92.0).max(0.0),
-                    ));
-                    self.card_grid.paint(&mut self.paint_ctx);
-                }
-                LauncherTab::Profiles => {
-                    self.profiles_panel.layout(Rect::new(
-                        content_rect.x,
-                        content_rect.y + 92.0,
-                        content_rect.w,
-                        (content_rect.h - 92.0).max(0.0),
-                    ));
-                    self.profiles_panel.paint(&mut self.paint_ctx);
-                }
-                LauncherTab::Settings => {
-                    self.settings_panel.layout(Rect::new(
-                        content_rect.x,
-                        content_rect.y + 92.0,
-                        content_rect.w,
-                        (content_rect.h - 92.0).max(0.0),
-                    ));
-                    self.settings_panel.paint(&mut self.paint_ctx);
-                }
-            }
+            self.launcher_shell.set_ui_state(self.ui_state);
+            self.launcher_shell
+                .layout(Rect::new(0.0, 0.0, screen_w, screen_h));
+            self.launcher_shell.paint(&mut self.paint_ctx);
 
             // Render UI
             if let Some(ui_renderer) = &mut self.ui_renderer {

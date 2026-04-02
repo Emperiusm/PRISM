@@ -7,6 +7,7 @@ pub mod profiles;
 pub mod quick_connect;
 pub mod server_card;
 pub mod server_form;
+pub mod shell;
 pub mod settings;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
