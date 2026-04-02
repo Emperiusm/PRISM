@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PRISM - Saved Connections</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<style data-purpose="custom-fonts">
+        @font-face {
+            font-family: 'Segoe UI Variable';
+            src: local('Segoe UI Variable Display'), local('Segoe UI');
+        }
+        body {
+            font-family: 'Segoe UI Variable', 'Inter', sans-serif;
+        }
+    </style>
+<style data-purpose="backgrounds">
+        .main-bg {
+            background: radial-gradient(circle at top left, rgba(161, 196, 253, 0.8) 0%, transparent 60%), radial-gradient(circle at bottom right, rgba(194, 233, 251, 0.8) 0%, transparent 60%), #8faee0;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.85);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+        .glass-header {
+            background: transparent;
+        }
+    </style>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sidebar: '#EBF1F6',
+                        primary: '#0F6CBD',
+                        textMain: '#0f172a',
+                        textMuted: '#475569'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-screen w-screen overflow-hidden flex bg-gray-100 text-textMain">
+<!-- BEGIN: Sidebar (Consistent with Home Screen) -->
+<aside class="w-64 bg-sidebar flex flex-col justify-between border-r border-gray-200/50 shadow-sm z-10 relative">
+<div>
+<div class="p-6">
+<button class="text-gray-500 hover:text-gray-700 focus:outline-none">
+<i class="fas fa-bars text-xl"></i>
+</button>
+</div>
+<nav class="mt-2 space-y-1 px-3">
+<a class="flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200/40 rounded-md group transition-colors" href="#">
+<i class="fas fa-home w-6 text-center mr-2 text-gray-500 group-hover:text-gray-700"></i>
+                    Home
+                </a>
+<!-- Active Nav Item -->
+<a class="flex items-center px-3 py-2.5 bg-gray-200/60 rounded-md text-sm font-medium text-gray-900 relative group" href="#">
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-md"></div>
+<i class="fas fa-bookmark w-6 text-center mr-2 text-primary"></i>
+                    Saved Connections
+                </a>
+<a class="flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200/40 rounded-md group transition-colors" href="#">
+<i class="far fa-folder w-6 text-center mr-2 text-gray-500 group-hover:text-gray-700"></i>
+                    Profiles
+                </a>
+</nav>
+</div>
+<div class="p-4 mb-2">
+<a class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200/40 rounded-md group transition-colors" href="#">
+<i class="fas fa-cog w-6 text-center mr-2 text-gray-500 group-hover:text-gray-700"></i>
+                Settings
+            </a>
+</div>
+</aside>
+<!-- END: Sidebar -->
+<!-- BEGIN: Main Content Area -->
+<main class="flex-1 flex flex-col relative main-bg">
+<!-- BEGIN: Top Navigation Bar (Consistent with Home Screen) -->
+<header class="glass-header h-16 flex items-center justify-between px-8 z-10">
+<div class="flex items-center gap-2">
+<h1 class="text-2xl font-semibold text-slate-800 tracking-tight">Saved Connections</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<i class="fas fa-gem text-blue-500 text-lg"></i>
+<span class="font-semibold text-slate-700 tracking-wider text-sm uppercase">PRISM</span>
+</div>
+<button class="w-8 h-8 rounded-full bg-white/50 border border-white/60 flex items-center justify-center text-gray-600 hover:bg-white/80 transition">
+<i class="fas fa-user text-sm"></i>
+</button>
+<div class="flex items-center gap-3 text-slate-600 ml-4">
+<button class="hover:text-slate-900 transition"><i class="fas fa-minus"></i></button>
+<button class="hover:text-slate-900 transition"><i class="far fa-square"></i></button>
+<button class="hover:text-slate-900 transition"><i class="fas fa-times"></i></button>
+</div>
+</div>
+</header>
+<!-- END: Top Navigation Bar -->
+<!-- BEGIN: Content Body -->
+<div class="flex-1 overflow-y-auto p-8 relative z-0">
+<div class="max-w-6xl mx-auto">
+<!-- Filters & Action Bar -->
+<div class="flex justify-between items-center mb-8">
+<div class="flex gap-2">
+<span class="px-4 py-1.5 rounded-full text-xs font-semibold bg-primary text-white shadow-sm cursor-pointer">All Hosts (14)</span>
+<span class="px-4 py-1.5 rounded-full text-xs font-medium bg-white/50 text-slate-700 border border-white/60 hover:bg-white transition cursor-pointer">Work</span>
+<span class="px-4 py-1.5 rounded-full text-xs font-medium bg-white/50 text-slate-700 border border-white/60 hover:bg-white transition cursor-pointer">Personal</span>
+<span class="px-4 py-1.5 rounded-full text-xs font-medium bg-white/50 text-slate-700 border border-white/60 hover:bg-white transition cursor-pointer">Linux Servers</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-4 py-2 bg-white/60 hover:bg-white/80 rounded-lg text-sm font-medium border border-white/50 transition-colors flex items-center gap-2">
+<i class="fas fa-filter text-xs text-slate-500"></i> Filter
+                        </button>
+<button class="px-4 py-2 bg-white/60 hover:bg-white/80 rounded-lg text-sm font-medium border border-white/50 transition-colors flex items-center gap-2">
+<i class="fas fa-sort-amount-down text-xs text-slate-500"></i> Last Connected
+                        </button>
+</div>
+</div>
+<!-- Grid of Saved Hosts -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Machine Card: Online -->
+<div class="glass-card rounded-2xl overflow-hidden flex flex-col group">
+<div class="h-32 w-full bg-slate-200/50 relative overflow-hidden">
+<img alt="Workstation" class="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnFJRsqF7MNcwSzBpdqOqa3J_dhRVWpgt_bzM01I2eZzwgZXzJjjeYdNss_cJz59-869tBBrN5_N9nEwWReOzkSN624V7WEN8_TJx4kMLV0yh4Es0pMFHcLYT1ljhz5z-kXhi-dDbXaKzuwPjvAX6AX3Id0cH9KsNCyHwhVBHdWwtt_ZKns0snOl4ACX2bgWR9PwCclvTCatdYvdTy1Px2Cvm4uJ_9D7R2LrrUtJAGJNQZ0BJRO6XoXGdU93De69Zp0DEhhLkp8yw"/>
+<div class="absolute top-3 left-3 flex gap-2">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-800 border border-green-200">
+                                    Online
+                                </span>
+<span class="bg-black/20 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">WORK</span>
+</div>
+<button class="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors">
+<i class="fas fa-heart"></i>
+</button>
+</div>
+<div class="p-5 flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-slate-900 truncate">Creative-Workstation-01</h3>
+<button class="text-slate-400 hover:text-slate-600"><i class="fas fa-ellipsis-v text-xs"></i></button>
+</div>
+<p class="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-4">Windows 11 Pro • 192.168.1.45</p>
+<div class="flex items-center justify-between text-[11px] text-slate-500 mb-6 mt-auto">
+<div class="flex items-center gap-1.5">
+<i class="far fa-clock"></i>
+<span>2 hours ago</span>
+</div>
+<div class="flex items-center gap-1.5">
+<i class="fas fa-bolt text-blue-500"></i>
+<span>12ms Latency</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 py-2 bg-primary hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-all text-sm">
+                                    Connect
+                                </button>
+<button class="px-3 bg-white/80 hover:bg-white text-slate-500 border border-slate-200 rounded-lg transition-colors">
+<i class="fas fa-edit text-xs"></i>
+</button>
+</div>
+</div>
+</div>
+<!-- Machine Card: Sleeping -->
+<div class="glass-card rounded-2xl overflow-hidden flex flex-col group">
+<div class="h-32 w-full bg-slate-200/50 relative overflow-hidden">
+<img alt="Server" class="w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuANZOpOI2ot82cpIZAHXSDQf00vfUsI5P89kJ_K7y36wVMZ6KYM5d_GVdX2c7luIcB-iPiBlqVIxFcYj0BZyRSDqiiZaUFzjXX-FYl_hDnGQcLP7gQLspb58ayeeHqS9nVu7H3CRMgQg_1dhu7COyF6rPJtBfEgXTRrXT2zAm_-K9UmVuNlNLbD3HVM6fOFMbhYC8WsDqlkR7bJNdPkTfUvoW_DgmSyt-3L6cGYzFHHwrdNhk7ZniTXOxiY-KHKsKj8d8MX3xzutUM"/>
+<div class="absolute top-3 left-3 flex gap-2">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                    Sleeping
+                                </span>
+<span class="bg-black/20 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">PERSONAL</span>
+</div>
+<button class="absolute top-3 right-3 text-slate-300 hover:text-red-400 transition-colors">
+<i class="far fa-heart"></i>
+</button>
+</div>
+<div class="p-5 flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-slate-900 truncate">Home-Media-Vault</h3>
+<button class="text-slate-400 hover:text-slate-600"><i class="fas fa-ellipsis-v text-xs"></i></button>
+</div>
+<p class="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-4">Ubuntu 22.04 LTS • 10.0.0.88</p>
+<div class="flex items-center justify-between text-[11px] text-slate-500 mb-6 mt-auto">
+<div class="flex items-center gap-1.5">
+<i class="far fa-clock"></i>
+<span>3 days ago</span>
+</div>
+<div class="flex items-center gap-1.5">
+<i class="fas fa-power-off text-amber-500"></i>
+<span>WOL Supported</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-semibold rounded-lg shadow-sm transition-all text-sm flex items-center justify-center gap-2">
+<i class="fas fa-bolt text-xs"></i> Wake &amp; Connect
+                                </button>
+<button class="px-3 bg-white/80 hover:bg-white text-slate-500 border border-slate-200 rounded-lg transition-colors">
+<i class="fas fa-edit text-xs"></i>
+</button>
+</div>
+</div>
+</div>
+<!-- Machine Card: Offline (Unreachable style) -->
+<div class="glass-card rounded-2xl overflow-hidden flex flex-col group opacity-80">
+<div class="h-32 w-full bg-slate-300/50 relative overflow-hidden grayscale">
+<img alt="Server Rack" class="w-full h-full object-cover opacity-30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuATe-33QdBjr66m7XfxPVmeBVlsg7lH-1QixdtuwXmLjXvlhbVZV3xfKqmMZSxtcxEnEhlU00WS1dfDmdx7IIZwnDVRnP8OS2cq8FSuatx-oxEIpqT4XkO6DqSVc-cQ7n64wsBAE1zU2WGEVUm1BDzlU04H433ctezDEv4DTYb1Bgu9dELiWK7iYAobw5oA-ZVRT1UFd4YW5S33lnFVgRdcR5pIQIaG1pUx39A0QLgnD04juGLsas1nZhZHKSZfn9v0O05IFuLXdcM"/>
+<div class="absolute top-3 left-3 flex gap-2">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800 border border-red-200">
+                                    Unreachable
+                                </span>
+<span class="bg-black/20 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">WORK</span>
+</div>
+</div>
+<div class="p-5 flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-slate-400 truncate">Dev-Render-Node-B</h3>
+<button class="text-slate-400 hover:text-slate-600"><i class="fas fa-ellipsis-v text-xs"></i></button>
+</div>
+<p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-4">Win Server 2022 • 192.168.1.102</p>
+<div class="flex items-center justify-between text-[11px] text-slate-400 mb-6 mt-auto">
+<div class="flex items-center gap-1.5">
+<i class="far fa-clock"></i>
+<span>12 days ago</span>
+</div>
+<div class="flex items-center gap-1.5">
+<i class="fas fa-exclamation-triangle"></i>
+<span>Timed Out</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 py-2 bg-slate-200/50 text-slate-500 font-semibold rounded-lg text-sm cursor-not-allowed">
+                                    Retry Discovery
+                                </button>
+<button class="px-3 bg-white/80 hover:bg-white text-slate-500 border border-slate-200 rounded-lg transition-colors">
+<i class="fas fa-edit text-xs"></i>
+</button>
+</div>
+</div>
+</div>
+<!-- Add New Host Grid Card -->
+<div class="border-2 border-dashed border-white/60 bg-white/20 rounded-2xl flex flex-col items-center justify-center p-8 hover:bg-white/40 hover:border-white transition-all cursor-pointer min-h-[300px] group">
+<div class="w-14 h-14 rounded-full bg-white/80 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
+<i class="fas fa-plus text-primary text-xl"></i>
+</div>
+<p class="font-bold text-slate-800 group-hover:text-primary transition-colors">Add New Connection</p>
+<p class="text-xs text-slate-600 mt-1">Manual IP or Network Discovery</p>
+</div>
+</div>
+</div>
+</div>
+<!-- END: Content Body -->
+</main>
+<!-- END: Main Content Area -->
+<!-- Global Action Button (Fluent Style FAB) -->
+<button class="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all group z-20">
+<i class="fas fa-plus text-xl group-hover:rotate-90 transition-transform duration-300"></i>
+</button>
+</body></html>

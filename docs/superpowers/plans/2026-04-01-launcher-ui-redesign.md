@@ -413,7 +413,7 @@ pub enum UiAction {
 }
 ```
 
-Note: `OpenSettings` is removed. Any code referencing it will fail to compile, which is intentional — we fix those call sites in the shell extraction task.
+Note: migrate call sites to `OpenLauncherTab(LauncherTab::Settings)` first, then remove `OpenSettings` so the tree stays compiling throughout.
 
 - [ ] **Step 2: Add modal types to launcher/mod.rs**
 

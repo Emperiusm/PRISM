@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PRISM Settings - Identity &amp; Security</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Segoe UI Variable', 'Inter', -apple-system, sans-serif;
+            background-color: #8faee0;
+        }
+
+        .main-bg {
+            background: radial-gradient(circle at top left, rgba(161, 196, 253, 0.8) 0%, transparent 60%), 
+                        radial-gradient(circle at bottom right, rgba(194, 233, 251, 0.8) 0%, transparent 60%), 
+                        #8faee0;
+            min-height: 100vh;
+        }
+
+        .mica-panel {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(40px) saturate(150%);
+            -webkit-backdrop-filter: blur(40px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .glass-list {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .sidebar-mica {
+            background: rgba(235, 241, 246, 0.8);
+            backdrop-filter: blur(25px);
+            border-right: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        .fluent-input {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+            transition: all 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+        }
+
+        .fluent-input:focus {
+            background: #ffffff;
+            border-bottom-color: #0F6CBD;
+            box-shadow: none;
+            outline: none;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+        }
+    </style>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sidebar: '#EBF1F6',
+                        primary: '#0F6CBD',
+                        textMain: '#0f172a',
+                        textMuted: '#475569',
+                        accent: '#005fb8'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-screen w-screen overflow-hidden flex text-textMain">
+<!-- Sidebar Navigation -->
+<aside class="w-64 sidebar-mica flex flex-col justify-between z-50 relative">
+<div>
+<div class="p-6 flex items-center gap-4">
+<button class="text-gray-500 hover:text-gray-700">
+<i class="fas fa-bars text-xl"></i>
+</button>
+<div class="flex items-center gap-2">
+<i class="fas fa-gem text-primary text-lg"></i>
+<span class="font-bold text-slate-800 tracking-tight">PRISM</span>
+</div>
+</div>
+<nav class="mt-2 space-y-1 px-3">
+<a class="flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-black/5 rounded-md group transition-colors" href="#">
+<i class="fas fa-home w-6 text-center mr-2 text-gray-500 group-hover:text-gray-700"></i>
+                    Home
+                </a>
+<a class="flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-black/5 rounded-md group transition-colors" href="#">
+<i class="far fa-bookmark w-6 text-center mr-2 text-gray-500 group-hover:text-gray-700"></i>
+                    Saved Connections
+                </a>
+<a class="flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-black/5 rounded-md group transition-colors" href="#">
+<i class="far fa-folder w-6 text-center mr-2 text-gray-500 group-hover:text-gray-700"></i>
+                    Profiles
+                </a>
+<div class="pt-4 pb-2 px-3">
+<span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Settings</span>
+</div>
+<a class="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-black/5 rounded-md transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">settings</span> General
+                </a>
+<a class="flex items-center px-3 py-2.5 bg-white/60 shadow-sm rounded-md text-sm font-semibold text-primary relative" href="#">
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-md"></div>
+<span class="material-symbols-outlined mr-3 text-[20px]" style="font-variation-settings: 'FILL' 1;">security</span> Identity &amp; Security
+                </a>
+<a class="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-black/5 rounded-md transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">podcasts</span> Streaming
+                </a>
+<a class="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-black/5 rounded-md transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">keyboard</span> Input
+                </a>
+<a class="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-black/5 rounded-md transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">volume_up</span> Audio
+                </a>
+</nav>
+</div>
+<div class="p-4 mb-2">
+<div class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700">
+<img alt="User profile" class="w-7 h-7 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFCuYfpVt17vw7B5kk4CN9KnBv6tMjwtZHzTxF8sOHkKr2otXDsALO8sUR4bUaLt696qV5WtIyRHY44xF5ic47pO5C-c17jIoe1NyCB3KCT7z24FnkDVynDZwDs1iFsUcxNd92G22pmEB1ZQuI6qcKpt-0KRcL3w0BRbxyGcwg0B-1zZ3BTbHLb0y0C_6ZbCD4-ube6HOeQ-vjtEigTpEVlNc3b-MHJj3bkETO_9LiAwQBI_3xvjvgKXzdFD7j_JmRUBgov4berO4"/>
+<span class="truncate">Verified Dev</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col relative main-bg overflow-y-auto custom-scrollbar">
+<!-- Top bar-like header to match home screen nav feel -->
+<header class="h-16 flex items-center justify-between px-10 shrink-0">
+<div class="flex items-center gap-2">
+<span class="text-textMuted text-sm">Settings</span>
+<span class="text-textMuted text-xs">/</span>
+<span class="text-slate-800 font-semibold text-sm">Identity &amp; Security</span>
+</div>
+<div class="flex items-center gap-4 text-slate-600">
+<button class="hover:text-slate-900 transition"><i class="fas fa-minus text-xs"></i></button>
+<button class="hover:text-slate-900 transition"><i class="far fa-square text-xs"></i></button>
+<button class="hover:text-slate-900 transition"><i class="fas fa-times text-xs"></i></button>
+</div>
+</header>
+<div class="flex-1 px-10 pb-20">
+<div class="max-w-4xl">
+<!-- Page Header -->
+<header class="mb-10 mt-4">
+<h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">Identity &amp; Security</h1>
+<p class="text-textMuted">Manage your digital footprint and trusted encryption paths for remote sessions.</p>
+</header>
+<!-- Settings Content Card -->
+<div class="mica-panel rounded-2xl p-8 shadow-xl space-y-10">
+<!-- Identity Path Section -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+<div>
+<h3 class="text-sm font-semibold text-slate-800 mb-1">Identity Path</h3>
+<p class="text-xs text-textMuted">Your unique cryptographic identifier across the PRISM fabric.</p>
+</div>
+<div class="md:col-span-2">
+<div class="fluent-input rounded-md px-4 py-3 flex items-center justify-between group">
+<code class="text-primary font-mono text-sm">verified-dev-01.prism.internal</code>
+<span class="material-symbols-outlined text-textMuted text-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">content_copy</span>
+</div>
+</div>
+</section>
+<div class="h-px bg-black/5"></div>
+<!-- Device Trust Section -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+<div>
+<h3 class="text-sm font-semibold text-slate-800 mb-1">Device Trust</h3>
+<p class="text-xs text-textMuted">Validation status of this hardware endpoint.</p>
+</div>
+<div class="md:col-span-2">
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold border border-green-200">
+<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    Trusted Device
+                                </span>
+<span class="text-xs text-textMuted italic">Last verified 2 hours ago</span>
+</div>
+</div>
+</section>
+<div class="h-px bg-black/5"></div>
+<!-- Streaming Defaults -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+<div>
+<h3 class="text-sm font-semibold text-slate-800 mb-1">Streaming Defaults</h3>
+<p class="text-xs text-textMuted">Balance latency and fidelity for your remote sessions.</p>
+</div>
+<div class="md:col-span-2">
+<div class="relative">
+<select class="w-full fluent-input rounded-md px-4 py-2.5 text-sm appearance-none cursor-pointer focus:ring-0">
+<option>Balanced</option>
+<option selected="">Performance</option>
+<option>Quality</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-textMuted text-[18px]">expand_more</span>
+</div>
+</div>
+</section>
+<div class="h-px bg-black/5"></div>
+<!-- Input Controls -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+<div>
+<h3 class="text-sm font-semibold text-slate-800 mb-1">Input</h3>
+<p class="text-xs text-textMuted">Configure how local peripherals interact with the remote OS.</p>
+</div>
+<div class="md:col-span-2 space-y-3">
+<div class="flex items-center justify-between p-4 bg-white/30 border border-white/40 rounded-lg">
+<div class="flex flex-col">
+<span class="text-sm font-medium text-slate-800">Exclusive Keyboard Capture</span>
+<span class="text-[11px] text-textMuted">Prevent system-level shortcuts from leaving the stream.</span>
+</div>
+<button class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-primary">
+<span class="translate-x-5 pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out"></span>
+</button>
+</div>
+<div class="flex items-center justify-between p-4 bg-white/30 border border-white/40 rounded-lg">
+<div class="flex flex-col">
+<span class="text-sm font-medium text-slate-800">Relative Mouse Movement</span>
+<span class="text-[11px] text-textMuted">Direct injection for high-precision cursor tracking.</span>
+</div>
+<button class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-slate-300">
+<span class="translate-x-0 pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out"></span>
+</button>
+</div>
+</div>
+</section>
+<div class="h-px bg-black/5"></div>
+<!-- Audio Paths -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+<div>
+<h3 class="text-sm font-semibold text-slate-800 mb-1">Audio</h3>
+<p class="text-xs text-textMuted">Route sound between your local and remote environments.</p>
+</div>
+<div class="md:col-span-2 space-y-4">
+<div class="space-y-1.5">
+<label class="text-[10px] font-bold text-textMuted uppercase tracking-wider ml-1">Remote Output</label>
+<div class="relative">
+<select class="w-full fluent-input rounded-md px-4 py-2.5 text-sm appearance-none focus:ring-0">
+<option>Internal Audio Engine (Mica)</option>
+<option>System Default Speakers</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-textMuted">speaker</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="text-[10px] font-bold text-textMuted uppercase tracking-wider ml-1">Local Mic Path</label>
+<div class="relative">
+<select class="w-full fluent-input rounded-md px-4 py-2.5 text-sm appearance-none focus:ring-0">
+<option>Universal Passthrough</option>
+<option>High Fidelity (Direct)</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-textMuted">mic</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer Actions -->
+<div class="pt-8 flex justify-end gap-3">
+<button class="px-5 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-black/5 transition-all">Discard</button>
+<button class="px-8 py-2 bg-primary hover:bg-blue-700 text-white text-sm font-semibold rounded-md shadow-md shadow-blue-500/10 active:scale-95 transition-all">
+                            Apply Changes
+                        </button>
+</div>
+</div>
+<!-- Footer Version Meta -->
+<div class="mt-12 opacity-40">
+<p class="text-[10px] text-slate-900 font-bold uppercase tracking-[0.2em] text-center">PRISM Professional Edition • v4.2.0-beta</p>
+</div>
+</div>
+</div>
+</main>
+</body></html>

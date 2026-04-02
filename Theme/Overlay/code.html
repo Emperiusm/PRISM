@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#005FB8",
+              "surface": "#F3F3F3",
+              "on-surface": "#1A1A1A",
+              "background": "#F3F3F3",
+              "outline-variant": "#D1D1D1",
+              "prism-blue": "#005FB8",
+              "sidebar": "#EBF1F6",
+              "textMain": "#1A1A1A",
+              "textMuted": "#454545"
+            },
+            fontFamily: {
+              "headline": ["Segoe UI Variable", "Inter", "sans-serif"],
+              "body": ["Segoe UI Variable", "Inter", "sans-serif"],
+              "label": ["Segoe UI Variable", "Inter", "sans-serif"]
+            },
+            borderRadius: {
+                "DEFAULT": "8px", 
+                "lg": "8px", 
+                "xl": "12px", 
+                "full": "9999px"
+            },
+          },
+        },
+      }</script>
+<style>body {
+            font-family: 'Segoe UI Variable', 'Inter', sans-serif;
+        }
+        /* Mica-like aesthetic from SCREEN_16 */
+        .glass-panel-light {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(40px) saturate(150%);
+            -webkit-backdrop-filter: blur(40px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+        }
+        .sidebar-mica {
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(45px) saturate(160%);
+            -webkit-backdrop-filter: blur(45px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+        }
+        .contrast-shadow {
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .prism-shadow {
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }</style>
+</head>
+<body class="bg-surface text-on-surface font-body overflow-hidden h-screen w-screen selection:bg-primary/30">
+<!-- Remote Session Background -->
+<div class="fixed inset-0 z-0">
+<img alt="Windows 11 inspired digital wallpaper" class="w-full h-full object-cover" data-alt="vibrant abstract windows 11 style wallpaper with flowing blue and purple silk textures and soft cinematic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDz_C5C4GcBVW2UnIOhp6XEmAbeU6bGT_TeTtiHXD-jW8_9W7ihX4qXBdGhYOKcD4OiS-VOkTIlJuv2jtsiuDW6sTZFUjF9eJbT74kpPnWCl922qTREmJLO23lnYd3C51Hy1L9w2OF8IyQZH4JZxVl7IbS2XbTzdKVQ0QiilR78KyRNIgyOs66O_Q3wlBYmxCkFX7WioEfWDZSHjonf29NhLbb3O9CDPVvxC_zNS7qP9tykjG-EVjgtRCtu70etvYTBYE60sIaelV8"/>
+</div>
+<!-- TopAppBar: Floating status bar -->
+<header class="fixed top-0 left-0 right-0 z-50 flex justify-center items-center w-full px-4">
+<div class="glass-panel-light rounded-full mt-4 mx-auto max-w-fit px-6 py-2 flex items-center gap-6">
+<!-- Brand / Product Name -->
+<div class="flex items-center gap-2 pr-4 border-r border-black/10">
+<i class="fas fa-gem text-primary text-sm font-bold"></i>
+<span class="text-xs font-bold text-textMain tracking-tight contrast-shadow">PRISM REMOTE</span>
+</div>
+<!-- Technical Metrics -->
+<div class="flex items-center gap-5">
+<div class="flex flex-col items-center">
+<span class="text-[9px] uppercase tracking-wider font-bold text-slate-700">FPS</span>
+<span class="text-xs font-bold text-textMain contrast-shadow">60</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-[9px] uppercase tracking-wider font-bold text-slate-700">Latency</span>
+<span class="text-xs font-bold text-green-700">12ms</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-[9px] uppercase tracking-wider font-bold text-slate-700">Bitrate</span>
+<span class="text-xs font-bold text-textMain contrast-shadow">25 Mbps</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-[9px] uppercase tracking-wider font-bold text-slate-700">Codec</span>
+<span class="text-xs font-bold text-textMain contrast-shadow">AV1</span>
+</div>
+<div class="flex items-center px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+<span class="text-[9px] uppercase tracking-wider font-bold text-primary">Gaming</span>
+</div>
+</div>
+<!-- Navigation Controls -->
+<nav class="flex items-center gap-4 pl-4 border-l border-black/10">
+<button class="text-slate-700 hover:text-primary transition-colors" title="Performance">
+<i class="fas fa-tachometer-alt text-sm font-bold"></i>
+</button>
+<button class="text-slate-700 hover:text-primary transition-colors" title="Quality">
+<i class="far fa-image text-sm font-bold"></i>
+</button>
+<button class="text-slate-700 hover:text-primary transition-colors" title="Connection">
+<i class="fas fa-wifi text-sm font-bold"></i>
+</button>
+<button class="text-slate-700 hover:text-primary transition-colors" title="Settings">
+<i class="fas fa-cog text-sm font-bold"></i>
+</button>
+</nav>
+</div>
+</header>
+<!-- Sidebar: Stream Control (Highly Transparent Mica) -->
+<aside class="fixed left-0 top-0 z-40 flex flex-col p-4 h-full">
+<div class="rounded-[16px] m-4 w-64 h-[calc(100vh-6rem)] flex flex-col mt-20 sidebar-mica">
+<!-- Sidebar Header -->
+<div class="p-6">
+<h2 class="text-base font-bold text-slate-900 contrast-shadow">Stream Control</h2>
+<div class="flex items-center gap-2 mt-1">
+<span class="w-2 h-2 rounded-full bg-green-600 shadow-[0_0_8px_rgba(22,163,74,0.5)]"></span>
+<p class="text-[11px] font-bold text-slate-800 uppercase tracking-wide">4K @ 60FPS • ACTIVE</p>
+</div>
+</div>
+<!-- Sidebar Navigation -->
+<nav class="flex-1 px-3 space-y-1">
+<button class="w-full flex items-center gap-3 bg-primary hover:bg-blue-700 text-white rounded-[8px] px-3 py-2.5 shadow-md transition-all">
+<i class="fas fa-bolt w-4 text-center text-xs font-bold"></i>
+<span class="text-sm font-semibold">Performance</span>
+</button>
+<button class="w-full flex items-center gap-3 text-slate-900 hover:bg-white/40 px-3 py-2.5 rounded-[8px] transition-colors contrast-shadow">
+<i class="far fa-clock w-4 text-center text-xs font-bold"></i>
+<span class="text-sm font-semibold">Quality</span>
+</button>
+<button class="w-full flex items-center gap-3 text-slate-900 hover:bg-white/40 px-3 py-2.5 rounded-[8px] transition-colors contrast-shadow">
+<i class="fas fa-network-wired w-4 text-center text-xs font-bold"></i>
+<span class="text-sm font-semibold">Connection</span>
+</button>
+<button class="w-full flex items-center gap-3 text-slate-900 hover:bg-white/40 px-3 py-2.5 rounded-[8px] transition-colors contrast-shadow">
+<i class="far fa-window-maximize w-4 text-center text-xs font-bold"></i>
+<span class="text-sm font-semibold">Display</span>
+</button>
+</nav>
+<!-- Bottom Action -->
+<div class="p-4 mt-auto">
+<div class="p-4 rounded-[12px] bg-white/30 border border-white/40 backdrop-blur-sm">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] uppercase font-bold text-slate-800 tracking-wider">GPU Usage</span>
+<span class="text-[10px] font-bold text-primary">32%</span>
+</div>
+<div class="w-full bg-black/10 h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-1/3 shadow-[0_0_8px_rgba(0,95,184,0.3)]"></div>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Overlay UI Elements -->
+<div class="fixed bottom-8 right-8 z-50 flex flex-col gap-4">
+<button class="w-14 h-14 rounded-full bg-primary hover:bg-blue-700 text-white flex items-center justify-center shadow-xl active:scale-95 transition-all">
+<i class="fas fa-power-off text-xl"></i>
+</button>
+</div>
+<!-- Technical Specs Corner (Bottom Bar) -->
+<div class="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 glass-panel-light px-8 py-3 rounded-full flex items-center gap-10">
+<div class="flex items-center gap-2">
+<i class="fas fa-server text-slate-700 text-xs"></i>
+<span class="text-[11px] uppercase tracking-widest text-slate-900 font-bold contrast-shadow">192.168.1.104</span>
+</div>
+<div class="flex items-center gap-2">
+<i class="far fa-clock text-slate-700 text-xs"></i>
+<span class="text-[11px] uppercase tracking-widest text-slate-900 font-bold contrast-shadow">UPTIME: 12:42:01</span>
+</div>
+<div class="flex items-center gap-2">
+<i class="fas fa-shield-alt text-green-700 text-xs"></i>
+<span class="text-[11px] uppercase tracking-widest text-green-700 font-bold contrast-shadow">SECURE CHANNEL</span>
+</div>
+</div>
+</body></html>
