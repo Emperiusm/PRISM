@@ -2,6 +2,7 @@
 //! Client configuration — CLI args, saved servers, shader cache paths.
 
 pub mod servers;
+pub mod profiles;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
