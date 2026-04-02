@@ -599,9 +599,6 @@ impl PrismApp {
                 self.launcher_tab = LauncherTab::Home;
                 self.stats_bar.hide();
             }
-            UiAction::OpenSettings => {
-                self.launcher_tab = LauncherTab::Settings;
-            }
             UiAction::CloseOverlay => {
                 self.ui_state = UiState::Stream;
                 self.stats_bar.hide();
