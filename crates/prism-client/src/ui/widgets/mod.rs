@@ -212,7 +212,9 @@ pub enum UiAction {
     EditServer(uuid::Uuid),
     DeleteServer(uuid::Uuid),
     AddServer,
-    OpenSettings,
+    SaveServer,
+    CancelModal,
+    ConfirmDeleteServer(uuid::Uuid),
 }
 
 // ---------------------------------------------------------------------------

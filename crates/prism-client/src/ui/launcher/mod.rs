@@ -57,3 +57,17 @@ impl LauncherTab {
         }
     }
 }
+
+/// Which modal is active on top of the launcher.
+#[derive(Debug, Clone)]
+pub enum ActiveModal {
+    ServerForm { mode: FormMode },
+    ConfirmDelete { server_id: uuid::Uuid, name: String },
+}
+
+/// Add vs edit mode for the server form.
+#[derive(Debug, Clone)]
+pub enum FormMode {
+    Add,
+    Edit { server_id: uuid::Uuid },
+}
