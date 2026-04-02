@@ -10,6 +10,7 @@ pub mod separator;
 pub mod slider;
 pub mod sparkline;
 pub mod text_input;
+pub mod toggle;
 
 use crate::ui::launcher::LauncherTab;
 
