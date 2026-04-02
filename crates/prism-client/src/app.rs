@@ -28,11 +28,7 @@ use crate::ui::launcher::server_form::ServerForm;
 use crate::ui::launcher::shell::LauncherShell;
 use crate::ui::launcher::settings::SettingsPanel;
 use crate::ui::launcher::{ActiveModal, FormMode, LauncherTab};
-use crate::ui::overlay::conn_panel::ConnPanel;
-use crate::ui::overlay::display_panel::DisplayPanel;
-use crate::ui::overlay::perf_panel::PerfPanel;
-use crate::ui::overlay::quality_panel::QualityPanel;
-use crate::ui::overlay::stats_bar::StatsBar;
+use crate::ui::overlay::capsule::OverlayCapsule;
 use crate::ui::widgets::{
     EventResponse, MouseButton as UiMouseButton, PaintContext, Rect, UiAction, UiEvent,
     Widget,
@@ -57,11 +53,7 @@ pub struct PrismApp {
     profile_store: Option<Arc<Mutex<ProfileStore>>>,
     pending_connect_profile: Option<ProfileConfig>,
     // Overlay widgets
-    stats_bar: StatsBar,
-    perf_panel: PerfPanel,
-    quality_panel: QualityPanel,
-    conn_panel: ConnPanel,
-    display_panel: DisplayPanel,
+    overlay_capsule: OverlayCapsule,
     // Connection state
     tokio_runtime: Option<tokio::runtime::Runtime>,
     stream_texture: Option<StreamTexture>,
@@ -145,11 +137,7 @@ impl PrismApp {
             server_store,
             profile_store,
             pending_connect_profile: None,
-            stats_bar: StatsBar::new(),
-            perf_panel: PerfPanel::new(),
-            quality_panel: QualityPanel::new(),
-            conn_panel: ConnPanel::new(),
-            display_panel: DisplayPanel::new(),
+            overlay_capsule: OverlayCapsule::new(),
             tokio_runtime: None,
             stream_texture: None,
             connect_result_rx: None,
@@ -718,7 +706,7 @@ impl PrismApp {
                 self.ui_state = UiState::Launcher;
                 self.launcher_shell.set_tab(LauncherTab::Home);
                 self.pending_connect_profile = None;
-                self.stats_bar.hide();
+                self.overlay_capsule.hide();
             }
             UiAction::AddServer => {
                 self.launcher_shell.show_modal(ActiveModal::ServerForm {
@@ -730,25 +718,9 @@ impl PrismApp {
             }
             UiAction::CloseOverlay => {
                 self.ui_state = UiState::Stream;
-                self.stats_bar.hide();
+                self.overlay_capsule.hide();
             }
-            UiAction::OpenPanel(name) => match name.as_str() {
-                "performance" => self.perf_panel.show(),
-                "quality" => self.quality_panel.show(),
-                "connection" => self.conn_panel.show(),
-                "display" => self.display_panel.show(),
-                _ => {}
-            },
-            UiAction::ClosePanel(name) => match name.as_str() {
-                "performance" => self.perf_panel.hide(),
-                "quality" => self.quality_panel.hide(),
-                "connection" => self.conn_panel.hide(),
-                "display" => self.display_panel.hide(),
-                _ => {}
-            },
-            UiAction::TogglePinStatsBar => {
-                self.stats_bar.toggle_pin();
-            }
+            UiAction::OpenPanel(_) | UiAction::ClosePanel(_) | UiAction::TogglePinStatsBar => {}
             UiAction::SwitchProfile(profile_name) => {
                 self.bridge
                     .send_control(ControlCommand::SwitchProfile(profile_name));
@@ -994,50 +966,18 @@ impl PrismApp {
         if self.ui_state.shows_overlay() {
             let renderer = self.renderer.as_ref().expect("renderer exists");
             let screen_w = renderer.width() as f32;
+            let screen_h = renderer.height() as f32;
 
             // Update stats from bridge
             if let Some(stats) = self.bridge.current_stats() {
-                self.stats_bar.update_stats(stats.clone());
-                self.perf_panel.update(&stats);
+                self.overlay_capsule.update_stats(stats);
             }
 
             self.paint_ctx.clear();
-
-            // Layout and paint stats bar
-            self.stats_bar.show();
-            let bar_w = (screen_w - 40.0).min(960.0);
-            let bar_x = (screen_w - bar_w) * 0.5;
-            self.stats_bar.layout(Rect::new(bar_x, 18.0, bar_w, 48.0));
-            self.stats_bar.paint(&mut self.paint_ctx);
-
-            // Layout and paint visible sub-panels below the stats bar
-            let mut panel_x = bar_x;
-            let panel_y = 84.0;
-            let panel_gap = 16.0;
-
-            if self.perf_panel.is_visible() {
-                self.perf_panel
-                    .layout(Rect::new(panel_x, panel_y, 260.0, 220.0));
-                self.perf_panel.paint(&mut self.paint_ctx);
-                panel_x += 260.0 + panel_gap;
-            }
-            if self.quality_panel.is_visible() {
-                self.quality_panel
-                    .layout(Rect::new(panel_x, panel_y, 260.0, 280.0));
-                self.quality_panel.paint(&mut self.paint_ctx);
-                panel_x += 260.0 + panel_gap;
-            }
-            if self.conn_panel.is_visible() {
-                self.conn_panel
-                    .layout(Rect::new(panel_x, panel_y, 260.0, 200.0));
-                self.conn_panel.paint(&mut self.paint_ctx);
-                panel_x += 260.0 + panel_gap;
-            }
-            if self.display_panel.is_visible() {
-                self.display_panel
-                    .layout(Rect::new(panel_x, panel_y, 260.0, 220.0));
-                self.display_panel.paint(&mut self.paint_ctx);
-            }
+            self.overlay_capsule.show();
+            self.overlay_capsule
+                .layout(Rect::new(0.0, 0.0, screen_w, screen_h));
+            self.overlay_capsule.paint(&mut self.paint_ctx);
 
             // Render overlay UI on top of stream
             if let Some(ui_renderer) = &mut self.ui_renderer {
@@ -1196,7 +1136,7 @@ impl ApplicationHandler for PrismApp {
                         x: self.mouse_x,
                         y: self.mouse_y,
                     };
-                    let _ = self.stats_bar.handle_event(&event);
+                    let _ = self.overlay_capsule.handle_event(&event);
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
@@ -1231,40 +1171,7 @@ impl ApplicationHandler for PrismApp {
                 }
 
                 if self.ui_state.shows_overlay() {
-                    // Route to overlay widgets
-                    match self.stats_bar.handle_event(&ui_event) {
-                        EventResponse::Action(action) => {
-                            self.handle_action(action);
-                            return;
-                        }
-                        EventResponse::Consumed => return,
-                        EventResponse::Ignored => {}
-                    }
-                    match self.perf_panel.handle_event(&ui_event) {
-                        EventResponse::Action(action) => {
-                            self.handle_action(action);
-                            return;
-                        }
-                        EventResponse::Consumed => return,
-                        EventResponse::Ignored => {}
-                    }
-                    match self.quality_panel.handle_event(&ui_event) {
-                        EventResponse::Action(action) => {
-                            self.handle_action(action);
-                            return;
-                        }
-                        EventResponse::Consumed => return,
-                        EventResponse::Ignored => {}
-                    }
-                    match self.conn_panel.handle_event(&ui_event) {
-                        EventResponse::Action(action) => {
-                            self.handle_action(action);
-                            return;
-                        }
-                        EventResponse::Consumed => return,
-                        EventResponse::Ignored => {}
-                    }
-                    match self.display_panel.handle_event(&ui_event) {
+                    match self.overlay_capsule.handle_event(&ui_event) {
                         EventResponse::Action(action) => {
                             self.handle_action(action);
                             return;
@@ -1284,11 +1191,11 @@ impl ApplicationHandler for PrismApp {
                             match self.ui_state {
                                 UiState::Stream => {
                                     self.ui_state = UiState::Overlay;
-                                    self.stats_bar.show();
+                                    self.overlay_capsule.show();
                                 }
                                 UiState::Overlay => {
                                     self.ui_state = UiState::Stream;
-                                    self.stats_bar.hide();
+                                    self.overlay_capsule.hide();
                                 }
                                 _ => {}
                             }
