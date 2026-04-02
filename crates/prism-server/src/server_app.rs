@@ -1077,24 +1077,17 @@ async fn handle_connection(
 /// create one. This requires admin privileges — if we can't create the rule,
 /// log a warning with the command the user can run manually.
 fn ensure_firewall_rule(port: u16) {
-    // Check if rule already exists
-    let check = std::process::Command::new("netsh")
+    // Delete any existing rule first — it may have wrong profile/port settings
+    // from a previous version or a Windows Firewall prompt.
+    let _ = std::process::Command::new("netsh")
         .args([
             "advfirewall",
             "firewall",
-            "show",
+            "delete",
             "rule",
             "name=PRISM Server",
         ])
         .output();
-
-    match check {
-        Ok(output) if output.status.success() => {
-            tracing::info!("firewall rule \"PRISM Server\" already exists");
-            return;
-        }
-        _ => {} // Rule doesn't exist or netsh failed — try to create it
-    }
 
     tracing::info!(port, "creating firewall rule for UDP port {port}");
 
