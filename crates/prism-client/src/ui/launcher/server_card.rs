@@ -67,6 +67,7 @@ pub struct ServerCard {
     accent_color: [f32; 3],
     connect_button: Button,
     edit_button: Button,
+    delete_button: Button,
     hover_anim: Animation,
     hovered: bool,
     rect: Rect,
@@ -111,6 +112,8 @@ impl ServerCard {
             .with_style(ButtonStyle::Primary),
             edit_button: Button::new("Edit", UiAction::EditServer(server.id))
                 .with_style(ButtonStyle::Secondary),
+            delete_button: Button::new("Del", UiAction::DeleteServer(server.id))
+                .with_style(ButtonStyle::Destructive),
             hover_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             hovered: false,
             rect: Rect::new(0.0, 0.0, Self::WIDTH, Self::HEIGHT),
@@ -186,20 +189,21 @@ impl ServerCard {
 
 impl Widget for ServerCard {
     fn layout(&mut self, available: Rect) -> Size {
+        const ACTION_GAP: f32 = 8.0;
+        const SECONDARY_W: f32 = 62.0;
         self.rect = Rect::new(available.x, available.y, Self::WIDTH, Self::HEIGHT);
         let button_y = self.buttons_y();
-        self.connect_button.layout(Rect::new(
-            self.rect.x + 18.0,
-            button_y,
-            self.rect.w - 114.0,
-            40.0,
-        ));
-        self.edit_button.layout(Rect::new(
-            self.rect.x + self.rect.w - 84.0,
-            button_y,
-            66.0,
-            40.0,
-        ));
+        let delete_x = self.rect.x + self.rect.w - 18.0 - SECONDARY_W;
+        let edit_x = delete_x - ACTION_GAP - SECONDARY_W;
+        let connect_x = self.rect.x + 18.0;
+        let connect_w = (edit_x - ACTION_GAP - connect_x).max(80.0);
+
+        self.connect_button
+            .layout(Rect::new(connect_x, button_y, connect_w, 40.0));
+        self.edit_button
+            .layout(Rect::new(edit_x, button_y, SECONDARY_W, 40.0));
+        self.delete_button
+            .layout(Rect::new(delete_x, button_y, SECONDARY_W, 40.0));
         Size {
             w: Self::WIDTH,
             h: Self::HEIGHT,
@@ -299,6 +303,7 @@ impl Widget for ServerCard {
 
         self.connect_button.paint(ctx);
         self.edit_button.paint(ctx);
+        self.delete_button.paint(ctx);
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
@@ -310,6 +315,11 @@ impl Widget for ServerCard {
         let edit_resp = self.edit_button.handle_event(event);
         if !matches!(edit_resp, EventResponse::Ignored) {
             return edit_resp;
+        }
+
+        let delete_resp = self.delete_button.handle_event(event);
+        if !matches!(delete_resp, EventResponse::Ignored) {
+            return delete_resp;
         }
 
         match event {
@@ -344,6 +354,7 @@ impl Widget for ServerCard {
         self.hover_anim.tick(dt_ms);
         self.connect_button.animate(dt_ms);
         self.edit_button.animate(dt_ms);
+        self.delete_button.animate(dt_ms);
     }
 }
 
@@ -415,7 +426,7 @@ mod tests {
         card.layout(Rect::new(0.0, 0.0, 800.0, 600.0));
 
         let resp = card.handle_event(&UiEvent::MouseDown {
-            x: card.rect.x + card.rect.w - 40.0,
+            x: card.rect.x + card.rect.w - 104.0,
             y: card.rect.y + card.rect.h - 30.0,
             button: MouseButton::Left,
         });
@@ -423,6 +434,25 @@ mod tests {
         assert!(matches!(
             resp,
             EventResponse::Action(UiAction::EditServer(id)) if id == server_id
+        ));
+    }
+
+    #[test]
+    fn delete_button_returns_delete_action() {
+        let server = make_server();
+        let server_id = server.id;
+        let mut card = ServerCard::from_saved(&server);
+        card.layout(Rect::new(0.0, 0.0, 800.0, 600.0));
+
+        let resp = card.handle_event(&UiEvent::MouseDown {
+            x: card.rect.x + card.rect.w - 32.0,
+            y: card.rect.y + card.rect.h - 30.0,
+            button: MouseButton::Left,
+        });
+
+        assert!(matches!(
+            resp,
+            EventResponse::Action(UiAction::DeleteServer(id)) if id == server_id
         ));
     }
 }
