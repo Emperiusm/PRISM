@@ -11,7 +11,7 @@ use winit::window::{Window, WindowId};
 
 use crate::config::ClientConfig;
 use crate::config::client_config_prefs::UserPrefs;
-use crate::config::profiles::ProfileStore;
+use crate::config::profiles::{ProfileConfig, ProfileStore};
 use crate::config::servers::ServerStore;
 use crate::input::InputCoalescer;
 use crate::input::double_tap::DoubleTapDetector;
@@ -19,7 +19,7 @@ use crate::renderer::PrismRenderer;
 use crate::renderer::blur_pipeline::BlurPipeline;
 use crate::renderer::stream_texture::StreamTexture;
 use crate::renderer::ui_renderer::UiRenderer;
-use crate::session_bridge::SessionBridge;
+use crate::session_bridge::{ControlCommand, SessionBridge};
 use crate::ui::launcher::card_grid::CardGrid;
 use crate::ui::launcher::nav::LauncherNav;
 use crate::ui::launcher::profiles::ProfilesPanel;
@@ -54,6 +54,8 @@ pub struct PrismApp {
     // Launcher widgets
     launcher_shell: LauncherShell,
     server_store: Option<ServerStore>,
+    profile_store: Option<Arc<Mutex<ProfileStore>>>,
+    pending_connect_profile: Option<ProfileConfig>,
     // Overlay widgets
     stats_bar: StatsBar,
     perf_panel: PerfPanel,
@@ -141,6 +143,8 @@ impl PrismApp {
             bridge: SessionBridge::new(),
             launcher_shell,
             server_store,
+            profile_store,
+            pending_connect_profile: None,
             stats_bar: StatsBar::new(),
             perf_panel: PerfPanel::new(),
             quality_panel: QualityPanel::new(),
@@ -232,6 +236,50 @@ impl PrismApp {
         });
     }
 
+    fn resolve_profile_for_connection(
+        &self,
+        raw_address: &str,
+        normalized_address: &str,
+    ) -> Option<ProfileConfig> {
+        let preferred_profile = self.server_store.as_ref().and_then(|store| {
+            store
+                .servers()
+                .iter()
+                .find(|server| server.address == raw_address || server.address == normalized_address)
+                .map(|server| server.default_profile.clone())
+        });
+        let profile_name = preferred_profile.unwrap_or_else(|| "Balanced".to_string());
+
+        let store = self.profile_store.as_ref()?;
+        let guard = store.lock().ok()?;
+        guard
+            .get_by_name(&profile_name)
+            .cloned()
+            .or_else(|| guard.get_by_name("Balanced").cloned())
+            .or_else(|| guard.list().first().cloned())
+    }
+
+    fn encoder_preset_label(profile: &ProfileConfig) -> String {
+        match profile.encoder_preset {
+            prism_session::EncoderPreset::UltraLowLatency => "UltraLowLatency".to_string(),
+            prism_session::EncoderPreset::Balanced => "Balanced".to_string(),
+            prism_session::EncoderPreset::Quality => "Quality".to_string(),
+        }
+    }
+
+    fn send_profile_defaults(&self, profile: &ProfileConfig) {
+        self.bridge
+            .send_control(ControlCommand::SwitchProfile(profile.name.clone()));
+        self.bridge.send_control(ControlCommand::UpdateQuality {
+            encoder_preset: Some(Self::encoder_preset_label(profile)),
+            max_fps: Some(profile.max_fps),
+            lossless_text: None,
+            region_detection: None,
+        });
+        self.bridge
+            .send_control(ControlCommand::SetBandwidthLimit(profile.bitrate_bps));
+    }
+
     /// Initiate an async connection to the given server address on a background
     /// tokio runtime. The result is communicated back via `connect_result_rx`.
     fn start_connection(&mut self, address: &str) {
@@ -241,6 +289,7 @@ impl PrismApp {
         } else {
             format!("{address}:7000")
         };
+        self.pending_connect_profile = self.resolve_profile_for_connection(address, &addr_str);
         let addr: std::net::SocketAddr = match addr_str.parse() {
             Ok(a) => a,
             Err(e) => {
@@ -362,6 +411,12 @@ impl PrismApp {
 
         // ── Create SessionBridge channels ────────────────────────────────
         let (bridge, network) = SessionBridge::create_connected();
+        let crate::session_bridge::NetworkSide {
+            frame_tx,
+            mut control_rx,
+            input_rx,
+            ..
+        } = network;
 
         // ── Spawn heartbeat ──────────────────────────────────────────────
         let hb_conn = connection.clone();
@@ -382,8 +437,98 @@ impl PrismApp {
         });
 
         // ── Spawn input forwarder ────────────────────────────────────────
+        // Spawn control forwarder (UI control commands -> control datagrams).
+        let conn_control = connection.clone();
+        tokio::spawn(async move {
+            use bytes::BytesMut;
+            use prism_protocol::channel::CHANNEL_CONTROL;
+            use prism_protocol::header::{HEADER_SIZE, PrismHeader};
+            use prism_session::control_msg::{
+                MONITOR_LAYOUT, PROFILE_SWITCH, QUALITY_UPDATE, SESSION_INFO, ProfileSwitchPayload,
+                QualityUpdatePayload,
+            };
+
+            let mut sequence = 1_u32;
+            while let Some(cmd) = control_rx.recv().await {
+                let (msg_type, payload) = match cmd {
+                    ControlCommand::SwitchProfile(profile_name) => {
+                        let payload = ProfileSwitchPayload {
+                            profile_name,
+                            max_fps: 60,
+                            encoder_preset: "Balanced".to_string(),
+                            prefer_lossless_text: false,
+                            region_detection: false,
+                        };
+                        let Ok(bytes) = serde_json::to_vec(&payload) else {
+                            continue;
+                        };
+                        (PROFILE_SWITCH, bytes)
+                    }
+                    ControlCommand::UpdateQuality {
+                        encoder_preset,
+                        max_fps,
+                        lossless_text,
+                        region_detection,
+                    } => {
+                        let payload = QualityUpdatePayload {
+                            encoder_preset,
+                            max_fps,
+                            bitrate_bps: None,
+                            lossless_text,
+                            region_detection,
+                        };
+                        let Ok(bytes) = serde_json::to_vec(&payload) else {
+                            continue;
+                        };
+                        (QUALITY_UPDATE, bytes)
+                    }
+                    ControlCommand::SetBandwidthLimit(bps) => {
+                        let payload = QualityUpdatePayload {
+                            encoder_preset: None,
+                            max_fps: None,
+                            bitrate_bps: Some(bps),
+                            lossless_text: None,
+                            region_detection: None,
+                        };
+                        let Ok(bytes) = serde_json::to_vec(&payload) else {
+                            continue;
+                        };
+                        (QUALITY_UPDATE, bytes)
+                    }
+                    ControlCommand::SelectMonitor(index) => {
+                        let Ok(bytes) =
+                            serde_json::to_vec(&serde_json::json!({ "monitor_index": index }))
+                        else {
+                            continue;
+                        };
+                        (MONITOR_LAYOUT, bytes)
+                    }
+                    ControlCommand::RequestServerInfo => (SESSION_INFO, Vec::new()),
+                    ControlCommand::Disconnect => break,
+                };
+
+                let Ok(header) = PrismHeader::new(
+                    CHANNEL_CONTROL,
+                    msg_type,
+                    0,
+                    sequence,
+                    0,
+                    payload.len() as u32,
+                ) else {
+                    continue;
+                };
+                sequence = sequence.wrapping_add(1);
+
+                let mut packet = BytesMut::with_capacity(HEADER_SIZE + payload.len());
+                header.encode(&mut packet);
+                packet.extend_from_slice(&payload);
+                if conn_control.send_datagram(packet.freeze()).is_err() {
+                    break;
+                }
+            }
+        });
+
         let conn_input = connection.clone();
-        let input_rx = network.input_rx;
         tokio::spawn(async move {
             loop {
                 let mut sent_any = false;
@@ -402,7 +547,6 @@ impl PrismApp {
         // ── Spawn frame receiver ─────────────────────────────────────────
         let conn_recv = connection.clone();
         let conn_idr = connection.clone();
-        let frame_tx = network.frame_tx;
         tokio::spawn(async move {
             let mut decoder = match openh264::decoder::Decoder::new() {
                 Ok(d) => d,
@@ -573,6 +717,7 @@ impl PrismApp {
                 self.stream_bind_group = None;
                 self.ui_state = UiState::Launcher;
                 self.launcher_shell.set_tab(LauncherTab::Home);
+                self.pending_connect_profile = None;
                 self.stats_bar.hide();
             }
             UiAction::AddServer => {
@@ -604,6 +749,31 @@ impl PrismApp {
             UiAction::TogglePinStatsBar => {
                 self.stats_bar.toggle_pin();
             }
+            UiAction::SwitchProfile(profile_name) => {
+                self.bridge
+                    .send_control(ControlCommand::SwitchProfile(profile_name));
+            }
+            UiAction::UpdateQuality {
+                preset,
+                max_fps,
+                lossless_text,
+                region_detection,
+            } => {
+                self.bridge.send_control(ControlCommand::UpdateQuality {
+                    encoder_preset: preset,
+                    max_fps,
+                    lossless_text,
+                    region_detection,
+                });
+            }
+            UiAction::SetBandwidthLimit(bps) => {
+                self.bridge
+                    .send_control(ControlCommand::SetBandwidthLimit(bps));
+            }
+            UiAction::SelectMonitor(index) => {
+                self.bridge
+                    .send_control(ControlCommand::SelectMonitor(index));
+            }
             _ => {
                 // Other actions not yet wired
                 tracing::debug!(?action, "unhandled UI action");
@@ -623,11 +793,15 @@ impl PrismApp {
                 tracing::info!("connection established");
                 self.bridge = bridge;
                 self.ui_state = UiState::Stream;
+                if let Some(profile) = self.pending_connect_profile.take() {
+                    self.send_profile_defaults(&profile);
+                }
                 self.connect_result_rx = None;
             }
             Ok(ConnectTaskResult::Failed { error }) => {
                 tracing::error!(%error, "connection failed");
                 self.ui_state = UiState::Launcher;
+                self.pending_connect_profile = None;
                 self.connect_result_rx = None;
             }
             Err(std::sync::mpsc::TryRecvError::Empty) => {
@@ -636,6 +810,7 @@ impl PrismApp {
             Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                 tracing::error!("connection task channel disconnected");
                 self.ui_state = UiState::Launcher;
+                self.pending_connect_profile = None;
                 self.connect_result_rx = None;
             }
         }
