@@ -43,6 +43,15 @@ impl Dropdown {
         }
     }
 
+    pub fn set_selected_by_text(&mut self, text: &str) -> bool {
+        if let Some(index) = self.options.iter().position(|option| option == text) {
+            self.selected = index;
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn is_open(&self) -> bool {
         self.open
     }
