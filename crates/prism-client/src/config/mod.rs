@@ -3,6 +3,7 @@
 
 pub mod servers;
 pub mod profiles;
+pub mod client_config_prefs;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
