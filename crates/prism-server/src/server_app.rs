@@ -961,7 +961,7 @@ async fn handle_connection(
                     client_id,
                     device_id,
                     unified,
-                    prism_session::ConnectionProfile::coding(),
+                    prism_session::ConnectionProfile::gaming(),
                     &[
                         prism_protocol::channel::CHANNEL_DISPLAY,
                         prism_protocol::channel::CHANNEL_INPUT,

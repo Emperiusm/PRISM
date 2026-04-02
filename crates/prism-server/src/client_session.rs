@@ -67,6 +67,12 @@ impl ClientSession {
         self.last_activity = Instant::now();
     }
 
+    /// Replace the active connection profile and refresh activity timestamp.
+    pub fn update_profile(&mut self, profile: ConnectionProfile) {
+        self.profile = profile;
+        self.last_activity = Instant::now();
+    }
+
     /// Subscribe the client to the given channel.
     /// Returns `true` if the channel was not already subscribed.
     pub fn subscribe(&mut self, channel_id: u16) -> bool {
