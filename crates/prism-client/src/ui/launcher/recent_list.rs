@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::config::servers::{SavedServer, ServerStatus};
 use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
+use crate::ui::widgets::icon::{Icon, ICON_SYNC};
 use crate::ui::widgets::{
     ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
     Widget,
@@ -122,6 +123,18 @@ impl RecentList {
 
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
+    }
+
+    /// Number of focusable widgets (one reconnect button per row).
+    pub fn focusable_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    /// Set keyboard focus on the reconnect button at `local_index`.
+    pub fn set_focus(&mut self, local_index: Option<usize>) {
+        for (i, row) in self.rows.iter_mut().enumerate() {
+            row.reconnect_button.set_focused(local_index == Some(i));
+        }
     }
 }
 
@@ -246,6 +259,12 @@ impl Widget for RecentList {
             });
 
             // (e) Reconnect button with sync icon to the left
+            let btn_rect = row.reconnect_button.rect();
+            Icon::new(ICON_SYNC)
+                .with_size(14.0)
+                .with_color(theme::LT_TEXT_MUTED)
+                .at(btn_rect.x - 20.0, btn_rect.y + (btn_rect.h - 14.0) * 0.5)
+                .paint(ctx);
             row.reconnect_button.paint(ctx);
 
             // Inner separator (except last row)

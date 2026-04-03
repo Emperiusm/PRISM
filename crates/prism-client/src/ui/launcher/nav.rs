@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Sidebar navigation for launcher tabs.
 
-use super::LauncherTab;
+use super::{LauncherTab, SettingsSection};
 use crate::ui::theme;
 use crate::ui::widgets::icon::{
-    Icon, ICON_DEVICES, ICON_HOME, ICON_MENU, ICON_SETTINGS, ICON_TUNE,
+    Icon, ICON_DEVICES, ICON_HOME, ICON_KEYBOARD, ICON_MENU, ICON_SETTINGS, ICON_SHIELD,
+    ICON_SPEAKER, ICON_STREAMING, ICON_TUNE,
 };
 use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
+    Widget,
 };
 
 const ITEM_H: f32 = 40.0;
@@ -17,9 +19,12 @@ const SIDE_PADDING: f32 = 14.0;
 pub struct LauncherNav {
     rect: Rect,
     active_tab: LauncherTab,
+    active_section: SettingsSection,
     hovered_tab: Option<LauncherTab>,
+    hovered_section: Option<SettingsSection>,
     primary_items: Vec<(LauncherTab, Rect)>,
     settings_item: Rect,
+    sub_nav_items: Vec<(SettingsSection, Rect)>,
 }
 
 impl LauncherNav {
@@ -27,14 +32,25 @@ impl LauncherNav {
         Self {
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             active_tab: LauncherTab::Home,
+            active_section: SettingsSection::IdentitySecurity,
             hovered_tab: None,
+            hovered_section: None,
             primary_items: Vec::new(),
             settings_item: Rect::new(0.0, 0.0, 0.0, 0.0),
+            sub_nav_items: Vec::new(),
         }
     }
 
     pub fn set_active_tab(&mut self, tab: LauncherTab) {
         self.active_tab = tab;
+    }
+
+    pub fn set_active_section(&mut self, section: SettingsSection) {
+        self.active_section = section;
+    }
+
+    pub fn active_section(&self) -> SettingsSection {
+        self.active_section
     }
 
     fn item_rect(&self, index: usize) -> Rect {
@@ -61,6 +77,21 @@ impl Widget for LauncherNav {
             .enumerate()
             .map(|(index, tab)| (*tab, self.item_rect(index)))
             .collect();
+
+        // When Settings is active, compute sub-nav items after the primary ones
+        self.sub_nav_items.clear();
+        if self.active_tab == LauncherTab::Settings {
+            let main_nav_bottom_y = self.rect.y
+                + 94.0
+                + LauncherTab::PRIMARY.len() as f32 * (ITEM_H + ITEM_GAP);
+            let sub_header_y = main_nav_bottom_y + 16.0;
+            for (i, section) in SettingsSection::ALL.iter().enumerate() {
+                let item_y = sub_header_y + 24.0 + i as f32 * (ITEM_H + 4.0);
+                let item_rect = Rect::new(self.rect.x, item_y, self.rect.w, ITEM_H);
+                self.sub_nav_items.push((*section, item_rect));
+            }
+        }
+
         self.settings_item = Rect::new(
             self.rect.x,
             self.rect.y + self.rect.h - 54.0,
@@ -145,6 +176,64 @@ impl Widget for LauncherNav {
             });
         }
 
+        // Settings sub-nav (TASK-066, TASK-067)
+        if self.active_tab == LauncherTab::Settings && !self.sub_nav_items.is_empty() {
+            // "SETTINGS" header
+            let header_y = self.sub_nav_items[0].1.y - 24.0;
+            ctx.push_text_run(TextRun {
+                x: self.rect.x + SIDE_PADDING,
+                y: header_y,
+                text: "SETTINGS".into(),
+                font_size: theme::FONT_LABEL,
+                color: theme::LT_TEXT_MUTED,
+                bold: true,
+                ..Default::default()
+            });
+
+            for (section, rect) in &self.sub_nav_items {
+                let is_active = *section == self.active_section;
+                let hovered = self.hovered_section == Some(*section);
+
+                if is_active {
+                    theme::paint_active_list_indicator(
+                        &mut ctx.glass_quads,
+                        *rect,
+                        theme::PRIMARY_BLUE,
+                    );
+                } else if hovered {
+                    ctx.push_glass_quad(theme::launcher_nav_item_surface(*rect, false, true));
+                }
+
+                let icon_codepoint = match section {
+                    SettingsSection::General => ICON_SETTINGS,
+                    SettingsSection::IdentitySecurity => ICON_SHIELD,
+                    SettingsSection::Streaming => ICON_STREAMING,
+                    SettingsSection::Input => ICON_KEYBOARD,
+                    SettingsSection::Audio => ICON_SPEAKER,
+                };
+                let color = if is_active {
+                    theme::LT_TEXT_PRIMARY
+                } else {
+                    theme::LT_TEXT_SECONDARY
+                };
+
+                Icon::new(icon_codepoint)
+                    .with_size(18.0)
+                    .with_color(color)
+                    .at(rect.x + SIDE_PADDING, rect.y + 11.0)
+                    .paint(ctx);
+
+                ctx.push_text_run(TextRun {
+                    x: rect.x + 40.0,
+                    y: rect.y + 12.0,
+                    text: section.label().into(),
+                    font_size: theme::FONT_LABEL,
+                    color,
+                    ..Default::default()
+                });
+            }
+        }
+
         let hovered = self.hovered_tab == Some(LauncherTab::Settings);
         let settings_active = self.active_tab == LauncherTab::Settings;
         if settings_active {
@@ -184,6 +273,24 @@ impl Widget for LauncherNav {
             },
             ..Default::default()
         });
+
+        // Sidebar footer avatar (TASK-074) — rendered on all tabs
+        let footer_y = self.rect.y + self.rect.h - 56.0;
+        ctx.push_glass_quad(GlassQuad {
+            rect: Rect::new(self.rect.x + SIDE_PADDING, footer_y, 36.0, 36.0),
+            tint: [0.75, 0.82, 0.90, 1.0],
+            corner_radius: 18.0,
+            ..Default::default()
+        });
+        ctx.push_text_run(TextRun {
+            x: self.rect.x + SIDE_PADDING + 44.0,
+            y: footer_y + 10.0,
+            text: "Verified Dev".into(),
+            font_size: theme::FONT_LABEL,
+            color: theme::LT_TEXT_PRIMARY,
+            bold: true,
+            ..Default::default()
+        });
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
@@ -198,6 +305,10 @@ impl Widget for LauncherNav {
                             .contains(*x, *y)
                             .then_some(LauncherTab::Settings)
                     });
+                self.hovered_section = self
+                    .sub_nav_items
+                    .iter()
+                    .find_map(|(section, rect)| rect.contains(*x, *y).then_some(*section));
                 EventResponse::Ignored
             }
             UiEvent::MouseDown {
@@ -205,6 +316,15 @@ impl Widget for LauncherNav {
                 y,
                 button: MouseButton::Left,
             } => {
+                // Sub-nav clicks take priority when Settings tab is active
+                if let Some((section, _)) = self
+                    .sub_nav_items
+                    .iter()
+                    .find(|(_, rect)| rect.contains(*x, *y))
+                {
+                    return EventResponse::Action(UiAction::OpenSettingsSection(*section));
+                }
+
                 if let Some((tab, _)) = self
                     .primary_items
                     .iter()

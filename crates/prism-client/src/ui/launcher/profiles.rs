@@ -64,7 +64,7 @@ impl ProfilesPanel {
             draft,
             dirty: false,
             list_rows: Vec::new(),
-            bitrate_slider: Slider::new("Bitrate", 5.0, 80.0, 35.0)
+            bitrate_slider: Slider::new("Bitrate", 5.0, 50.0, 35.0)
                 .with_format(|v| format!("{} Mbps", v.round() as u32))
                 .with_color_mode(ColorMode::Light),
             fps_dropdown: Dropdown::new(Self::fps_options(), 2).with_color_mode(ColorMode::Light),
@@ -271,7 +271,7 @@ impl ProfilesPanel {
 
     fn sync_controls_from_profile(&mut self, profile: &ProfileConfig) {
         self.bitrate_slider
-            .set_value((profile.bitrate_bps as f32 / 1_000_000.0).clamp(5.0, 80.0));
+            .set_value((profile.bitrate_bps as f32 / 1_000_000.0).clamp(5.0, 50.0));
         self.fps_dropdown
             .set_selected(Self::fps_to_index(profile.max_fps));
         self.encoder_dropdown
@@ -748,7 +748,7 @@ impl Widget for ProfilesPanel {
         ctx.push_text_run(TextRun {
             x: slider_rect.x + slider_rect.w - 50.0,
             y: slider_rect.y + slider_rect.h + 4.0,
-            text: "80 MBPS".into(),
+            text: "50 MBPS".into(),
             font_size: theme::FONT_CAPTION,
             color: theme::LT_TEXT_MUTED,
             ..Default::default()

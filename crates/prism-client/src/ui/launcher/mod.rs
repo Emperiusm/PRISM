@@ -60,6 +60,36 @@ impl LauncherTab {
     }
 }
 
+/// Settings sub-sections shown when the Settings tab is active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsSection {
+    General,
+    IdentitySecurity,
+    Streaming,
+    Input,
+    Audio,
+}
+
+impl SettingsSection {
+    pub const ALL: [SettingsSection; 5] = [
+        SettingsSection::General,
+        SettingsSection::IdentitySecurity,
+        SettingsSection::Streaming,
+        SettingsSection::Input,
+        SettingsSection::Audio,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            SettingsSection::General => "General",
+            SettingsSection::IdentitySecurity => "Identity & Security",
+            SettingsSection::Streaming => "Streaming",
+            SettingsSection::Input => "Input",
+            SettingsSection::Audio => "Audio",
+        }
+    }
+}
+
 /// Which modal is active on top of the launcher.
 #[derive(Debug, Clone)]
 pub enum ActiveModal {

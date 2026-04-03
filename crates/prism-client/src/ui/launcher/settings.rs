@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use crate::config::client_config_prefs::UserPrefs;
 use crate::ui::theme;
 use crate::ui::widgets::dropdown::Dropdown;
+use crate::ui::widgets::icon::{Icon, ICON_MIC, ICON_SPEAKER};
 use crate::ui::widgets::toggle::Toggle;
 use crate::ui::widgets::{
     ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
@@ -153,8 +154,10 @@ impl Widget for SettingsPanel {
 
         // Streaming Defaults
         cursor_y += ROW_GAP + 20.0;
+        let dropdown_w = right_w.min(240.0);
+        let dropdown_x = right_x + right_w - dropdown_w;
         self.default_profile_dropdown
-            .layout(Rect::new(right_x, cursor_y, right_w, 40.0));
+            .layout(Rect::new(dropdown_x, cursor_y, dropdown_w, 40.0));
         cursor_y += 40.0;
 
         // Input
@@ -209,13 +212,15 @@ impl Widget for SettingsPanel {
             text: "Identity & Security".to_string(),
             font_size: theme::FONT_DISPLAY,
             color: theme::LT_TEXT_PRIMARY,
+            bold: true,
             ..Default::default()
         });
 
         ctx.push_text_run(TextRun {
             x: content_x,
             y: scroll_top + 74.0,
-            text: "Manage your digital footprint and application settings.".to_string(),
+            text: "Manage your digital footprint and trusted encryption paths for remote sessions."
+                .to_string(),
             font_size: theme::FONT_BODY,
             color: theme::LT_TEXT_MUTED,
             ..Default::default()
@@ -312,6 +317,15 @@ impl Widget for SettingsPanel {
             color: theme::launcher_chip_text_color(theme::ChipTone::Success),
             ..Default::default()
         });
+        // Trust metadata (TASK-071)
+        ctx.push_text_run(TextRun {
+            x: trust_badge.x + trust_badge.w + 12.0,
+            y: trust_badge.y + 5.0,
+            text: "Last verified 2 hours ago".to_string(),
+            font_size: theme::FONT_LABEL,
+            color: theme::LT_TEXT_MUTED,
+            ..Default::default()
+        });
 
         cy += 74.0;
         draw_separator(ctx, cy);
@@ -346,10 +360,18 @@ impl Widget for SettingsPanel {
         ));
         ctx.push_text_run(TextRun {
             x: right_x + 16.0,
-            y: cy + 16.0,
+            y: cy + 10.0,
             text: "Exclusive Keyboard Capture".to_string(),
             font_size: theme::FONT_LABEL,
             color: theme::LT_TEXT_PRIMARY,
+            ..Default::default()
+        });
+        ctx.push_text_run(TextRun {
+            x: right_x + 16.0,
+            y: cy + 30.0,
+            text: "Send all keystrokes to the remote session".to_string(),
+            font_size: theme::FONT_CAPTION,
+            color: theme::LT_TEXT_MUTED,
             ..Default::default()
         });
         self.exclusive_keyboard_toggle.paint(ctx);
@@ -361,10 +383,18 @@ impl Widget for SettingsPanel {
         ));
         ctx.push_text_run(TextRun {
             x: right_x + 16.0,
-            y: cy + 16.0,
+            y: cy + 10.0,
             text: "Relative Mouse Movement".to_string(),
             font_size: theme::FONT_LABEL,
             color: theme::LT_TEXT_PRIMARY,
+            ..Default::default()
+        });
+        ctx.push_text_run(TextRun {
+            x: right_x + 16.0,
+            y: cy + 30.0,
+            text: "Use relative positioning for mouse input".to_string(),
+            font_size: theme::FONT_CAPTION,
+            color: theme::LT_TEXT_MUTED,
             ..Default::default()
         });
         self.relative_mouse_toggle.paint(ctx);
@@ -390,6 +420,12 @@ impl Widget for SettingsPanel {
             ..Default::default()
         });
         self.audio_output_dropdown.paint(ctx);
+        // Speaker icon inside dropdown right edge (TASK-073)
+        Icon::new(ICON_SPEAKER)
+            .with_size(16.0)
+            .with_color(theme::LT_TEXT_MUTED)
+            .at(right_x + right_w - 28.0, cy + 32.0)
+            .paint(ctx);
 
         cy += 76.0;
         ctx.push_text_run(TextRun {
@@ -401,6 +437,12 @@ impl Widget for SettingsPanel {
             ..Default::default()
         });
         self.mic_dropdown.paint(ctx);
+        // Mic icon inside dropdown right edge (TASK-073)
+        Icon::new(ICON_MIC)
+            .with_size(16.0)
+            .with_color(theme::LT_TEXT_MUTED)
+            .at(right_x + right_w - 28.0, cy + 32.0)
+            .paint(ctx);
 
         // Versioning watermark at the bottom
         let watermark_y = card_y + card_h + 30.0;

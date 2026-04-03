@@ -399,6 +399,17 @@ pub fn launcher_control_surface(rect: Rect, focused: bool) -> GlassQuad {
     )
 }
 
+/// Keyboard focus ring — transparent fill with a `PRIMARY_BLUE` border.
+/// Rendered as an overlay on the focused widget's rect.
+pub fn focus_ring(rect: Rect, radius: f32) -> GlassQuad {
+    glass_quad(
+        rect,
+        [0.0, 0.0, 0.0, 0.0], // fully transparent fill
+        [PRIMARY_BLUE[0], PRIMARY_BLUE[1], PRIMARY_BLUE[2], 0.80],
+        radius,
+    )
+}
+
 /// Launcher modal surface — white panel.
 pub fn launcher_modal_surface(rect: Rect) -> GlassQuad {
     glass_quad(

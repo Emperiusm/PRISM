@@ -200,6 +200,7 @@ pub enum KeyCode {
     Enter,
     Escape,
     Tab,
+    ShiftTab,
     Backspace,
     Delete,
     Left,
@@ -267,6 +268,7 @@ pub enum UiAction {
     SaveServer,
     CancelModal,
     ConfirmDeleteServer(uuid::Uuid),
+    OpenSettingsSection(crate::ui::launcher::SettingsSection),
 }
 
 // ---------------------------------------------------------------------------

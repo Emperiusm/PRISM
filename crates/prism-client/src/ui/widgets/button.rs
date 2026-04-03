@@ -24,6 +24,7 @@ pub struct Button {
     rect: Rect,
     hover_anim: Animation,
     hovered: bool,
+    focused: bool,
     radius_override: Option<f32>,
 }
 
@@ -37,6 +38,7 @@ impl Button {
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             hover_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             hovered: false,
+            focused: false,
             radius_override: None,
         }
     }
@@ -59,6 +61,14 @@ impl Button {
     pub fn rect(&self) -> Rect {
         self.rect
     }
+
+    pub fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    pub fn set_focused(&mut self, focused: bool) {
+        self.focused = focused;
+    }
 }
 
 impl Widget for Button {
@@ -80,6 +90,9 @@ impl Widget for Button {
             let text_x =
                 self.rect.x + (self.rect.w - theme::text_width(&self.label, font_size)) * 0.5;
             let text_y = self.rect.y + (self.rect.h - font_size) * 0.5 - 1.0;
+            if self.focused {
+                ctx.push_glass_quad(theme::focus_ring(self.rect, 8.0));
+            }
             ctx.push_text_run(TextRun {
                 x: text_x,
                 y: text_y,
@@ -188,6 +201,11 @@ impl Widget for Button {
                 [0.0, 0.0, 0.0, 0.0],
                 radius,
             ));
+        }
+
+        // Focus ring overlay
+        if self.focused {
+            ctx.push_glass_quad(theme::focus_ring(self.rect, radius));
         }
 
         let font_size = 13.0;
