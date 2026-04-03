@@ -11,13 +11,15 @@ use crate::ui::launcher::quick_connect::QuickConnect;
 use crate::ui::launcher::server_form::ServerForm;
 use crate::ui::launcher::settings::SettingsPanel;
 use crate::ui::theme;
+use crate::ui::widgets::icon::{Icon, ICON_SEARCH};
 use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
+    Widget,
 };
 
 const SIDEBAR_W: f32 = 224.0;
 const CONTENT_PAD: f32 = 28.0;
-const HEADER_OFFSET: f32 = 92.0;
+const HEADER_H: f32 = 48.0;
 
 pub struct LauncherShell {
     nav: LauncherNav,
@@ -173,18 +175,18 @@ impl LauncherShell {
         let content_x = SIDEBAR_W + CONTENT_PAD;
         self.content_rect = Rect::new(
             content_x,
-            42.0,
+            0.0,
             (screen_w - content_x - CONTENT_PAD).max(320.0),
-            (screen_h - 70.0).max(320.0),
+            screen_h.max(320.0),
         );
     }
 
     fn content_body_rect(&self) -> Rect {
         Rect::new(
             self.content_rect.x,
-            self.content_rect.y + HEADER_OFFSET,
+            self.content_rect.y + HEADER_H + 16.0,
             self.content_rect.w,
-            (self.content_rect.h - HEADER_OFFSET).max(0.0),
+            (self.content_rect.h - HEADER_H - 16.0).max(0.0),
         )
     }
 
@@ -192,12 +194,12 @@ impl LauncherShell {
         let body = self.content_body_rect();
         match self.active_tab {
             LauncherTab::Home => {
-                let quick_y = self.content_rect.y + HEADER_OFFSET;
+                let quick_y = body.y;
 
                 let quick_size = self.quick_connect.layout(Rect::new(
-                    self.content_rect.x,
+                    body.x,
                     quick_y,
-                    self.content_rect.w,
+                    body.w,
                     300.0,
                 ));
 
@@ -206,10 +208,10 @@ impl LauncherShell {
                 let card_y = section_y + 34.0;
 
                 self.card_grid.layout(Rect::new(
-                    self.content_rect.x,
+                    body.x,
                     card_y,
-                    self.content_rect.w,
-                    (self.content_rect.y + self.content_rect.h - card_y).max(0.0),
+                    body.w,
+                    (body.y + body.h - card_y).max(0.0),
                 ));
             }
             LauncherTab::SavedConnections => {
@@ -225,31 +227,48 @@ impl LauncherShell {
     }
 
     fn paint_header(&self, ctx: &mut PaintContext) {
-        let title_x = self.content_rect.x;
-        let title_y = self.content_rect.y + 6.0;
+        let bar_rect = Rect::new(self.content_rect.x, 0.0, self.content_rect.w, HEADER_H);
+
+        // Page title (bold)
+        let title = self.active_tab.title();
         ctx.push_text_run(TextRun {
-            x: title_x,
-            y: title_y,
-            text: self.active_tab.title().to_string(),
-            font_size: theme::FONT_DISPLAY,
+            x: bar_rect.x + 16.0,
+            y: bar_rect.y + 14.0,
+            text: title.to_string(),
+            font_size: theme::FONT_HEADLINE,
             color: theme::LT_TEXT_PRIMARY,
-            ..Default::default()
-        });
-        ctx.push_text_run(TextRun {
-            x: title_x,
-            y: title_y + 40.0,
-            text: self.active_tab.subtitle().to_string(),
-            font_size: theme::FONT_BODY,
-            color: theme::LT_TEXT_SECONDARY,
+            bold: true,
             ..Default::default()
         });
 
+        // Profiles tab: search input placeholder
+        if self.active_tab == LauncherTab::Profiles {
+            let search_w = 200.0;
+            let search_x = bar_rect.x + bar_rect.w - search_w - 100.0;
+            let search_rect = Rect::new(search_x, 8.0, search_w, 32.0);
+            ctx.push_glass_quad(theme::launcher_control_surface(search_rect, false));
+            Icon::new(ICON_SEARCH)
+                .with_size(16.0)
+                .with_color(theme::LT_TEXT_MUTED)
+                .at(search_rect.x + 8.0, search_rect.y + 8.0)
+                .paint(ctx);
+            ctx.push_text_run(TextRun {
+                x: search_rect.x + 28.0,
+                y: search_rect.y + 9.0,
+                text: "Search profiles...".into(),
+                font_size: theme::FONT_LABEL,
+                color: theme::LT_TEXT_MUTED,
+                ..Default::default()
+            });
+        }
+
+        // Connecting status chip
         if self.ui_state == UiState::Connecting {
             let chip_text = "Connecting...";
             let chip_w = theme::text_width(chip_text, 12.0) + 28.0;
             let status_rect = Rect::new(
-                self.content_rect.x + self.content_rect.w - chip_w,
-                title_y + 2.0,
+                bar_rect.x + bar_rect.w - chip_w - 100.0,
+                bar_rect.y + 10.0,
                 chip_w,
                 28.0,
             );
@@ -266,15 +285,36 @@ impl LauncherShell {
                 ..Default::default()
             });
         }
+
+        // Right side: PRISM text + avatar placeholder
+        let prism_x = bar_rect.x + bar_rect.w - 120.0;
+        ctx.push_text_run(TextRun {
+            x: prism_x,
+            y: bar_rect.y + 16.0,
+            text: "PRISM".into(),
+            font_size: theme::FONT_LABEL,
+            color: theme::LT_TEXT_MUTED,
+            ..Default::default()
+        });
+
+        // Avatar circle (32px)
+        let avatar_x = bar_rect.x + bar_rect.w - 56.0;
+        ctx.push_glass_quad(GlassQuad {
+            rect: Rect::new(avatar_x, 8.0, 32.0, 32.0),
+            tint: [0.8, 0.85, 0.9, 1.0],
+            corner_radius: 16.0,
+            ..Default::default()
+        });
     }
 
     fn paint_active_tab(&self, ctx: &mut PaintContext) {
+        let body = self.content_body_rect();
         match self.active_tab {
             LauncherTab::Home => {
                 let section_y = self.home_recent_y;
                 self.quick_connect.paint(ctx);
                 ctx.push_text_run(TextRun {
-                    x: self.content_rect.x,
+                    x: body.x,
                     y: section_y,
                     text: "Recent Connections".to_string(),
                     font_size: 13.0,
@@ -283,9 +323,9 @@ impl LauncherShell {
                     ..Default::default()
                 });
                 ctx.push_glass_quad(theme::launcher_separator(Rect::new(
-                    self.content_rect.x,
+                    body.x,
                     section_y + 20.0,
-                    self.content_rect.w,
+                    body.w,
                     1.0,
                 )));
                 self.card_grid.paint(ctx);

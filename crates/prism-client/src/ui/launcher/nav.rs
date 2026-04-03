@@ -3,6 +3,9 @@
 
 use super::LauncherTab;
 use crate::ui::theme;
+use crate::ui::widgets::icon::{
+    Icon, ICON_DEVICES, ICON_HOME, ICON_MENU, ICON_SETTINGS, ICON_TUNE,
+};
 use crate::ui::widgets::{
     EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
@@ -73,19 +76,30 @@ impl Widget for LauncherNav {
     fn paint(&self, ctx: &mut PaintContext) {
         ctx.push_glass_quad(theme::launcher_sidebar_surface(self.rect));
 
-        // TODO(Phase 5): replace with Icon::new(ICON_MENU)
-        ctx.push_text_run(TextRun {
-            x: self.rect.x + 18.0,
-            y: self.rect.y + 30.0,
-            text: "\u{2261}".into(), // ≡ hamburger
-            font_size: 24.0,
-            color: theme::LT_TEXT_SECONDARY,
-            ..Default::default()
-        });
+        // Hamburger menu icon
+        Icon::new(ICON_MENU)
+            .with_size(24.0)
+            .with_color(theme::LT_TEXT_SECONDARY)
+            .at(self.rect.x + 18.0, self.rect.y + 30.0)
+            .paint(ctx);
+
+        // Settings tab: additional PRISM branding next to hamburger
+        if self.active_tab == LauncherTab::Settings {
+            ctx.push_text_run(TextRun {
+                x: self.rect.x + 50.0,
+                y: self.rect.y + 32.0,
+                text: "PRISM".into(),
+                font_size: theme::FONT_LABEL,
+                color: theme::LT_TEXT_PRIMARY,
+                bold: true,
+                ..Default::default()
+            });
+        }
 
         for (tab, rect) in &self.primary_items {
             let hovered = self.hovered_tab == Some(*tab);
-            if *tab == self.active_tab {
+            let is_active = *tab == self.active_tab;
+            if is_active {
                 theme::paint_active_list_indicator(
                     &mut ctx.glass_quads,
                     *rect,
@@ -99,12 +113,30 @@ impl Widget for LauncherNav {
                 ));
             }
 
+            let icon_codepoint = match tab {
+                LauncherTab::Home => ICON_HOME,
+                LauncherTab::SavedConnections => ICON_DEVICES,
+                LauncherTab::Profiles => ICON_TUNE,
+                LauncherTab::Settings => ICON_SETTINGS,
+            };
+            let icon_color = if is_active {
+                theme::LT_TEXT_PRIMARY
+            } else {
+                theme::LT_TEXT_SECONDARY
+            };
+
+            Icon::new(icon_codepoint)
+                .with_size(20.0)
+                .with_color(icon_color)
+                .at(rect.x + SIDE_PADDING, rect.y + 10.0)
+                .paint(ctx);
+
             ctx.push_text_run(TextRun {
-                x: rect.x + SIDE_PADDING + 16.0,
+                x: rect.x + SIDE_PADDING + 20.0 + 8.0,
                 y: rect.y + 11.0,
                 text: tab.label().to_string(),
                 font_size: 13.0,
-                color: if *tab == self.active_tab {
+                color: if is_active {
                     theme::LT_TEXT_PRIMARY
                 } else {
                     theme::LT_TEXT_SECONDARY
@@ -114,7 +146,8 @@ impl Widget for LauncherNav {
         }
 
         let hovered = self.hovered_tab == Some(LauncherTab::Settings);
-        if self.active_tab == LauncherTab::Settings {
+        let settings_active = self.active_tab == LauncherTab::Settings;
+        if settings_active {
             theme::paint_active_list_indicator(
                 &mut ctx.glass_quads,
                 self.settings_item,
@@ -127,12 +160,24 @@ impl Widget for LauncherNav {
                 true,
             ));
         }
+
+        let settings_icon_color = if settings_active {
+            theme::LT_TEXT_PRIMARY
+        } else {
+            theme::LT_TEXT_SECONDARY
+        };
+        Icon::new(ICON_SETTINGS)
+            .with_size(20.0)
+            .with_color(settings_icon_color)
+            .at(self.settings_item.x + SIDE_PADDING, self.settings_item.y + 10.0)
+            .paint(ctx);
+
         ctx.push_text_run(TextRun {
-            x: self.settings_item.x + SIDE_PADDING + 16.0,
+            x: self.settings_item.x + SIDE_PADDING + 20.0 + 8.0,
             y: self.settings_item.y + 11.0,
             text: "Settings".into(),
             font_size: 13.0,
-            color: if self.active_tab == LauncherTab::Settings {
+            color: if settings_active {
                 theme::LT_TEXT_PRIMARY
             } else {
                 theme::LT_TEXT_SECONDARY

@@ -3,6 +3,7 @@
 
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
+use crate::ui::widgets::icon::{Icon, ICON_CHEVRON_DOWN};
 use crate::ui::widgets::{
     ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
 };
@@ -14,6 +15,7 @@ pub struct Dropdown {
     open_anim: Animation,
     rect: Rect,
     color_mode: ColorMode,
+    trailing_icon: Option<char>,
 }
 
 impl Dropdown {
@@ -25,11 +27,17 @@ impl Dropdown {
             open_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             color_mode: ColorMode::Dark,
+            trailing_icon: None,
         }
     }
 
     pub fn with_color_mode(mut self, mode: ColorMode) -> Self {
         self.color_mode = mode;
+        self
+    }
+
+    pub fn with_trailing_icon(mut self, codepoint: char) -> Self {
+        self.trailing_icon = Some(codepoint);
         self
     }
 
@@ -100,7 +108,7 @@ impl Widget for Dropdown {
             ColorMode::Dark => theme::TEXT_PRIMARY,
         };
 
-        let label = format!("{} v", self.selected_text());
+        let label = self.selected_text().to_string();
         ctx.push_text_run(TextRun {
             x: self.rect.x + 14.0,
             y: self.rect.y + (self.rect.h - 13.0) * 0.5 - 1.0,
@@ -109,6 +117,20 @@ impl Widget for Dropdown {
             color: header_text_color,
             ..Default::default()
         });
+
+        let icon_cp = self.trailing_icon.unwrap_or(ICON_CHEVRON_DOWN);
+        let icon_color = match self.color_mode {
+            ColorMode::Light => theme::LT_TEXT_MUTED,
+            ColorMode::Dark => theme::TEXT_MUTED,
+        };
+        Icon::new(icon_cp)
+            .with_size(16.0)
+            .with_color(icon_color)
+            .at(
+                self.rect.x + self.rect.w - 28.0,
+                self.rect.y + (self.rect.h - 16.0) / 2.0,
+            )
+            .paint(ctx);
 
         // Open dropdown items
         if self.open_anim.value() > 0.01 {
