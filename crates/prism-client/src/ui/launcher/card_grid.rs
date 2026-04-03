@@ -19,6 +19,9 @@ const TOOLBAR_H: f32 = 52.0;
 const SUBTITLE_H: f32 = 28.0;
 const FAB_SIZE: f32 = 56.0;
 const FAB_PAD: f32 = 24.0;
+const ADD_CARD_DASH: f32 = 14.0;
+const ADD_CARD_GAP: f32 = 10.0;
+const ADD_CARD_BORDER: f32 = 2.0;
 
 const PAGE_SUBTITLE: &str =
     "Browse saved desktops, reconnect quickly, and keep your machines organized.";
@@ -307,6 +310,69 @@ impl CardGrid {
             48.0,
         )
     }
+
+    fn scrolled_mouse_event(&self, event: &UiEvent) -> UiEvent {
+        match event {
+            UiEvent::MouseMove { x, y } => UiEvent::MouseMove {
+                x: *x,
+                y: *y + self.scroll_y,
+            },
+            UiEvent::MouseDown { x, y, button } => UiEvent::MouseDown {
+                x: *x,
+                y: *y + self.scroll_y,
+                button: button.clone(),
+            },
+            UiEvent::MouseUp { x, y, button } => UiEvent::MouseUp {
+                x: *x,
+                y: *y + self.scroll_y,
+                button: button.clone(),
+            },
+            _ => event.clone(),
+        }
+    }
+
+    fn paint_dashed_outline(ctx: &mut PaintContext, rect: Rect, color: [f32; 4]) {
+        let start_x = rect.x + 14.0;
+        let end_x = rect.x + rect.w - 14.0;
+        let start_y = rect.y + 14.0;
+        let end_y = rect.y + rect.h - 14.0;
+
+        let mut x = start_x;
+        while x < end_x {
+            let dash_w = (end_x - x).min(ADD_CARD_DASH);
+            ctx.push_glass_quad(GlassQuad {
+                rect: Rect::new(x, rect.y, dash_w, ADD_CARD_BORDER),
+                tint: color,
+                corner_radius: 0.0,
+                ..Default::default()
+            });
+            ctx.push_glass_quad(GlassQuad {
+                rect: Rect::new(x, rect.y + rect.h - ADD_CARD_BORDER, dash_w, ADD_CARD_BORDER),
+                tint: color,
+                corner_radius: 0.0,
+                ..Default::default()
+            });
+            x += ADD_CARD_DASH + ADD_CARD_GAP;
+        }
+
+        let mut y = start_y;
+        while y < end_y {
+            let dash_h = (end_y - y).min(ADD_CARD_DASH);
+            ctx.push_glass_quad(GlassQuad {
+                rect: Rect::new(rect.x, y, ADD_CARD_BORDER, dash_h),
+                tint: color,
+                corner_radius: 0.0,
+                ..Default::default()
+            });
+            ctx.push_glass_quad(GlassQuad {
+                rect: Rect::new(rect.x + rect.w - ADD_CARD_BORDER, y, ADD_CARD_BORDER, dash_h),
+                tint: color,
+                corner_radius: 0.0,
+                ..Default::default()
+            });
+            y += ADD_CARD_DASH + ADD_CARD_GAP;
+        }
+    }
 }
 
 impl Default for CardGrid {
@@ -462,13 +528,13 @@ impl Widget for CardGrid {
         if let Some(add_rect) = self.add_card_rect() {
             let ar = Rect::new(add_rect.x, add_rect.y - scroll, add_rect.w, add_rect.h);
 
-            // Dashed-style border (approximate with reduced-opacity white border)
             ctx.push_glass_quad(theme::glass_quad(
                 ar,
                 [1.0, 1.0, 1.0, 0.30],
-                [1.0, 1.0, 1.0, 0.60],
+                [0.0, 0.0, 0.0, 0.0],
                 theme::CARD_RADIUS,
             ));
+            Self::paint_dashed_outline(ctx, ar, [1.0, 1.0, 1.0, 0.60]);
 
             // White filled circle with ICON_ADD
             let circle_r = 24.0;
@@ -600,11 +666,12 @@ impl Widget for CardGrid {
             _ => {}
         }
 
+        let scrolled_event = self.scrolled_mouse_event(event);
         if let UiEvent::MouseDown {
             x,
             y,
             button: MouseButton::Left,
-        } = event
+        } = &scrolled_event
             && let Some(add_rect) = self.add_card_rect()
             && add_rect.contains(*x, *y)
         {
@@ -619,7 +686,7 @@ impl Widget for CardGrid {
             .zip(self.positions.iter().take(visible))
         {
             let card = &mut self.cards[*card_index];
-            match event {
+            match &scrolled_event {
                 UiEvent::MouseMove { x, y } => {
                     let _ = card.handle_event(&UiEvent::MouseMove { x: *x, y: *y });
                 }

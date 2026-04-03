@@ -180,6 +180,10 @@ impl Widget for RecentList {
 
     fn paint(&self, ctx: &mut PaintContext) {
         // List container
+        ctx.push_glow_rect(theme::signature_shadow(
+            self.list_rect,
+            theme::CONTROL_RADIUS,
+        ));
         ctx.push_glass_quad(theme::launcher_list_surface(self.list_rect));
 
         if self.rows.is_empty() {

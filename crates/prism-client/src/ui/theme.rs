@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared visual tokens for the PRISM client UI.
 
-use crate::ui::widgets::{GlassQuad, Rect};
+use crate::ui::widgets::{GlassQuad, GlowLayer, GlowRect, PaintContext, Rect, TextRun};
 
 pub const BACKDROP: [f64; 3] = [0.047, 0.063, 0.094];
 
@@ -33,6 +33,11 @@ pub const FONT_CHIP: f32 = 10.0;
 pub const MODAL_RADIUS: f32 = 22.0;
 pub const CAPSULE_RADIUS: f32 = 24.0;
 pub const TOGGLE_RADIUS: f32 = 10.0;
+pub const GHOST_BORDER_MAIN: [f32; 4] = [1.0, 1.0, 1.0, 0.50];
+pub const GHOST_BORDER_LIST: [f32; 4] = [1.0, 1.0, 1.0, 0.60];
+pub const PRIMARY_BLUE_DEEP: [f32; 4] = [0.0, 0.404, 0.753, 1.0]; // #0067C0
+pub const PRIMARY_BLUE_GLOW: [f32; 4] = [0.651, 0.784, 1.0, 1.0]; // #A6C8FF
+pub const CONTRAST_TEXT_SHADOW: [f32; 4] = [0.0, 0.0, 0.0, 0.10];
 
 pub fn glass_quad(
     rect: Rect,
@@ -47,42 +52,67 @@ pub fn glass_quad(
         border_color,
         corner_radius,
         noise_intensity: 0.0,
+        backdrop_blur: 0.0,
+        saturation: 1.0,
+    }
+}
+
+pub fn glass_quad_material(
+    rect: Rect,
+    tint: [f32; 4],
+    border_color: [f32; 4],
+    corner_radius: f32,
+    backdrop_blur: f32,
+    saturation: f32,
+) -> GlassQuad {
+    GlassQuad {
+        backdrop_blur,
+        saturation,
+        ..glass_quad(rect, tint, border_color, corner_radius)
     }
 }
 
 pub fn hero_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.15, 0.19, 0.26, 0.76],
         [1.0, 1.0, 1.0, 0.16],
         HERO_RADIUS,
+        30.0,
+        1.05,
     )
 }
 
 pub fn card_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.14, 0.18, 0.24, 0.72],
         [1.0, 1.0, 1.0, 0.14],
         CARD_RADIUS,
+        26.0,
+        1.05,
     )
 }
 
 pub fn floating_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.12, 0.16, 0.22, 0.78],
         [1.0, 1.0, 1.0, 0.16],
         PANEL_RADIUS,
+        40.0,
+        1.15,
     )
 }
 
 pub fn sidebar_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.10, 0.14, 0.19, 0.84],
         [1.0, 1.0, 1.0, 0.10],
         SIDEBAR_RADIUS,
+        40.0,
+        1.12,
     )
 }
 
@@ -108,7 +138,7 @@ pub fn nav_item_surface(rect: Rect, active: bool, hovered: bool) -> GlassQuad {
 }
 
 pub fn control_surface(rect: Rect, focused: bool) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         if focused {
             [0.17, 0.22, 0.29, 0.94]
@@ -121,6 +151,8 @@ pub fn control_surface(rect: Rect, focused: bool) -> GlassQuad {
             [1.0, 1.0, 1.0, 0.12]
         },
         CONTROL_RADIUS,
+        18.0,
+        1.02,
     )
 }
 
@@ -174,11 +206,13 @@ pub fn status_chip(rect: Rect, tone: ChipTone) -> GlassQuad {
 }
 
 pub fn section_header_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.13, 0.17, 0.23, 0.60],
         [1.0, 1.0, 1.0, 0.06],
         CONTROL_RADIUS,
+        18.0,
+        1.02,
     )
 }
 
@@ -187,29 +221,35 @@ pub fn modal_scrim(rect: Rect) -> GlassQuad {
 }
 
 pub fn modal_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.12, 0.16, 0.22, 0.94],
         [1.0, 1.0, 1.0, 0.14],
         MODAL_RADIUS,
+        30.0,
+        1.10,
     )
 }
 
 pub fn capsule_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.10, 0.14, 0.19, 0.88],
         [1.0, 1.0, 1.0, 0.12],
         CAPSULE_RADIUS,
+        30.0,
+        1.08,
     )
 }
 
 pub fn capsule_dropdown_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.11, 0.15, 0.21, 0.92],
         [1.0, 1.0, 1.0, 0.10],
         PANEL_RADIUS,
+        34.0,
+        1.12,
     )
 }
 
@@ -286,51 +326,61 @@ pub const SEGMENTED_ACTIVE_LIGHT: [f32; 4] = PRIMARY_BLUE;
 
 /// Launcher sidebar — cream Mica tint.
 pub fn launcher_sidebar_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [0.922, 0.945, 0.965, 0.92], // #EBF1F6 at high opacity
-        [1.0, 1.0, 1.0, 0.40],
+        GHOST_BORDER_MAIN,
         0.0,
+        18.0,
+        1.05,
     )
 }
 
 /// Launcher hero / glass-panel — white frosted glass.
 pub fn launcher_hero_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [1.0, 1.0, 1.0, 0.45],
-        [1.0, 1.0, 1.0, 0.50],
+        GHOST_BORDER_MAIN,
         HERO_RADIUS,
+        20.0,
+        1.0,
     )
 }
 
 /// Launcher card — white glass, medium opacity.
 pub fn launcher_card_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [1.0, 1.0, 1.0, 0.65],
-        [1.0, 1.0, 1.0, 0.70],
+        GHOST_BORDER_MAIN,
         CARD_RADIUS,
+        15.0,
+        1.0,
     )
 }
 
 /// Launcher card hover overlay.
 pub fn launcher_card_hover(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [1.0, 1.0, 1.0, 0.85],
-        [1.0, 1.0, 1.0, 0.80],
+        GHOST_BORDER_MAIN,
         CARD_RADIUS,
+        20.0,
+        1.0,
     )
 }
 
 /// Launcher list container — nearly opaque white.
 pub fn launcher_list_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [1.0, 1.0, 1.0, 0.85],
-        [1.0, 1.0, 1.0, 0.60],
+        GHOST_BORDER_LIST,
         CONTROL_RADIUS,
+        10.0,
+        1.0,
     )
 }
 
@@ -387,7 +437,7 @@ pub fn paint_active_list_indicator(
 
 /// Launcher control (text input, dropdown) — white with subtle border.
 pub fn launcher_control_surface(rect: Rect, focused: bool) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [1.0, 1.0, 1.0, 0.80],
         if focused {
@@ -396,6 +446,8 @@ pub fn launcher_control_surface(rect: Rect, focused: bool) -> GlassQuad {
             [0.831, 0.843, 0.863, 1.0] // border-gray-300
         },
         CONTROL_RADIUS,
+        12.0,
+        1.0,
     )
 }
 
@@ -412,11 +464,13 @@ pub fn focus_ring(rect: Rect, radius: f32) -> GlassQuad {
 
 /// Launcher modal surface — white panel.
 pub fn launcher_modal_surface(rect: Rect) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [1.0, 1.0, 1.0, 0.92],
-        [1.0, 1.0, 1.0, 0.60],
+        GHOST_BORDER_MAIN,
         MODAL_RADIUS,
+        24.0,
+        1.0,
     )
 }
 
@@ -444,11 +498,13 @@ pub fn launcher_inner_separator(rect: Rect) -> GlassQuad {
 
 /// Toggle card surface — Profiles uses ~60% white, Settings uses ~30% white.
 pub fn launcher_toggle_card_surface(rect: Rect, alpha: f32) -> GlassQuad {
-    glass_quad(
+    glass_quad_material(
         rect,
         [1.0, 1.0, 1.0, alpha], // 0.60 for Profiles, 0.30 for Settings
-        [1.0, 1.0, 1.0, 0.80],
+        GHOST_BORDER_MAIN,
         CARD_RADIUS, // rounded-2xl = 16px
+        16.0,
+        1.0,
     )
 }
 
@@ -488,4 +544,90 @@ pub fn launcher_chip_text_color(tone: ChipTone) -> [f32; 4] {
         ChipTone::Accent => [0.114, 0.357, 0.627, 1.0],  // text-blue-800
         ChipTone::Neutral => [0.278, 0.333, 0.412, 1.0], // text-gray-600
     }
+}
+
+pub fn glass_panel_light_surface(rect: Rect, radius: f32) -> GlassQuad {
+    glass_quad_material(
+        rect,
+        [1.0, 1.0, 1.0, 0.45],
+        GHOST_BORDER_MAIN,
+        radius,
+        40.0,
+        1.50,
+    )
+}
+
+pub fn sidebar_mica_surface(rect: Rect, radius: f32) -> GlassQuad {
+    glass_quad_material(
+        rect,
+        [1.0, 1.0, 1.0, 0.35],
+        [1.0, 1.0, 1.0, 0.40],
+        radius,
+        45.0,
+        1.60,
+    )
+}
+
+pub fn signature_shadow(rect: Rect, corner_radius: f32) -> GlowRect {
+    let expand = 12.0;
+    GlowRect {
+        rect: Rect::new(
+            rect.x - expand,
+            rect.y - expand,
+            rect.w + expand * 2.0,
+            rect.h + expand * 2.0,
+        ),
+        color: [0.0, 0.0, 0.0, 0.06],
+        corner_radius: corner_radius + expand,
+        spread: 32.0,
+        intensity: 1.0,
+        layer: GlowLayer::Underlay,
+    }
+}
+
+pub fn hover_elevation_shadow(rect: Rect, corner_radius: f32, hover_amount: f32) -> GlowRect {
+    let hover = hover_amount.clamp(0.0, 1.0);
+    let expand = 14.0 + hover * 4.0;
+    GlowRect {
+        rect: Rect::new(
+            rect.x - expand,
+            rect.y - expand * 0.6,
+            rect.w + expand * 2.0,
+            rect.h + expand * 2.1,
+        ),
+        color: [0.0, 0.0, 0.0, 0.05 + hover * 0.03],
+        corner_radius: corner_radius + expand,
+        spread: 24.0 + hover * 10.0,
+        intensity: 1.0,
+        layer: GlowLayer::Underlay,
+    }
+}
+
+pub fn button_gradient_highlight(rect: Rect, corner_radius: f32, intensity: f32) -> GlowRect {
+    GlowRect {
+        rect: Rect::new(
+            rect.x + rect.w * 0.04,
+            rect.y + rect.h * 0.05,
+            rect.w * 0.72,
+            rect.h * 0.85,
+        ),
+        color: [
+            PRIMARY_BLUE_GLOW[0],
+            PRIMARY_BLUE_GLOW[1],
+            PRIMARY_BLUE_GLOW[2],
+            0.36 + intensity.clamp(0.0, 1.0) * 0.10,
+        ],
+        corner_radius,
+        spread: 22.0,
+        intensity: 1.0,
+        layer: GlowLayer::Overlay,
+    }
+}
+
+pub fn push_text_with_shadow(ctx: &mut PaintContext, run: TextRun, shadow_color: [f32; 4]) {
+    let mut shadow = run.clone();
+    shadow.y += 1.0;
+    shadow.color = shadow_color;
+    ctx.push_text_run(shadow);
+    ctx.push_text_run(run);
 }

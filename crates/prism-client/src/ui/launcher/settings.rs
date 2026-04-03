@@ -231,6 +231,7 @@ impl Widget for SettingsPanel {
         let card_h = (self.max_scroll + self.rect.h) - 200.0; // Approximation of content depth
         let card_rect = Rect::new(content_x, card_y, content_w, card_h.max(680.0));
 
+        ctx.push_glow_rect(theme::signature_shadow(card_rect, theme::HERO_RADIUS));
         ctx.push_glass_quad(theme::launcher_hero_surface(card_rect));
 
         // Drawing Helper
@@ -417,6 +418,7 @@ impl Widget for SettingsPanel {
             text: "REMOTE OUTPUT".to_string(),
             font_size: 10.0,
             color: audio_label_color,
+            letter_spacing: 0.05,
             ..Default::default()
         });
         self.audio_output_dropdown.paint(ctx);
@@ -434,6 +436,7 @@ impl Widget for SettingsPanel {
             text: "LOCAL MIC PATH".to_string(),
             font_size: 10.0,
             color: audio_label_color,
+            letter_spacing: 0.05,
             ..Default::default()
         });
         self.mic_dropdown.paint(ctx);

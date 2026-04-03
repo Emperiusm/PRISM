@@ -4,8 +4,10 @@
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
 use crate::ui::widgets::dropdown::Dropdown;
+use crate::ui::widgets::icon::{ICON_BOLT, ICON_CLOCK, ICON_MONITOR, ICON_STREAMING, Icon};
 use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
+    Widget,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -42,7 +44,8 @@ impl StatsBar {
     pub fn new() -> Self {
         Self {
             stats: SessionStats::default(),
-            profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0),
+            profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0)
+                .with_color_mode(ColorMode::Light),
             pinned: false,
             visible: false,
             fade_anim: Animation::new(EaseCurve::EaseOut, 200.0),
@@ -144,25 +147,33 @@ impl Widget for StatsBar {
             return;
         }
 
-        // Stitch glass pill
-        ctx.push_glass_quad(theme::glass_quad(
-            self.rect,
-            [1.0, 1.0, 1.0, 0.45 * alpha],
-            [1.0, 1.0, 1.0, 0.50 * alpha],
-            28.0, // Fully rounded pill
-        ));
+        ctx.push_glow_rect(theme::signature_shadow(self.rect, 28.0));
+        let mut bar = theme::glass_panel_light_surface(self.rect, 28.0);
+        bar.tint[3] *= alpha;
+        bar.border_color[3] *= alpha;
+        ctx.push_glass_quad(bar);
 
         // 1. Brand
-        ctx.push_text_run(TextRun {
-            x: self.rect.x + 20.0,
-            y: self.rect.y + 20.0,
-            text: "PRISM REMOTE".into(),
-            font_size: 11.0,
-            color: theme::ACCENT,
-            ..Default::default()
-        });
+        theme::push_text_with_shadow(
+            ctx,
+            TextRun {
+                x: self.rect.x + 20.0,
+                y: self.rect.y + 20.0,
+                text: "PRISM REMOTE".into(),
+                font_size: 11.0,
+                color: [
+                    theme::LT_TEXT_PRIMARY[0],
+                    theme::LT_TEXT_PRIMARY[1],
+                    theme::LT_TEXT_PRIMARY[2],
+                    alpha,
+                ],
+                bold: true,
+                ..Default::default()
+            },
+            [0.0, 0.0, 0.0, 0.10 * alpha],
+        );
 
-        ctx.push_glass_quad(theme::separator(Rect::new(
+        ctx.push_glass_quad(theme::launcher_separator(Rect::new(
             self.rect.x + 115.0,
             self.rect.y + 16.0,
             1.0,
@@ -173,8 +184,18 @@ impl Widget for StatsBar {
         let mut mx = self.rect.x + 130.0;
         let metric_label_y = self.rect.y + 8.0;
         let metric_val_y = self.rect.y + 24.0;
-        let metric_label_color = [0.0, 0.0, 0.0, 0.6 * alpha];
-        let metric_val_color = [0.0, 0.0, 0.0, 0.9 * alpha];
+        let metric_label_color = [
+            theme::LT_TEXT_SECONDARY[0],
+            theme::LT_TEXT_SECONDARY[1],
+            theme::LT_TEXT_SECONDARY[2],
+            alpha,
+        ];
+        let metric_val_color = [
+            theme::LT_TEXT_PRIMARY[0],
+            theme::LT_TEXT_PRIMARY[1],
+            theme::LT_TEXT_PRIMARY[2],
+            alpha,
+        ];
 
         let draw_metric =
             |ctx: &mut PaintContext, x: f32, label: &str, val: &str, val_c: [f32; 4]| {
@@ -184,17 +205,24 @@ impl Widget for StatsBar {
                     text: label.into(),
                     font_size: 9.0,
                     color: metric_label_color,
+                    bold: true,
+                    letter_spacing: 0.05,
                     ..Default::default()
                 });
-                ctx.push_text_run(TextRun {
-                    x,
-                    y: metric_val_y,
-                    text: val.into(),
-                    font_size: 12.0,
-                    color: val_c,
-                    monospace: true,
-                    ..Default::default()
-                });
+                theme::push_text_with_shadow(
+                    ctx,
+                    TextRun {
+                        x,
+                        y: metric_val_y,
+                        text: val.into(),
+                        font_size: 12.0,
+                        color: val_c,
+                        monospace: true,
+                        bold: true,
+                        ..Default::default()
+                    },
+                    [0.0, 0.0, 0.0, 0.10 * alpha],
+                );
             };
 
         draw_metric(
@@ -221,10 +249,10 @@ impl Widget for StatsBar {
             ctx,
             mx,
             "BITRATE",
-            &format!("{:.1}M", mbps),
+            &format!("{mbps:.0} Mbps"),
             metric_val_color,
         );
-        mx += 65.0;
+        mx += 78.0;
 
         draw_metric(
             ctx,
@@ -238,32 +266,34 @@ impl Widget for StatsBar {
             metric_val_color,
         );
 
-        // Profile Dropdown (Restores native interaction and SwitchProfile event)
+        // Profile Dropdown (kept functional, styled for the light glass pill)
         self.profile_dropdown.paint(ctx);
 
-        // 3. Navigation Buttons (Right Aligned)
-        ctx.push_glass_quad(theme::separator(Rect::new(
+        // 3. Navigation Controls (Right Aligned)
+        ctx.push_glass_quad(theme::launcher_separator(Rect::new(
             self.perf_btn_rect().x - 16.0,
             self.rect.y + 16.0,
             1.0,
             24.0,
         )));
 
-        let draw_nav_btn = |ctx: &mut PaintContext, r: Rect, label: &str| {
-            ctx.push_text_run(TextRun {
-                x: r.x + 6.0,
-                y: r.y + 6.0,
-                text: label.into(),
-                font_size: 11.0,
-                color: metric_label_color,
-                ..Default::default()
-            });
+        let draw_nav_icon = |ctx: &mut PaintContext, r: Rect, icon: char| {
+            Icon::new(icon)
+                .with_size(16.0)
+                .with_color([
+                    theme::LT_TEXT_SECONDARY[0],
+                    theme::LT_TEXT_SECONDARY[1],
+                    theme::LT_TEXT_SECONDARY[2],
+                    alpha,
+                ])
+                .at(r.x + 12.0, r.y + 4.0)
+                .paint(ctx);
         };
 
-        draw_nav_btn(ctx, self.perf_btn_rect(), "PERF");
-        draw_nav_btn(ctx, self.qual_btn_rect(), "QUAL");
-        draw_nav_btn(ctx, self.conn_btn_rect(), "CONN");
-        draw_nav_btn(ctx, self.disp_btn_rect(), "DISP");
+        draw_nav_icon(ctx, self.perf_btn_rect(), ICON_BOLT);
+        draw_nav_icon(ctx, self.qual_btn_rect(), ICON_CLOCK);
+        draw_nav_icon(ctx, self.conn_btn_rect(), ICON_STREAMING);
+        draw_nav_icon(ctx, self.disp_btn_rect(), ICON_MONITOR);
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
