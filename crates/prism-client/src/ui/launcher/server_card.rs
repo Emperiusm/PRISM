@@ -301,11 +301,7 @@ impl Widget for ServerCard {
             self.status_chip_rect()
         };
 
-        if self.layout_mode == CardLayoutMode::Row {
-            ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
-        } else {
-            ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
-        }
+        ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
         ctx.push_text_run(TextRun {
             x: status_rect.x + 12.0,
             y: status_rect.y + 4.0,
