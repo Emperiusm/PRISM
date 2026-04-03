@@ -290,7 +290,7 @@ pub fn launcher_sidebar_surface(rect: Rect) -> GlassQuad {
         rect,
         [0.922, 0.945, 0.965, 0.92], // #EBF1F6 at high opacity
         [1.0, 1.0, 1.0, 0.40],
-        SIDEBAR_RADIUS,
+        0.0,
     )
 }
 
@@ -362,6 +362,27 @@ pub fn launcher_nav_item_surface(rect: Rect, active: bool, hovered: bool) -> Gla
         [0.0, 0.0, 0.0, 0.0],
         CONTROL_RADIUS,
     )
+}
+
+/// Paints an edge-to-edge active indicator with a 4px accent left bar.
+/// Reused by nav items, Profiles list, and Settings sub-nav.
+pub fn paint_active_list_indicator(
+    quads: &mut Vec<GlassQuad>,
+    item_rect: Rect,
+    accent_color: [f32; 4],
+) {
+    quads.push(GlassQuad {
+        rect: Rect::new(item_rect.x, item_rect.y, item_rect.w, item_rect.h),
+        tint: [0.898, 0.898, 0.898, 0.60],
+        corner_radius: 0.0,
+        ..Default::default()
+    });
+    quads.push(GlassQuad {
+        rect: Rect::new(item_rect.x, item_rect.y, 4.0, item_rect.h),
+        tint: accent_color,
+        corner_radius: 0.0,
+        ..Default::default()
+    });
 }
 
 /// Launcher control (text input, dropdown) — white with subtle border.
