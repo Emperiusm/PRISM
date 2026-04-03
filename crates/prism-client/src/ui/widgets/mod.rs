@@ -86,6 +86,8 @@ pub struct GlassQuad {
     pub border_color: [f32; 4],
     pub corner_radius: f32,
     pub noise_intensity: f32,
+    pub backdrop_blur: f32,
+    pub saturation: f32,
 }
 
 impl Default for GlassQuad {
@@ -97,6 +99,8 @@ impl Default for GlassQuad {
             border_color: [0.0; 4],
             corner_radius: 0.0,
             noise_intensity: 0.0,
+            backdrop_blur: 0.0,
+            saturation: 1.0,
         }
     }
 }
@@ -112,6 +116,8 @@ pub struct TextRun {
     pub monospace: bool,
     pub bold: bool,
     pub icon: bool,
+    /// Letter spacing in `em` units. `0.05` = 5% of the font size.
+    pub letter_spacing: f32,
 }
 
 impl Default for TextRun {
@@ -125,8 +131,16 @@ impl Default for TextRun {
             monospace: false,
             bold: false,
             icon: false,
+            letter_spacing: 0.0,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GlowLayer {
+    Underlay,
+    #[default]
+    Overlay,
 }
 
 /// Accent glow draw command.
@@ -134,8 +148,10 @@ impl Default for TextRun {
 pub struct GlowRect {
     pub rect: Rect,
     pub color: [f32; 4],
+    pub corner_radius: f32,
     pub spread: f32,
     pub intensity: f32,
+    pub layer: GlowLayer,
 }
 
 // ---------------------------------------------------------------------------
@@ -377,6 +393,8 @@ mod tests {
             border_color: [1.0; 4],
             corner_radius: 8.0,
             noise_intensity: 0.05,
+            backdrop_blur: 0.0,
+            saturation: 1.0,
         });
         assert_eq!(ctx.glass_quads.len(), 1);
     }

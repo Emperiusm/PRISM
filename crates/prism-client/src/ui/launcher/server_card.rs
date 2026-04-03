@@ -49,24 +49,6 @@ pub enum CardStatus {
     New,
 }
 
-impl CardStatus {
-    fn label(self) -> &'static str {
-        match self {
-            CardStatus::Recent => "Recent",
-            CardStatus::Dormant => "Dormant",
-            CardStatus::New => "New",
-        }
-    }
-
-    fn chip_tone(self) -> theme::ChipTone {
-        match self {
-            CardStatus::Recent => theme::ChipTone::Success,
-            CardStatus::Dormant => theme::ChipTone::Warning,
-            CardStatus::New => theme::ChipTone::Accent,
-        }
-    }
-}
-
 pub struct ServerCard {
     server_id: uuid::Uuid,
     display_name: String,
@@ -199,6 +181,22 @@ impl ServerCard {
         }
     }
 
+    fn server_status_label(&self) -> &'static str {
+        match self.server_status {
+            ServerStatus::Online => "Online",
+            ServerStatus::Sleeping => "Sleeping",
+            ServerStatus::Unreachable => "Unreachable",
+        }
+    }
+
+    fn server_status_tone(&self) -> theme::ChipTone {
+        match self.server_status {
+            ServerStatus::Online => theme::ChipTone::Success,
+            ServerStatus::Sleeping => theme::ChipTone::Warning,
+            ServerStatus::Unreachable => theme::ChipTone::Danger,
+        }
+    }
+
     fn buttons_y(&self) -> f32 {
         if self.layout_mode == CardLayoutMode::Row {
             self.rect.y + 12.0
@@ -234,21 +232,23 @@ impl ServerCard {
             self.accent_color[2],
             1.0,
         ];
-        let status = self.status();
 
         ctx.push_glass_quad(theme::launcher_row_surface(r, hover > 0.01));
 
-        let status_label = status.label();
+        let status_label = self.server_status_label();
         let status_w = theme::text_width(status_label, 10.0) + 26.0;
         let status_rect = Rect::new(r.x + 220.0, r.y + 22.0, status_w, 20.0);
 
-        ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
+        ctx.push_glass_quad(theme::launcher_status_chip(
+            status_rect,
+            self.server_status_tone(),
+        ));
         ctx.push_text_run(TextRun {
             x: status_rect.x + 12.0,
             y: status_rect.y + 4.0,
             text: status_label.to_string(),
             font_size: 10.0,
-            color: theme::launcher_chip_text_color(status.chip_tone()),
+            color: theme::launcher_chip_text_color(self.server_status_tone()),
             ..Default::default()
         });
 
@@ -300,6 +300,22 @@ impl ServerCard {
         self.edit_button.paint(ctx);
         self.delete_button.paint(ctx);
     }
+
+    fn append_shifted(ctx: &mut PaintContext, mut source: PaintContext, dy: f32) {
+        for mut quad in source.glass_quads.drain(..) {
+            quad.rect.y -= dy;
+            quad.blur_rect.y -= dy;
+            ctx.push_glass_quad(quad);
+        }
+        for mut glow in source.glow_rects.drain(..) {
+            glow.rect.y -= dy;
+            ctx.push_glow_rect(glow);
+        }
+        for mut run in source.text_runs.drain(..) {
+            run.y -= dy;
+            ctx.push_text_run(run);
+        }
+    }
 }
 
 impl Widget for ServerCard {
@@ -348,14 +364,22 @@ impl Widget for ServerCard {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        let r = self.rect;
+        let base_rect = self.rect;
         let hover = self.hover_anim.value();
         let is_unreachable = self.server_status == ServerStatus::Unreachable;
         let card_alpha = if is_unreachable { 0.80 } else { 1.0 };
 
         if self.layout_mode == CardLayoutMode::Row {
-            self.paint_row(ctx, r, hover);
+            self.paint_row(ctx, base_rect, hover);
             return;
+        }
+
+        let lift = hover * 2.0;
+        let r = Rect::new(base_rect.x, base_rect.y - lift, base_rect.w, base_rect.h);
+        if hover > 0.01 {
+            ctx.push_glow_rect(theme::hover_elevation_shadow(r, theme::CARD_RADIUS, hover));
+        } else {
+            ctx.push_glow_rect(theme::signature_shadow(r, theme::CARD_RADIUS));
         }
 
         // ── Card surface ──
@@ -381,17 +405,19 @@ impl Widget for ServerCard {
         let badge_x = r.x + 8.0;
 
         // Status badge
-        let status = self.status();
-        let status_label = status.label();
+        let status_label = self.server_status_label();
         let status_w = theme::text_width(status_label, 10.0) + 20.0;
         let status_rect = Rect::new(badge_x, badge_y, status_w, 20.0);
-        ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
+        ctx.push_glass_quad(theme::launcher_status_chip(
+            status_rect,
+            self.server_status_tone(),
+        ));
         ctx.push_text_run(TextRun {
             x: status_rect.x + 10.0,
             y: status_rect.y + 4.0,
             text: status_label.to_string(),
             font_size: 10.0,
-            color: theme::launcher_chip_text_color(status.chip_tone()),
+            color: theme::launcher_chip_text_color(self.server_status_tone()),
             ..Default::default()
         });
 
@@ -412,6 +438,7 @@ impl Widget for ServerCard {
                 text: tag_upper,
                 font_size: 10.0,
                 color: theme::LT_TEXT_SECONDARY,
+                letter_spacing: 0.05,
                 ..Default::default()
             });
         }
@@ -461,6 +488,7 @@ impl Widget for ServerCard {
             text: subtitle,
             font_size: 10.0,
             color: theme::LT_TEXT_MUTED,
+            letter_spacing: 0.05,
             ..Default::default()
         });
 
@@ -522,13 +550,20 @@ impl Widget for ServerCard {
         }
 
         // ── Footer: action button + edit icon ──
-        self.connect_button.paint(ctx);
+        let mut connect_ctx = PaintContext::new();
+        self.connect_button.paint(&mut connect_ctx);
+        Self::append_shifted(ctx, connect_ctx, lift);
         // Edit icon button
         let edit_rect = self.edit_button.rect();
+        let shifted_edit_rect =
+            Rect::new(edit_rect.x, edit_rect.y - lift, edit_rect.w, edit_rect.h);
+        let mut edit_ctx = PaintContext::new();
+        self.edit_button.paint(&mut edit_ctx);
+        Self::append_shifted(ctx, edit_ctx, lift);
         Icon::new(ICON_EDIT)
             .with_size(16.0)
             .with_color(theme::LT_TEXT_SECONDARY)
-            .at(edit_rect.x + 8.0, edit_rect.y + 8.0)
+            .at(shifted_edit_rect.x + 8.0, shifted_edit_rect.y + 8.0)
             .paint(ctx);
     }
 

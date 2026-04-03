@@ -14,7 +14,11 @@ use crate::ui::widgets::{
 
 const ITEM_H: f32 = 40.0;
 const ITEM_GAP: f32 = 8.0;
-const SIDE_PADDING: f32 = 14.0;
+const NAV_TOP_Y: f32 = 94.0;
+const NAV_ITEM_PAD_LEFT: f32 = 16.0;
+const FOOTER_H: f32 = 44.0;
+const FOOTER_BOTTOM_PAD: f32 = 16.0;
+const SETTINGS_GAP: f32 = 12.0;
 
 pub struct LauncherNav {
     rect: Rect,
@@ -24,6 +28,7 @@ pub struct LauncherNav {
     hovered_section: Option<SettingsSection>,
     primary_items: Vec<(LauncherTab, Rect)>,
     settings_item: Rect,
+    footer_rect: Rect,
     sub_nav_items: Vec<(SettingsSection, Rect)>,
 }
 
@@ -37,6 +42,7 @@ impl LauncherNav {
             hovered_section: None,
             primary_items: Vec::new(),
             settings_item: Rect::new(0.0, 0.0, 0.0, 0.0),
+            footer_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             sub_nav_items: Vec::new(),
         }
     }
@@ -56,10 +62,19 @@ impl LauncherNav {
     fn item_rect(&self, index: usize) -> Rect {
         Rect::new(
             self.rect.x,
-            self.rect.y + 94.0 + index as f32 * (ITEM_H + ITEM_GAP),
+            self.rect.y + NAV_TOP_Y + index as f32 * (ITEM_H + ITEM_GAP),
             self.rect.w,
             ITEM_H,
         )
+    }
+
+    fn paint_hover_band(ctx: &mut PaintContext, rect: Rect) {
+        ctx.push_glass_quad(GlassQuad {
+            rect,
+            tint: [0.898, 0.898, 0.898, 0.30],
+            corner_radius: 0.0,
+            ..Default::default()
+        });
     }
 }
 
@@ -78,25 +93,34 @@ impl Widget for LauncherNav {
             .map(|(index, tab)| (*tab, self.item_rect(index)))
             .collect();
 
+        self.footer_rect = Rect::new(
+            self.rect.x,
+            self.rect.y + self.rect.h - FOOTER_BOTTOM_PAD - FOOTER_H,
+            self.rect.w,
+            FOOTER_H,
+        );
+        self.settings_item = Rect::new(
+            self.rect.x,
+            self.footer_rect.y - SETTINGS_GAP - ITEM_H,
+            self.rect.w,
+            ITEM_H,
+        );
+
         // When Settings is active, compute sub-nav items after the primary ones
         self.sub_nav_items.clear();
         if self.active_tab == LauncherTab::Settings {
             let main_nav_bottom_y =
-                self.rect.y + 94.0 + LauncherTab::PRIMARY.len() as f32 * (ITEM_H + ITEM_GAP);
+                self.rect.y + NAV_TOP_Y + LauncherTab::PRIMARY.len() as f32 * (ITEM_H + ITEM_GAP);
             let sub_header_y = main_nav_bottom_y + 16.0;
             for (i, section) in SettingsSection::ALL.iter().enumerate() {
                 let item_y = sub_header_y + 24.0 + i as f32 * (ITEM_H + 4.0);
                 let item_rect = Rect::new(self.rect.x, item_y, self.rect.w, ITEM_H);
+                if item_rect.y + item_rect.h > self.settings_item.y - 8.0 {
+                    break;
+                }
                 self.sub_nav_items.push((*section, item_rect));
             }
         }
-
-        self.settings_item = Rect::new(
-            self.rect.x,
-            self.rect.y + self.rect.h - 54.0,
-            self.rect.w,
-            ITEM_H,
-        );
         Size {
             w: available.w,
             h: available.h,
@@ -136,7 +160,7 @@ impl Widget for LauncherNav {
                     theme::PRIMARY_BLUE,
                 );
             } else if hovered {
-                ctx.push_glass_quad(theme::launcher_nav_item_surface(*rect, false, true));
+                Self::paint_hover_band(ctx, *rect);
             }
 
             let icon_codepoint = match tab {
@@ -154,11 +178,11 @@ impl Widget for LauncherNav {
             Icon::new(icon_codepoint)
                 .with_size(20.0)
                 .with_color(icon_color)
-                .at(rect.x + SIDE_PADDING, rect.y + 10.0)
+                .at(rect.x + NAV_ITEM_PAD_LEFT, rect.y + 10.0)
                 .paint(ctx);
 
             ctx.push_text_run(TextRun {
-                x: rect.x + SIDE_PADDING + 20.0 + 8.0,
+                x: rect.x + NAV_ITEM_PAD_LEFT + 28.0,
                 y: rect.y + 11.0,
                 text: tab.label().to_string(),
                 font_size: 13.0,
@@ -176,7 +200,7 @@ impl Widget for LauncherNav {
             // "SETTINGS" header
             let header_y = self.sub_nav_items[0].1.y - 24.0;
             ctx.push_text_run(TextRun {
-                x: self.rect.x + SIDE_PADDING,
+                x: self.rect.x + NAV_ITEM_PAD_LEFT,
                 y: header_y,
                 text: "SETTINGS".into(),
                 font_size: theme::FONT_LABEL,
@@ -196,7 +220,7 @@ impl Widget for LauncherNav {
                         theme::PRIMARY_BLUE,
                     );
                 } else if hovered {
-                    ctx.push_glass_quad(theme::launcher_nav_item_surface(*rect, false, true));
+                    Self::paint_hover_band(ctx, *rect);
                 }
 
                 let icon_codepoint = match section {
@@ -215,11 +239,11 @@ impl Widget for LauncherNav {
                 Icon::new(icon_codepoint)
                     .with_size(18.0)
                     .with_color(color)
-                    .at(rect.x + SIDE_PADDING, rect.y + 11.0)
+                    .at(rect.x + NAV_ITEM_PAD_LEFT, rect.y + 11.0)
                     .paint(ctx);
 
                 ctx.push_text_run(TextRun {
-                    x: rect.x + 40.0,
+                    x: rect.x + NAV_ITEM_PAD_LEFT + 24.0,
                     y: rect.y + 12.0,
                     text: section.label().into(),
                     font_size: theme::FONT_LABEL,
@@ -238,11 +262,7 @@ impl Widget for LauncherNav {
                 theme::PRIMARY_BLUE,
             );
         } else if hovered {
-            ctx.push_glass_quad(theme::launcher_nav_item_surface(
-                self.settings_item,
-                false,
-                true,
-            ));
+            Self::paint_hover_band(ctx, self.settings_item);
         }
 
         let settings_icon_color = if settings_active {
@@ -254,13 +274,13 @@ impl Widget for LauncherNav {
             .with_size(20.0)
             .with_color(settings_icon_color)
             .at(
-                self.settings_item.x + SIDE_PADDING,
+                self.settings_item.x + NAV_ITEM_PAD_LEFT,
                 self.settings_item.y + 10.0,
             )
             .paint(ctx);
 
         ctx.push_text_run(TextRun {
-            x: self.settings_item.x + SIDE_PADDING + 20.0 + 8.0,
+            x: self.settings_item.x + NAV_ITEM_PAD_LEFT + 28.0,
             y: self.settings_item.y + 11.0,
             text: "Settings".into(),
             font_size: 13.0,
@@ -273,16 +293,20 @@ impl Widget for LauncherNav {
         });
 
         // Sidebar footer avatar (TASK-074) — rendered on all tabs
-        let footer_y = self.rect.y + self.rect.h - 56.0;
         ctx.push_glass_quad(GlassQuad {
-            rect: Rect::new(self.rect.x + SIDE_PADDING, footer_y, 36.0, 36.0),
+            rect: Rect::new(
+                self.footer_rect.x + NAV_ITEM_PAD_LEFT,
+                self.footer_rect.y + 4.0,
+                36.0,
+                36.0,
+            ),
             tint: [0.75, 0.82, 0.90, 1.0],
             corner_radius: 18.0,
             ..Default::default()
         });
         ctx.push_text_run(TextRun {
-            x: self.rect.x + SIDE_PADDING + 44.0,
-            y: footer_y + 10.0,
+            x: self.footer_rect.x + NAV_ITEM_PAD_LEFT + 44.0,
+            y: self.footer_rect.y + 14.0,
             text: "Verified Dev".into(),
             font_size: theme::FONT_LABEL,
             color: theme::LT_TEXT_PRIMARY,

@@ -2,16 +2,18 @@
 //! Renders PaintContext draw commands with real blurred glass compositing.
 
 use crate::renderer::text_renderer::TextPipeline;
-use crate::ui::widgets::PaintContext;
+use crate::ui::widgets::{GlowLayer, PaintContext};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct FlatQuadInstance {
+struct GlowInstance {
     rect: [f32; 4],
     color: [f32; 4],
     corner_radius: f32,
-    _padding: [f32; 3],
+    spread: f32,
+    intensity: f32,
+    _padding: f32,
 }
 
 #[repr(C)]
@@ -23,7 +25,8 @@ struct GlassInstance {
     border_color: [f32; 4],
     corner_radius: f32,
     noise_intensity: f32,
-    _padding: [f32; 2],
+    backdrop_blur: f32,
+    saturation: f32,
 }
 
 #[repr(C)]
@@ -32,23 +35,23 @@ struct ScreenUniform {
     screen_size: [f32; 2],
 }
 
-const FLAT_SHADER: &str = r#"
+const GLOW_SHADER: &str = r#"
 struct ScreenUniforms {
     screen_size: vec2<f32>,
 }
 
 @group(0) @binding(0) var<uniform> screen: ScreenUniforms;
 
-struct FlatQuadInstance {
+struct GlowInstance {
     rect: vec4<f32>,
     color: vec4<f32>,
     corner_radius: f32,
+    spread: f32,
+    intensity: f32,
     _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
 }
 
-@group(1) @binding(0) var<storage, read> instances: array<FlatQuadInstance>;
+@group(1) @binding(0) var<storage, read> instances: array<GlowInstance>;
 
 struct VertexOut {
     @builtin(position) clip_pos: vec4<f32>,
@@ -56,6 +59,8 @@ struct VertexOut {
     @location(1) quad_size: vec2<f32>,
     @location(2) color: vec4<f32>,
     @location(3) corner_radius: f32,
+    @location(4) spread: f32,
+    @location(5) intensity: f32,
 }
 
 @vertex
@@ -83,6 +88,8 @@ fn vs_main(
     out.quad_size = vec2<f32>(inst.rect.z, inst.rect.w);
     out.color = inst.color;
     out.corner_radius = inst.corner_radius;
+    out.spread = inst.spread;
+    out.intensity = inst.intensity;
     return out;
 }
 
@@ -90,11 +97,12 @@ fn vs_main(
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     let r = in.corner_radius;
     let half = in.quad_size * 0.5;
-    let p = abs(in.local_pos - half);
-    let q = p - half + vec2<f32>(r, r);
-    let d = length(max(q, vec2<f32>(0.0))) - r;
-    let alpha = 1.0 - smoothstep(-0.5, 0.5, d);
-    return vec4<f32>(in.color.rgb, in.color.a * alpha);
+    let p = in.local_pos - half;
+    let q = abs(p) - half + vec2<f32>(r, r);
+    let d = length(max(q, vec2<f32>(0.0))) + min(max(q.x, q.y), 0.0) - r;
+    let softness = max(in.spread, 0.001);
+    let alpha = exp(-max(d, 0.0) / softness) * in.color.a * in.intensity;
+    return vec4<f32>(in.color.rgb, alpha);
 }
 "#;
 
@@ -112,8 +120,8 @@ struct GlassInstance {
     border_color: vec4<f32>,
     corner_radius: f32,
     noise_intensity: f32,
-    _pad0: f32,
-    _pad1: f32,
+    backdrop_blur: f32,
+    saturation: f32,
 }
 
 @group(1) @binding(0) var<storage, read> instances: array<GlassInstance>;
@@ -129,6 +137,8 @@ struct VertexOut {
     @location(4) border_color: vec4<f32>,
     @location(5) corner_radius: f32,
     @location(6) noise_intensity: f32,
+    @location(7) backdrop_blur: f32,
+    @location(8) saturation: f32,
 }
 
 fn hash12(p: vec2<f32>) -> f32 {
@@ -166,7 +176,41 @@ fn vs_main(
     out.border_color = inst.border_color;
     out.corner_radius = inst.corner_radius;
     out.noise_intensity = inst.noise_intensity;
+    out.backdrop_blur = inst.backdrop_blur;
+    out.saturation = inst.saturation;
     return out;
+}
+
+fn saturate_color(color: vec3<f32>, amount: f32) -> vec3<f32> {
+    let luma = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
+    return clamp(mix(vec3<f32>(luma), color, amount), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn sample_backdrop(uv: vec2<f32>, blur_strength: f32) -> vec3<f32> {
+    let scaled_blur = blur_strength * 0.14;
+    if (scaled_blur <= 0.5) {
+        return textureSample(blur_tex, blur_samp, uv).rgb;
+    }
+
+    let offset = vec2<f32>(
+        scaled_blur / screen.screen_size.x,
+        scaled_blur / screen.screen_size.y
+    );
+    let center = textureSample(blur_tex, blur_samp, uv).rgb * 4.0;
+    let horizontal = (
+        textureSample(blur_tex, blur_samp, uv + vec2<f32>( offset.x, 0.0)).rgb +
+        textureSample(blur_tex, blur_samp, uv + vec2<f32>(-offset.x, 0.0)).rgb
+    ) * 2.0;
+    let vertical = (
+        textureSample(blur_tex, blur_samp, uv + vec2<f32>(0.0,  offset.y)).rgb +
+        textureSample(blur_tex, blur_samp, uv + vec2<f32>(0.0, -offset.y)).rgb
+    ) * 2.0;
+    let diagonal =
+        textureSample(blur_tex, blur_samp, uv + offset).rgb +
+        textureSample(blur_tex, blur_samp, uv + vec2<f32>( offset.x, -offset.y)).rgb +
+        textureSample(blur_tex, blur_samp, uv + vec2<f32>(-offset.x,  offset.y)).rgb +
+        textureSample(blur_tex, blur_samp, uv - offset).rgb;
+    return (center + horizontal + vertical + diagonal) / 16.0;
 }
 
 @fragment
@@ -182,7 +226,8 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         discard;
     }
 
-    var color = textureSample(blur_tex, blur_samp, in.blur_uv).rgb;
+    var color = sample_backdrop(in.blur_uv, in.backdrop_blur);
+    color = saturate_color(color, in.saturation);
     color = mix(color, in.tint.rgb, in.tint.a);
 
     if (in.noise_intensity > 0.001) {
@@ -198,18 +243,18 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-const MAX_FLAT_QUADS: usize = 512;
+const MAX_GLOW_RECTS: usize = 512;
 const MAX_GLASS_QUADS: usize = 512;
 
 /// Renders glass quads, glow rects, and text on top of a blurred backdrop.
 pub struct UiRenderer {
-    flat_pipeline: wgpu::RenderPipeline,
+    glow_pipeline: wgpu::RenderPipeline,
     glass_pipeline: wgpu::RenderPipeline,
-    flat_instance_buffer: wgpu::Buffer,
+    glow_instance_buffer: wgpu::Buffer,
     glass_instance_buffer: wgpu::Buffer,
     screen_uniform_buffer: wgpu::Buffer,
     screen_bind_group: wgpu::BindGroup,
-    flat_instance_bind_group: wgpu::BindGroup,
+    glow_instance_bind_group: wgpu::BindGroup,
     glass_instance_bind_group: wgpu::BindGroup,
     backdrop_bind_group_layout: wgpu::BindGroupLayout,
     backdrop_sampler: wgpu::Sampler,
@@ -253,10 +298,10 @@ impl UiRenderer {
             }],
         });
 
-        let flat_buf_size = (MAX_FLAT_QUADS * std::mem::size_of::<FlatQuadInstance>()) as u64;
-        let flat_instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("ui-flat-quad-instances"),
-            size: flat_buf_size,
+        let glow_buf_size = (MAX_GLOW_RECTS * std::mem::size_of::<GlowInstance>()) as u64;
+        let glow_instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("ui-glow-instances"),
+            size: glow_buf_size,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -269,11 +314,11 @@ impl UiRenderer {
             mapped_at_creation: false,
         });
 
-        let flat_instance_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("ui-flat-instance-bgl"),
+        let glow_instance_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("ui-glow-instance-bgl"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
@@ -298,12 +343,12 @@ impl UiRenderer {
                 }],
             });
 
-        let flat_instance_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("ui-flat-instance-bg"),
-            layout: &flat_instance_bgl,
+        let glow_instance_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("ui-glow-instance-bg"),
+            layout: &glow_instance_bgl,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: flat_instance_buffer.as_entire_binding(),
+                resource: glow_instance_buffer.as_entire_binding(),
             }],
         });
 
@@ -350,18 +395,18 @@ impl UiRenderer {
             ..Default::default()
         });
 
-        let flat_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("ui-flat-shader"),
-            source: wgpu::ShaderSource::Wgsl(FLAT_SHADER.into()),
+        let glow_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("ui-glow-shader"),
+            source: wgpu::ShaderSource::Wgsl(GLOW_SHADER.into()),
         });
         let glass_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("ui-glass-shader"),
             source: wgpu::ShaderSource::Wgsl(GLASS_SHADER.into()),
         });
 
-        let flat_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("ui-flat-pipeline-layout"),
-            bind_group_layouts: &[&screen_bgl, &flat_instance_bgl],
+        let glow_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("ui-glow-pipeline-layout"),
+            bind_group_layouts: &[&screen_bgl, &glow_instance_bgl],
             push_constant_ranges: &[],
         });
         let glass_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -374,17 +419,17 @@ impl UiRenderer {
             push_constant_ranges: &[],
         });
 
-        let flat_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("ui-flat-pipeline"),
-            layout: Some(&flat_layout),
+        let glow_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("ui-glow-pipeline"),
+            layout: Some(&glow_layout),
             vertex: wgpu::VertexState {
-                module: &flat_shader,
+                module: &glow_shader,
                 entry_point: Some("vs_main"),
                 buffers: &[],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
-                module: &flat_shader,
+                module: &glow_shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
@@ -435,13 +480,13 @@ impl UiRenderer {
         let text_pipeline = TextPipeline::new(device, queue, surface_format);
 
         Self {
-            flat_pipeline,
+            glow_pipeline,
             glass_pipeline,
-            flat_instance_buffer,
+            glow_instance_buffer,
             glass_instance_buffer,
             screen_uniform_buffer,
             screen_bind_group,
-            flat_instance_bind_group,
+            glow_instance_bind_group,
             glass_instance_bind_group,
             backdrop_bind_group_layout,
             backdrop_sampler,
@@ -485,20 +530,45 @@ impl UiRenderer {
                 border_color: gq.border_color,
                 corner_radius: gq.corner_radius,
                 noise_intensity: gq.noise_intensity,
-                _padding: [0.0; 2],
+                backdrop_blur: gq.backdrop_blur,
+                saturation: gq.saturation,
             })
             .collect();
 
-        let flat_instances: Vec<FlatQuadInstance> = paint_ctx
+        let under_glow_instances: Vec<GlowInstance> = paint_ctx
             .glow_rects
             .iter()
-            .take(MAX_FLAT_QUADS)
-            .map(|gr| FlatQuadInstance {
+            .filter(|gr| gr.layer == GlowLayer::Underlay)
+            .take(MAX_GLOW_RECTS)
+            .map(|gr| GlowInstance {
                 rect: [gr.rect.x, gr.rect.y, gr.rect.w, gr.rect.h],
                 color: gr.color,
-                corner_radius: 0.0,
-                _padding: [0.0; 3],
+                corner_radius: gr.corner_radius,
+                spread: gr.spread,
+                intensity: gr.intensity,
+                _padding: 0.0,
             })
+            .collect();
+
+        let remaining_capacity = MAX_GLOW_RECTS.saturating_sub(under_glow_instances.len());
+        let over_glow_instances: Vec<GlowInstance> = paint_ctx
+            .glow_rects
+            .iter()
+            .filter(|gr| gr.layer == GlowLayer::Overlay)
+            .take(remaining_capacity)
+            .map(|gr| GlowInstance {
+                rect: [gr.rect.x, gr.rect.y, gr.rect.w, gr.rect.h],
+                color: gr.color,
+                corner_radius: gr.corner_radius,
+                spread: gr.spread,
+                intensity: gr.intensity,
+                _padding: 0.0,
+            })
+            .collect();
+        let glow_instances: Vec<GlowInstance> = under_glow_instances
+            .iter()
+            .chain(over_glow_instances.iter())
+            .copied()
             .collect();
 
         if !glass_instances.is_empty() {
@@ -508,11 +578,11 @@ impl UiRenderer {
                 bytemuck::cast_slice(&glass_instances),
             );
         }
-        if !flat_instances.is_empty() {
+        if !glow_instances.is_empty() {
             queue.write_buffer(
-                &self.flat_instance_buffer,
+                &self.glow_instance_buffer,
                 0,
-                bytemuck::cast_slice(&flat_instances),
+                bytemuck::cast_slice(&glow_instances),
             );
         }
 
@@ -549,6 +619,13 @@ impl UiRenderer {
                 ..Default::default()
             });
 
+            if !under_glow_instances.is_empty() {
+                pass.set_pipeline(&self.glow_pipeline);
+                pass.set_bind_group(0, &self.screen_bind_group, &[]);
+                pass.set_bind_group(1, &self.glow_instance_bind_group, &[]);
+                pass.draw(0..6, 0..under_glow_instances.len() as u32);
+            }
+
             if !glass_instances.is_empty() {
                 pass.set_pipeline(&self.glass_pipeline);
                 pass.set_bind_group(0, &self.screen_bind_group, &[]);
@@ -557,11 +634,13 @@ impl UiRenderer {
                 pass.draw(0..6, 0..glass_instances.len() as u32);
             }
 
-            if !flat_instances.is_empty() {
-                pass.set_pipeline(&self.flat_pipeline);
+            if !over_glow_instances.is_empty() {
+                let base_instance = under_glow_instances.len() as u32;
+                let end_instance = base_instance + over_glow_instances.len() as u32;
+                pass.set_pipeline(&self.glow_pipeline);
                 pass.set_bind_group(0, &self.screen_bind_group, &[]);
-                pass.set_bind_group(1, &self.flat_instance_bind_group, &[]);
-                pass.draw(0..6, 0..flat_instances.len() as u32);
+                pass.set_bind_group(1, &self.glow_instance_bind_group, &[]);
+                pass.draw(0..6, base_instance..end_instance);
             }
 
             if !paint_ctx.text_runs.is_empty()
@@ -578,8 +657,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn flat_quad_instance_is_48_bytes() {
-        assert_eq!(std::mem::size_of::<FlatQuadInstance>(), 48);
+    fn glow_instance_is_48_bytes() {
+        assert_eq!(std::mem::size_of::<GlowInstance>(), 48);
     }
 
     #[test]

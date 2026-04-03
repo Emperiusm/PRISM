@@ -34,6 +34,7 @@ pub struct LauncherShell {
     active_modal: Option<ActiveModal>,
     screen_rect: Rect,
     sidebar_rect: Rect,
+    header_rect: Rect,
     content_rect: Rect,
     home_recent_y: f32,
     home_scroll_y: f32,
@@ -65,6 +66,7 @@ impl LauncherShell {
             active_modal: None,
             screen_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             sidebar_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
+            header_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             content_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             home_recent_y: 0.0,
             home_scroll_y: 0.0,
@@ -181,20 +183,22 @@ impl LauncherShell {
         self.screen_rect = Rect::new(0.0, 0.0, screen_w, screen_h);
         self.sidebar_rect = Rect::new(0.0, 0.0, SIDEBAR_W, screen_h);
         let content_x = SIDEBAR_W + CONTENT_PAD;
+        let content_w = (screen_w - content_x - CONTENT_PAD).max(320.0);
+        self.header_rect = Rect::new(content_x, 0.0, content_w, HEADER_H);
         self.content_rect = Rect::new(
             content_x,
-            0.0,
-            (screen_w - content_x - CONTENT_PAD).max(320.0),
-            screen_h.max(320.0),
+            HEADER_H,
+            content_w,
+            (screen_h - HEADER_H).max(320.0),
         );
     }
 
     fn content_body_rect(&self) -> Rect {
         Rect::new(
             self.content_rect.x,
-            self.content_rect.y + HEADER_H + 16.0,
+            self.content_rect.y + 16.0,
             self.content_rect.w,
-            (self.content_rect.h - HEADER_H - 16.0).max(0.0),
+            (self.content_rect.h - 16.0).max(0.0),
         )
     }
 
@@ -234,8 +238,27 @@ impl LauncherShell {
         }
     }
 
-    fn paint_header(&self, ctx: &mut PaintContext) {
-        let bar_rect = Rect::new(self.content_rect.x, 0.0, self.content_rect.w, HEADER_H);
+    fn paint_header_bar(&self, ctx: &mut PaintContext) {
+        let bar_rect = self.header_rect;
+        ctx.push_glass_quad(theme::glass_quad(
+            bar_rect,
+            [1.0, 1.0, 1.0, 0.10],
+            [0.0, 0.0, 0.0, 0.0],
+            0.0,
+        ));
+        ctx.push_glass_quad(theme::launcher_separator(Rect::new(
+            bar_rect.x,
+            bar_rect.y + bar_rect.h - 1.0,
+            bar_rect.w,
+            1.0,
+        )));
+
+        let avatar_rect = Rect::new(bar_rect.x + bar_rect.w - 40.0, bar_rect.y + 8.0, 32.0, 32.0);
+        let brand_text = "PRISM";
+        let brand_text_w = theme::text_width(brand_text, theme::FONT_LABEL);
+        let brand_total_w = 12.0 + 8.0 + brand_text_w;
+        let brand_x = avatar_rect.x - 16.0 - brand_total_w;
+        let brand_mark = Rect::new(brand_x, bar_rect.y + 18.0, 12.0, 12.0);
 
         // Page title — breadcrumb for Settings, plain title for others
         if self.active_tab == LauncherTab::Settings {
@@ -272,11 +295,37 @@ impl LauncherShell {
             });
         }
 
+        ctx.push_glass_quad(theme::glass_quad(
+            brand_mark,
+            theme::PRIMARY_BLUE,
+            theme::PRIMARY_BLUE,
+            4.0,
+        ));
+        ctx.push_text_run(TextRun {
+            x: brand_mark.x + brand_mark.w + 8.0,
+            y: bar_rect.y + 16.0,
+            text: brand_text.into(),
+            font_size: theme::FONT_LABEL,
+            color: theme::LT_TEXT_SECONDARY,
+            bold: true,
+            ..Default::default()
+        });
+
+        // Avatar placeholder
+        ctx.push_glass_quad(GlassQuad {
+            rect: avatar_rect,
+            tint: [0.8, 0.85, 0.9, 1.0],
+            corner_radius: 16.0,
+            ..Default::default()
+        });
+
+        let mut right_edge = brand_x - 16.0;
+
         // Profiles tab: search input placeholder
         if self.active_tab == LauncherTab::Profiles {
-            let search_w = 200.0;
-            let search_x = bar_rect.x + bar_rect.w - search_w - 100.0;
-            let search_rect = Rect::new(search_x, 8.0, search_w, 32.0);
+            let search_w = 220.0;
+            let search_x = (right_edge - search_w).max(bar_rect.x + 220.0);
+            let search_rect = Rect::new(search_x, bar_rect.y + 8.0, search_w, 32.0);
             ctx.push_glass_quad(theme::launcher_control_surface(search_rect, false));
             Icon::new(ICON_SEARCH)
                 .with_size(16.0)
@@ -291,6 +340,7 @@ impl LauncherShell {
                 color: theme::LT_TEXT_MUTED,
                 ..Default::default()
             });
+            right_edge = search_rect.x - 16.0;
         }
 
         // Connecting status chip
@@ -298,7 +348,7 @@ impl LauncherShell {
             let chip_text = "Connecting...";
             let chip_w = theme::text_width(chip_text, 12.0) + 28.0;
             let status_rect = Rect::new(
-                bar_rect.x + bar_rect.w - chip_w - 100.0,
+                right_edge - chip_w,
                 bar_rect.y + 10.0,
                 chip_w,
                 28.0,
@@ -316,26 +366,6 @@ impl LauncherShell {
                 ..Default::default()
             });
         }
-
-        // Right side: PRISM text + avatar placeholder
-        let prism_x = bar_rect.x + bar_rect.w - 120.0;
-        ctx.push_text_run(TextRun {
-            x: prism_x,
-            y: bar_rect.y + 16.0,
-            text: "PRISM".into(),
-            font_size: theme::FONT_LABEL,
-            color: theme::LT_TEXT_MUTED,
-            ..Default::default()
-        });
-
-        // Avatar circle (32px)
-        let avatar_x = bar_rect.x + bar_rect.w - 56.0;
-        ctx.push_glass_quad(GlassQuad {
-            rect: Rect::new(avatar_x, 8.0, 32.0, 32.0),
-            tint: [0.8, 0.85, 0.9, 1.0],
-            corner_radius: 16.0,
-            ..Default::default()
-        });
     }
 
     fn paint_active_tab(&self, ctx: &mut PaintContext) {
@@ -512,7 +542,7 @@ impl Widget for LauncherShell {
 
     fn paint(&self, ctx: &mut PaintContext) {
         self.nav.paint(ctx);
-        self.paint_header(ctx);
+        self.paint_header_bar(ctx);
         self.paint_active_tab(ctx);
         self.paint_modal_layer(ctx);
     }

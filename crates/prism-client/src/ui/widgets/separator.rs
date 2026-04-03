@@ -40,6 +40,7 @@ impl Widget for Separator {
             border_color: [0.0, 0.0, 0.0, 0.0],
             corner_radius: 0.0,
             noise_intensity: 0.0,
+            ..Default::default()
         });
 
         // 1px dark shadow line
@@ -51,6 +52,7 @@ impl Widget for Separator {
             border_color: [0.0, 0.0, 0.0, 0.0],
             corner_radius: 0.0,
             noise_intensity: 0.0,
+            ..Default::default()
         });
     }
 

@@ -3,6 +3,7 @@
 
 use super::{EventResponse, GlowRect, PaintContext, Rect, Size, UiEvent, Widget};
 use crate::ui::theme;
+use crate::ui::widgets::GlowLayer;
 
 pub struct Sparkline {
     values: Vec<f32>,
@@ -104,8 +105,10 @@ impl Widget for Sparkline {
                     self.accent_color[2],
                     point_alpha,
                 ],
+                corner_radius: 1.0,
                 spread,
                 intensity: point_alpha,
+                layer: GlowLayer::Overlay,
             });
         }
     }

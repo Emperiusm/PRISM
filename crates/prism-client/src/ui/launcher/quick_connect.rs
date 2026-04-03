@@ -82,6 +82,7 @@ impl Widget for QuickConnect {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
+        ctx.push_glow_rect(theme::signature_shadow(self.rect, theme::HERO_RADIUS));
         ctx.push_glass_quad(theme::launcher_hero_surface(self.rect));
 
         // Match Stitch visual intent with FONT_HERO heading centered

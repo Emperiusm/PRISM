@@ -104,6 +104,7 @@ impl Widget for QualityPanel {
             return;
         }
 
+        ctx.push_glow_rect(theme::signature_shadow(self.rect, theme::PANEL_RADIUS));
         ctx.push_glass_quad(theme::floating_surface(self.rect));
 
         ctx.push_text_run(TextRun {

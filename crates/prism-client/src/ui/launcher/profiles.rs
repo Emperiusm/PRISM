@@ -26,6 +26,7 @@ const COL_GAP: f32 = 32.0;
 const PANEL_PAD: f32 = 18.0;
 const ROW_H: f32 = 54.0;
 const ROW_GAP: f32 = 8.0;
+const LIST_HEADER_H: f32 = 40.0;
 
 pub struct ProfilesPanel {
     rect: Rect,
@@ -188,8 +189,12 @@ impl ProfilesPanel {
     }
 
     fn list_rect(&self) -> Rect {
-        // Presets header sits above the card at y+10..y+40; card starts at y+48
-        Rect::new(self.rect.x, self.rect.y + 48.0, LIST_W, self.rect.h - 48.0)
+        Rect::new(
+            self.rect.x,
+            self.rect.y + LIST_HEADER_H + 8.0,
+            LIST_W,
+            self.rect.h - LIST_HEADER_H - 8.0,
+        )
     }
 
     fn editor_rect(&self) -> Rect {
@@ -478,19 +483,19 @@ impl Widget for ProfilesPanel {
         let list = self.list_rect();
         let editor = self.editor_rect();
 
-        // --- TASK-048: Presets header on gradient background (above list card) ---
+        let presets_y = self.rect.y + 10.0;
         ctx.push_text_run(TextRun {
             x: self.rect.x + 4.0,
-            y: self.rect.y + 10.0,
+            y: presets_y,
             text: "Presets".into(),
-            font_size: theme::FONT_HEADLINE,
+            font_size: theme::FONT_BODY,
             color: theme::LT_TEXT_PRIMARY,
             bold: true,
             ..Default::default()
         });
-        // "+" add button — blue circle
-        let add_btn_x = self.rect.x + theme::text_width("Presets", theme::FONT_HEADLINE) + 16.0;
-        let add_btn_y = self.rect.y + 8.0;
+
+        let add_btn_x = self.rect.x + LIST_W - 28.0;
+        let add_btn_y = self.rect.y + 2.0;
         ctx.push_glass_quad(theme::glass_quad(
             Rect::new(add_btn_x, add_btn_y, 28.0, 28.0),
             theme::PRIMARY_BLUE,
@@ -503,10 +508,12 @@ impl Widget for ProfilesPanel {
             .at(add_btn_x + 6.0, add_btn_y + 6.0)
             .paint(ctx);
 
-        // List card surface — starts below header
-        ctx.push_glass_quad(theme::launcher_list_surface(list));
+        // List card surface — starts below the gradient-anchored presets header row.
+        ctx.push_glow_rect(theme::signature_shadow(list, theme::CARD_RADIUS));
+        ctx.push_glass_quad(theme::launcher_card_surface(list));
 
         // Editor surface
+        ctx.push_glow_rect(theme::signature_shadow(editor, theme::HERO_RADIUS));
         ctx.push_glass_quad(theme::launcher_hero_surface(editor));
 
         // --- TASK-049 + 050: List items with icons and active styling ---

@@ -1,6 +1,6 @@
 ---
 goal: "Launcher UI Layout & Geometry Polish — Bridge remaining gaps between Implementation.png and screen.png"
-version: 2.1
+version: 3.0
 date_created: 2026-04-03
 last_updated: 2026-04-03
 owner: PRISM Client Team
@@ -51,6 +51,7 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 - [x] **Pass 3 — Data & Screens** (Phases 4, 7–9: TASK-016 → TASK-023, TASK-034 → TASK-064)
 - [x] **Pass 4 — Settings & Polish** (Phase 10: TASK-066 → TASK-081)
 - [x] **Verification** (Phase 11: TASK-082 → TASK-086a)
+- [x] **Pass 5 ? High-Fidelity Refinement** (Phases 12?14: TASK-087 ? TASK-095)
 
 ### Phases
 
@@ -66,6 +67,9 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 - [x] Phase 9 — Profiles Editor Polish (17 tasks: 048–064)
 - [x] Phase 10 — Settings Panel Polish (12 tasks: 066–077)
 - [x] Phase 11 — Cross-Screen Verification (10 tasks: 078–086a)
+- [x] Phase 12 ? Structural Layout (3 tasks: 087?089)
+- [x] Phase 13 ? Sidebar & Nav Polish (3 tasks: 090?092)
+- [x] Phase 14 ? Profiles & Grid Refinement (3 tasks: 093?095)
 
 ---
 
@@ -352,7 +356,7 @@ git merge feat/launcher-ui-polish
 - **Release:** Tagging and releasing is a **separate decision** — not bundled into this plan. This branch is a UI polish increment, not necessarily a release milestone. After merging, evaluate whether a release is warranted based on the full state of `main`.
 
 **Recommended Execution Order:**
-This plan has 90 tasks with inter-phase dependencies. Execute in five passes to ensure foundational primitives exist before complex views that depend on them:
+This plan has inter-phase dependencies. Execute in six passes to ensure foundational primitives exist before complex views that depend on them:
 
 | Pass | Phases | Tasks | What it builds |
 |------|--------|-------|----------------|
@@ -361,8 +365,9 @@ This plan has 90 tasks with inter-phase dependencies. Execute in five passes to 
 | **Pass 2 — Icons & Header** | Phase 5, Phase 6 | TASK-024 → TASK-033 | Icon widget, Material Symbols `.ttf` loading, sidebar nav icons, header bar with page title + hamburger menu. Phase 6 depends on Phase 5's `Icon` type. |
 | **Pass 3 — Data & Screens** | Phase 4, Phase 7, Phase 8, Phase 9 | TASK-016 → TASK-023, TASK-034 → TASK-064 | Home Recent Connections list (Phase 4), Saved Connections filter bar + card grid + FAB (Phases 7–8), Profiles editor polish + header search bar (Phase 9). Execute one phase at a time sequentially. |
 | **Pass 4 — Settings & Polish** | Phase 10 | TASK-066 → TASK-081 | Settings sub-nav, breadcrumb header, dropdown constraints, toggle card surfaces, audio section layout, sidebar footer avatar. Depends on Pass 1 (bold text, sidebar geometry) and Pass 2 (icons, header bar). |
+| **Pass 5 — High-Fidelity Refinement** | Phases 12–14 | TASK-087 → TASK-095 | Final geometric reconciliation against the Stitch mockups. Focuses on structural shell layout, sidebar/nav polish, and the remaining Profiles/Connections/Settings refinements that make the launcher read edge-to-edge instead of like floating cards. |
 
-> **Note:** Phase 4 is deferred to Pass 3 because it depends on Phase 1 (bold text) and Phase 5 (icons for status chips and Reconnect button), but does not block Phase 5/6. Phase 11 (Verification) runs last after all passes.
+> **Note:** Phase 4 is deferred to Pass 3 because it depends on Phase 1 (bold text) and Phase 5 (icons for status chips and Reconnect button), but does not block Phase 5/6. Phase 11 (Verification) runs after Pass 4. Pass 5 (Phases 12–14) is a post-verification corrective pass that addresses the remaining visual deltas observed during the screenshot review.
 
 ---
 
@@ -1742,6 +1747,60 @@ ctx.text_runs.push(TextRun {
 
 ---
 
+### Pass 5: High-Fidelity Refinement
+
+- GOAL-012: Close the remaining geometric and structural deltas between the current launcher implementation and the approved Stitch mockups without introducing a new design source.
+
+#### Geometric Reconciliation
+
+| Element | Gap Analysis | Target Refinement |
+|---------|--------------|-------------------|
+| Sidebar | Currently reads like a floating card at `(28, 28)` with rounded framing. | **Flush panel:** start at `(0, 0)`, span full height, and remove the left-edge radius so the sidebar reads as structural chrome. |
+| Active Nav | Still uses a floating rounded pill with side margins. | **Flush rectangle:** make the active item edge-to-edge and add a `4px` `PRIMARY_BLUE` left-border bar. |
+| Header Bar | Page titles still feel embedded in the content area rather than in application chrome. | **Global header:** render titles inside a dedicated top bar with PRISM branding and an avatar placeholder. |
+| Presets Header | The `Presets` label remains visually tied to the list card. | **Gradient anchor:** move the label and add button onto the gradient so the list card begins below them. |
+
+### Phase 12: Structural Layout
+
+- GOAL-012A: Reconcile the shell layout with the mockup's edge-to-edge application framing.
+
+| Task | Description | Completed | Date |
+|------|-------------|-----------|------|
+| TASK-087 | **Sidebar frame (`ui/launcher/shell.rs`):** Update `compute_layout()` so `sidebar_rect` starts at `(0.0, 0.0)` and spans `screen_h`. This phase treats the sidebar as application chrome, not a floating card. | Complete | 2026-04-03 |
+| TASK-088 | **Header bar (`ui/launcher/shell.rs`):** Implement `paint_header_bar()` to render the active page title, PRISM branding, and avatar placeholder in the top `48px` band of the content area. | Complete | 2026-04-03 |
+| TASK-089 | **Content offset (`ui/launcher/shell.rs`):** Adjust `content_rect` to start at `y: 48.0` so the active page content sits below the new header bar without overlap. | Complete | 2026-04-03 |
+
+### Phase 13: Sidebar & Nav Polish
+
+- GOAL-013: Tighten sidebar behavior so the nav reads as flush structure rather than nested cards.
+
+| Task | Description | Completed | Date |
+|------|-------------|-----------|------|
+| TASK-090 | **Active nav indicator (`ui/launcher/nav.rs`):** Refactor `paint_active_list_indicator()` to use a full-width background quad plus a `4px` accent bar at `x: 0.0`. Remove the floating-pill treatment. | Complete | 2026-04-03 |
+| TASK-091 | **Sidebar top branding (`ui/launcher/nav.rs`):** Render the hamburger icon (`ICON_MENU`) as the sole branding element on non-Settings tabs so the top of the sidebar matches the mockup's restraint. | Complete | 2026-04-03 |
+| TASK-092 | **Persistent footer identity (`ui/launcher/nav.rs`):** Implement the sidebar footer so it always shows the user avatar and `Verified Dev` label. | Complete | 2026-04-03 |
+
+### Phase 14: Profiles & Grid Refinement
+
+- GOAL-014: Finish the remaining page-level refinements that still feel structurally offset from the mockups.
+
+| Task | Description | Completed | Date |
+|------|-------------|-----------|------|
+| TASK-093 | **Profiles header extraction (`ui/launcher/profiles.rs`):** Move the `Presets` header logic out of the white list card and onto the gradient background above it. | Complete | 2026-04-03 |
+| TASK-094 | **Connections add card (`ui/launcher/card_grid.rs`):** Update the `Add New Connection` card to use a dashed white border with tint `[1.0, 1.0, 1.0, 0.60]`. | Complete | 2026-04-03 |
+| TASK-095 | **Settings sub-navigation (`ui/launcher/nav.rs`):** Implement the `SETTINGS` sub-header and icon-based sub-navigation menu so the Settings screen matches the Stitch layout hierarchy. | Complete | 2026-04-03 |
+
+#### Implementation Checklist
+
+- **Typography:** Ensure hero titles such as `Quick Connect` explicitly render with `bold: true`.
+- **Buttons:** Verify the primary `Connect` button uses flat `#0F6CBD` blue rather than a lighter cyan or gradient.
+- **Corner radii:** Standardize on `8px` for inputs/buttons and `12px`-`20px` for cards; avoid pill-shaped address inputs.
+- **Status colors:** Map `Online` to Success (green), `Sleeping` to Warning (amber), and `Unreachable` to Danger (red).
+
+> **Commit after Pass 5:** `git add -A && git commit -m "feat(launcher): Pass 5 - High-Fidelity Refinement"`
+
+---
+
 ## 3. Alternatives
 
 - **ALT-001**: **Texture atlas for icons** — Load a `.png` sprite sheet and render icon quads via UV mapping. Rejected: requires a separate texture pipeline, UV coordinate management, and prevents dynamic recoloring without shader changes. The `.ttf` approach reuses the existing text rendering pipeline and supports per-icon color via the standard `TextRun.color` field.
@@ -1840,6 +1899,8 @@ ctx.text_runs.push(TextRun {
 - **TEST-009**: Keyboard navigation check: Tab/Shift+Tab cycles focus ring through interactive widgets. Escape dismisses modal.
 - **TEST-010**: Data-layer check: `cargo test -p prism-client` verifies `SavedServer` serialization/deserialization with new optional fields (`os_label`, `tags`, `wol_supported`, `last_latency_ms`) remains backward-compatible with existing `servers.json` snapshots.
 - **TEST-011**: Icon font subset check: verify all codepoints from TASK-025 render correctly (no missing-glyph squares/tofu) at 16px, 20px, and 24px sizes against a light background.
+- **TEST-012**: Pass 5 structural check: (a) `sidebar_rect` starts at `(0.0, 0.0)` and spans the full window height, (b) the header bar renders as a dedicated `48px` band above content, (c) the active nav item is a flush rectangle with a `4px` `PRIMARY_BLUE` left bar, (d) non-Settings tabs show only the hamburger icon at the sidebar top, (e) the sidebar footer shows the avatar + `Verified Dev`, (f) `Presets` and its add button sit above the white list card on the gradient, (g) the `Add New Connection` card uses the dashed white border treatment, and (h) Settings renders the `SETTINGS` sub-header with icon-based sub-navigation.
+- **TEST-013**: Regression check: After Pass 5 changes, verify all Phase 11 visual verification items (TASK-079 through TASK-085) still pass - Phases 12-14 should tighten the layout without reintroducing visual regressions.
 
 ---
 
@@ -1859,6 +1920,8 @@ ctx.text_runs.push(TextRun {
 - **RISK-010**: **Animation & transitions** — The `DESIGN.md` spec mentions "soft pulsing glow effect" for Sleeping chips and hover transitions. This plan only addresses static rendering. GPU-driven animations (glow pulse, hover ease-in/out) require a frame-time delta system and animation state tracking. **Deferred** to a follow-up plan. Static hover-state changes (immediate tint swap on `hovered` flag) are in scope.
 - **RISK-011**: **Backward compatibility of `SavedServer` schema** — TASK-P03 adds optional fields. Existing `servers.json` snapshots must deserialize correctly without these fields. Mitigation: all new fields use `Option<T>` with `#[serde(default)]`, or `Vec<T>` (defaults to empty). `ServerStore::compact()` will re-serialize with the new schema on next write. Add a unit test verifying old JSON still loads.
 - **ASSUMPTION-003**: The `ServerStatus` heuristic in `derived_status()` (TASK-P02) is a temporary stand-in. Real-time status requires either (a) periodic ICMP/TCP pings from the client, or (b) a discovery protocol response from the server. Both are out of scope for this UI-polish plan.
+- **RISK-012**: **Header bar extraction (TASK-089/090)** — Moving page titles from individual view modules into `shell.rs` requires careful coordination. Each view may have unique header content (e.g. Profiles has a search bar, Settings has breadcrumbs). Mitigation: the shell's `paint_header()` dispatches on `active_tab` to render tab-specific header content while keeping the shared layout (title position, branding, avatar) consistent.
+- **RISK-013**: **Sidebar flush geometry (TASK-087)** — After removing `SIDEBAR_PAD`, any absolute positioning that depended on the old sidebar origin offset will shift by `SIDEBAR_PAD` pixels. Mitigation: TASK-088 explicitly audits all sidebar content positioning to use relative offsets from the new `(0,0)` origin.
 
 ---
 

@@ -8,6 +8,14 @@ use glyphon::{
 
 use crate::ui::widgets::PaintContext;
 
+#[derive(Debug, Clone, Copy)]
+struct PreparedTextArea {
+    buffer_index: usize,
+    left: f32,
+    top: f32,
+    color: Color,
+}
+
 /// Wraps glyphon's text rendering pipeline for use with wgpu.
 ///
 /// Owns a `FontSystem`, glyph `SwashCache`, `TextAtlas`, and `GlyphonTextRenderer`.
@@ -21,6 +29,7 @@ pub struct TextPipeline {
     viewport: Viewport,
     /// Reusable buffer pool to avoid per-frame allocation.
     buffers: Vec<Buffer>,
+    prepared_areas: Vec<PreparedTextArea>,
 }
 
 impl TextPipeline {
@@ -51,6 +60,7 @@ impl TextPipeline {
             renderer,
             viewport,
             buffers: Vec::new(),
+            prepared_areas: Vec::new(),
         }
     }
 
@@ -74,7 +84,15 @@ impl TextPipeline {
             },
         );
 
-        let num_runs = paint_ctx.text_runs.len();
+        let num_runs: usize = paint_ctx
+            .text_runs
+            .iter()
+            .map(|run| {
+                let tracked =
+                    run.letter_spacing.abs() > f32::EPSILON && run.text.chars().count() > 1;
+                if tracked { run.text.chars().count() } else { 1 }
+            })
+            .sum();
 
         // Grow buffer pool if needed
         while self.buffers.len() < num_runs {
@@ -82,15 +100,11 @@ impl TextPipeline {
                 .push(Buffer::new(&mut self.font_system, Metrics::new(14.0, 18.0)));
         }
 
-        // Phase 1: update each buffer's content (requires &mut font_system)
-        for (i, run) in paint_ctx.text_runs.iter().enumerate() {
-            let buf = &mut self.buffers[i];
-            let line_height = (run.font_size * 1.3).ceil();
-            buf.set_metrics(
-                &mut self.font_system,
-                Metrics::new(run.font_size, line_height),
-            );
+        self.prepared_areas.clear();
+        let mut buffer_index = 0usize;
 
+        for run in &paint_ctx.text_runs {
+            let line_height = (run.font_size * 1.3).ceil();
             let family = if run.icon {
                 Family::Name("Material Symbols Outlined")
             } else if run.monospace {
@@ -98,33 +112,75 @@ impl TextPipeline {
             } else {
                 Family::SansSerif
             };
-
             let weight = if run.bold {
                 Weight::BOLD
             } else {
                 Weight::NORMAL
             };
-
-            buf.set_text(
-                &mut self.font_system,
-                &run.text,
-                Attrs::new().family(family).weight(weight),
-                Shaping::Advanced,
+            let attrs = Attrs::new().family(family).weight(weight);
+            let color = Color::rgba(
+                (run.color[0] * 255.0) as u8,
+                (run.color[1] * 255.0) as u8,
+                (run.color[2] * 255.0) as u8,
+                (run.color[3] * 255.0) as u8,
             );
 
-            buf.set_size(&mut self.font_system, Some(2000.0), Some(line_height + 4.0));
-            buf.shape_until_scroll(&mut self.font_system, false);
+            if run.letter_spacing.abs() > f32::EPSILON && run.text.chars().count() > 1 {
+                let spacing_px = run.letter_spacing * run.font_size;
+                let mut current_x = run.x;
+                for ch in run.text.chars() {
+                    let buf = &mut self.buffers[buffer_index];
+                    buf.set_metrics(
+                        &mut self.font_system,
+                        Metrics::new(run.font_size, line_height),
+                    );
+                    let glyph = ch.to_string();
+                    buf.set_text(&mut self.font_system, &glyph, attrs, Shaping::Advanced);
+                    buf.set_size(&mut self.font_system, Some(2000.0), Some(line_height + 4.0));
+                    buf.shape_until_scroll(&mut self.font_system, false);
+
+                    let glyph_width = buf
+                        .layout_runs()
+                        .map(|layout| layout.line_w)
+                        .next()
+                        .unwrap_or(run.font_size * 0.6);
+                    self.prepared_areas.push(PreparedTextArea {
+                        buffer_index,
+                        left: current_x,
+                        top: run.y,
+                        color,
+                    });
+                    current_x += glyph_width + spacing_px;
+                    buffer_index += 1;
+                }
+            } else {
+                let buf = &mut self.buffers[buffer_index];
+                buf.set_metrics(
+                    &mut self.font_system,
+                    Metrics::new(run.font_size, line_height),
+                );
+                buf.set_text(&mut self.font_system, &run.text, attrs, Shaping::Advanced);
+                buf.set_size(&mut self.font_system, Some(2000.0), Some(line_height + 4.0));
+                buf.shape_until_scroll(&mut self.font_system, false);
+
+                self.prepared_areas.push(PreparedTextArea {
+                    buffer_index,
+                    left: run.x,
+                    top: run.y,
+                    color,
+                });
+                buffer_index += 1;
+            }
         }
 
         // Phase 2: build TextArea refs (borrows buffers immutably)
-        let text_areas: Vec<TextArea> = paint_ctx
-            .text_runs
+        let text_areas: Vec<TextArea> = self
+            .prepared_areas
             .iter()
-            .enumerate()
-            .map(|(i, run)| TextArea {
-                buffer: &self.buffers[i],
-                left: run.x,
-                top: run.y,
+            .map(|area| TextArea {
+                buffer: &self.buffers[area.buffer_index],
+                left: area.left,
+                top: area.top,
                 scale: 1.0,
                 bounds: TextBounds {
                     left: 0,
@@ -132,12 +188,7 @@ impl TextPipeline {
                     right: screen_width as i32,
                     bottom: screen_height as i32,
                 },
-                default_color: Color::rgba(
-                    (run.color[0] * 255.0) as u8,
-                    (run.color[1] * 255.0) as u8,
-                    (run.color[2] * 255.0) as u8,
-                    (run.color[3] * 255.0) as u8,
-                ),
+                default_color: area.color,
                 custom_glyphs: &[],
             })
             .collect();

@@ -107,20 +107,14 @@ impl Widget for Button {
         let hover = self.hover_anim.value();
         let (tint, border, text_color) = match self.color_mode {
             ColorMode::Light => match self.style {
-                // ALT-005: flat PRIMARY_BLUE per approved mockups — not radial gradient per DESIGN.md
                 ButtonStyle::Primary => (
                     [
-                        theme::PRIMARY_BLUE[0],
-                        theme::PRIMARY_BLUE[1],
-                        theme::PRIMARY_BLUE[2],
-                        0.92 + hover * 0.08,
+                        theme::PRIMARY_BLUE_DEEP[0],
+                        theme::PRIMARY_BLUE_DEEP[1],
+                        theme::PRIMARY_BLUE_DEEP[2],
+                        0.94 + hover * 0.06,
                     ],
-                    [
-                        theme::PRIMARY_BLUE[0],
-                        theme::PRIMARY_BLUE[1],
-                        theme::PRIMARY_BLUE[2],
-                        0.30 + hover * 0.10,
-                    ],
+                    [1.0, 1.0, 1.0, 0.20 + hover * 0.08],
                     [1.0, 1.0, 1.0, 1.0],
                 ),
                 ButtonStyle::Secondary => (
@@ -168,17 +162,22 @@ impl Widget for Button {
             ColorMode::Light => 8.0,
             ColorMode::Dark => theme::CONTROL_RADIUS,
         });
+        if self.color_mode == ColorMode::Light && self.style == ButtonStyle::Primary {
+            ctx.push_glow_rect(theme::hover_elevation_shadow(
+                self.rect,
+                radius,
+                0.35 + hover * 0.35,
+            ));
+        }
         ctx.push_glass_quad(theme::glass_quad(self.rect, tint, border, radius));
+        if self.color_mode == ColorMode::Light && self.style == ButtonStyle::Primary {
+            ctx.push_glow_rect(theme::button_gradient_highlight(self.rect, radius, hover));
+        }
 
         if hover > 0.01 {
             let overlay = match self.color_mode {
                 ColorMode::Light => match self.style {
-                    ButtonStyle::Primary => [
-                        theme::PRIMARY_BLUE[0],
-                        theme::PRIMARY_BLUE[1],
-                        theme::PRIMARY_BLUE[2],
-                        0.06 + hover * 0.06,
-                    ],
+                    ButtonStyle::Primary => [1.0, 1.0, 1.0, 0.04 + hover * 0.03],
                     ButtonStyle::Secondary => [1.0, 1.0, 1.0, 0.04 + hover * 0.06],
                     ButtonStyle::Destructive => theme::destructive(0.06 + hover * 0.08),
                     ButtonStyle::Text => unreachable!(),
