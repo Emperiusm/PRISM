@@ -129,7 +129,7 @@ impl Widget for DisplayPanel {
             text: "Display".into(),
             font_size: 13.0,
             color: theme::TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
 
         self.monitor_dropdown.paint(ctx);

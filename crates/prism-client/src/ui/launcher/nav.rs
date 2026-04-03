@@ -79,7 +79,7 @@ impl Widget for LauncherNav {
             text: "PRISM".into(),
             font_size: 20.0,
             color: theme::LT_TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
         ctx.push_text_run(TextRun {
             x: self.rect.x + 18.0,
@@ -87,7 +87,7 @@ impl Widget for LauncherNav {
             text: "Remote client".into(),
             font_size: 11.0,
             color: theme::LT_TEXT_MUTED,
-            monospace: false,
+            ..Default::default()
         });
 
         for (tab, rect) in &self.primary_items {
@@ -110,7 +110,7 @@ impl Widget for LauncherNav {
                 } else {
                     theme::LT_TEXT_SECONDARY
                 },
-                monospace: false,
+                ..Default::default()
             });
         }
 
@@ -132,7 +132,7 @@ impl Widget for LauncherNav {
             } else {
                 theme::LT_TEXT_SECONDARY
             },
-            monospace: false,
+            ..Default::default()
         });
     }
 

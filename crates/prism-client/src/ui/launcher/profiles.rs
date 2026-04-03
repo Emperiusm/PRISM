@@ -418,7 +418,7 @@ impl Widget for ProfilesPanel {
             text: "Presets".into(),
             font_size: theme::FONT_LABEL,
             color: theme::LT_TEXT_MUTED,
-            monospace: false,
+            ..Default::default()
         });
 
         for (idx, row) in self.list_rows.iter().enumerate() {
@@ -451,7 +451,7 @@ impl Widget for ProfilesPanel {
                 } else {
                     theme::LT_TEXT_SECONDARY
                 },
-                monospace: false,
+                ..Default::default()
             });
 
             let subtitle = if profile.builtin {
@@ -474,7 +474,7 @@ impl Widget for ProfilesPanel {
                 text: subtitle,
                 font_size: 11.0,
                 color: theme::LT_TEXT_MUTED,
-                monospace: false,
+                ..Default::default()
             });
         }
 
@@ -493,7 +493,7 @@ impl Widget for ProfilesPanel {
                 text: draft.name.clone(),
                 font_size: theme::FONT_HERO,
                 color: theme::LT_TEXT_PRIMARY,
-                monospace: false,
+                ..Default::default()
             });
 
             if draft.builtin {
@@ -510,7 +510,7 @@ impl Widget for ProfilesPanel {
                     text: "SYSTEM".to_string(),
                     font_size: 10.0,
                     color: theme::launcher_chip_text_color(theme::ChipTone::Success),
-                    monospace: false,
+                    ..Default::default()
                 });
             }
 
@@ -525,7 +525,7 @@ impl Widget for ProfilesPanel {
                     text: "UNSAVED".to_string(),
                     font_size: 10.0,
                     color: theme::launcher_chip_text_color(theme::ChipTone::Warning),
-                    monospace: false,
+                    ..Default::default()
                 });
             }
 
@@ -535,7 +535,7 @@ impl Widget for ProfilesPanel {
                 text: "Optimized for high-performance interaction".to_string(),
                 font_size: theme::FONT_BODY,
                 color: theme::LT_TEXT_SECONDARY,
-                monospace: false,
+                ..Default::default()
             });
         }
 
@@ -552,7 +552,7 @@ impl Widget for ProfilesPanel {
                 text: text.to_string(),
                 font_size: theme::FONT_CAPTION,
                 color: theme::LT_TEXT_MUTED,
-                monospace: false,
+                ..Default::default()
             });
         };
 

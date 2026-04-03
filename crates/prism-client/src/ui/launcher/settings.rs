@@ -209,7 +209,7 @@ impl Widget for SettingsPanel {
             text: "Identity & Security".to_string(),
             font_size: theme::FONT_DISPLAY,
             color: theme::LT_TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
 
         ctx.push_text_run(TextRun {
@@ -218,7 +218,7 @@ impl Widget for SettingsPanel {
             text: "Manage your digital footprint and application settings.".to_string(),
             font_size: theme::FONT_BODY,
             color: theme::LT_TEXT_MUTED,
-            monospace: false,
+            ..Default::default()
         });
 
         // Main Card Surface bounding all attributes
@@ -236,7 +236,7 @@ impl Widget for SettingsPanel {
                 text: title.to_string(),
                 font_size: theme::FONT_BODY,
                 color: theme::LT_TEXT_PRIMARY,
-                monospace: false,
+                ..Default::default()
             });
             ctx.push_text_run(TextRun {
                 x: content_x + 32.0,
@@ -244,7 +244,7 @@ impl Widget for SettingsPanel {
                 text: subtitle.to_string(),
                 font_size: theme::FONT_CAPTION,
                 color: theme::LT_TEXT_MUTED,
-                monospace: false,
+                ..Default::default()
             });
         };
 
@@ -285,6 +285,7 @@ impl Widget for SettingsPanel {
             font_size: theme::FONT_LABEL,
             color: theme::PRIMARY_BLUE,
             monospace: true,
+            ..Default::default()
         });
 
         cy += 74.0;
@@ -309,7 +310,7 @@ impl Widget for SettingsPanel {
             text: "Trusted Device".to_string(),
             font_size: theme::FONT_CAPTION,
             color: theme::launcher_chip_text_color(theme::ChipTone::Success),
-            monospace: false,
+            ..Default::default()
         });
 
         cy += 74.0;
@@ -349,7 +350,7 @@ impl Widget for SettingsPanel {
             text: "Exclusive Keyboard Capture".to_string(),
             font_size: theme::FONT_LABEL,
             color: theme::LT_TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
         self.exclusive_keyboard_toggle.paint(ctx);
         cy += 64.0;
@@ -364,7 +365,7 @@ impl Widget for SettingsPanel {
             text: "Relative Mouse Movement".to_string(),
             font_size: theme::FONT_LABEL,
             color: theme::LT_TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
         self.relative_mouse_toggle.paint(ctx);
 
@@ -386,7 +387,7 @@ impl Widget for SettingsPanel {
             text: "REMOTE OUTPUT".to_string(),
             font_size: 10.0,
             color: audio_label_color,
-            monospace: false,
+            ..Default::default()
         });
         self.audio_output_dropdown.paint(ctx);
 
@@ -397,7 +398,7 @@ impl Widget for SettingsPanel {
             text: "LOCAL MIC PATH".to_string(),
             font_size: 10.0,
             color: audio_label_color,
-            monospace: false,
+            ..Default::default()
         });
         self.mic_dropdown.paint(ctx);
 
@@ -414,7 +415,7 @@ impl Widget for SettingsPanel {
                 theme::LT_TEXT_PRIMARY[2],
                 0.3,
             ],
-            monospace: false,
+            ..Default::default()
         });
     }
 

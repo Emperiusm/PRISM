@@ -129,7 +129,7 @@ impl Widget for ConnPanel {
             text: "Connection".into(),
             font_size: 13.0,
             color: theme::TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
 
         self.server_label.paint(ctx);

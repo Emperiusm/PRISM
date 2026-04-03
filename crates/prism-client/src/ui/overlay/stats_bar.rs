@@ -159,7 +159,7 @@ impl Widget for StatsBar {
             text: "PRISM REMOTE".into(),
             font_size: 11.0,
             color: theme::ACCENT,
-            monospace: false,
+            ..Default::default()
         });
 
         ctx.push_glass_quad(theme::separator(Rect::new(
@@ -184,7 +184,7 @@ impl Widget for StatsBar {
                     text: label.into(),
                     font_size: 9.0,
                     color: metric_label_color,
-                    monospace: false,
+                    ..Default::default()
                 });
                 ctx.push_text_run(TextRun {
                     x,
@@ -193,6 +193,7 @@ impl Widget for StatsBar {
                     font_size: 12.0,
                     color: val_c,
                     monospace: true,
+                    ..Default::default()
                 });
             };
 
@@ -255,7 +256,7 @@ impl Widget for StatsBar {
                 text: label.into(),
                 font_size: 11.0,
                 color: metric_label_color,
-                monospace: false,
+                ..Default::default()
             });
         };
 

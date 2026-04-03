@@ -130,7 +130,7 @@ impl Widget for SegmentedControl {
                 text: label.clone(),
                 font_size: 12.0,
                 color: text_color,
-                monospace: false,
+                ..Default::default()
             });
         }
     }

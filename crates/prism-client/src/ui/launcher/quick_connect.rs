@@ -78,7 +78,7 @@ impl Widget for QuickConnect {
             text: title.into(),
             font_size: theme::FONT_HERO,
             color: theme::LT_TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
 
         let subtitle = "Enter a hostname or IP address";
@@ -89,7 +89,7 @@ impl Widget for QuickConnect {
             text: subtitle.into(),
             font_size: theme::FONT_BODY,
             color: theme::LT_TEXT_MUTED,
-            monospace: false,
+            ..Default::default()
         });
 
         self.address_input.paint(ctx);

@@ -20,21 +20,23 @@ pub enum CardLayoutMode {
     Row,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CardFilter {
     All,
     Recent,
     Dormant,
     New,
+    Tag(String), // e.g. "WORK", "PERSONAL"
 }
 
 impl CardFilter {
-    pub fn label(self, total_cards: usize) -> String {
+    pub fn label(&self) -> String {
         match self {
-            CardFilter::All => format!("All Hosts ({total_cards})"),
-            CardFilter::Recent => "Recent".to_string(),
-            CardFilter::Dormant => "Dormant".to_string(),
-            CardFilter::New => "New".to_string(),
+            Self::All => "All Hosts".into(),
+            Self::Recent => "Recent".into(),
+            Self::Dormant => "Dormant".into(),
+            Self::New => "New".into(),
+            Self::Tag(t) => t.clone(),
         }
     }
 }
@@ -80,6 +82,7 @@ pub struct ServerCard {
     last_connected: Option<u64>,
     last_info: String,
     accent_color: [f32; 3],
+    tags: Vec<String>,
     connect_button: Button,
     edit_button: Button,
     delete_button: Button,
@@ -119,6 +122,7 @@ impl ServerCard {
             last_connected: server.last_connected,
             last_info,
             accent_color,
+            tags: server.tags.clone(),
             connect_button: Button::new(
                 "Connect",
                 UiAction::Connect {
@@ -156,12 +160,13 @@ impl ServerCard {
         self.layout_mode = mode;
     }
 
-    pub fn matches_filter(&self, filter: CardFilter) -> bool {
+    pub fn matches_filter(&self, filter: &CardFilter) -> bool {
         match filter {
             CardFilter::All => true,
             CardFilter::Recent => self.status() == CardStatus::Recent,
             CardFilter::Dormant => self.status() == CardStatus::Dormant,
             CardFilter::New => self.status() == CardStatus::New,
+            CardFilter::Tag(tag) => self.tags.contains(tag),
         }
     }
 
@@ -308,7 +313,7 @@ impl Widget for ServerCard {
             text: status.label().to_string(),
             font_size: 10.0,
             color: theme::launcher_chip_text_color(status.chip_tone()),
-            monospace: false,
+            ..Default::default()
         });
 
         if self.layout_mode == CardLayoutMode::Card {
@@ -326,7 +331,7 @@ impl Widget for ServerCard {
                 text: profile_label,
                 font_size: 10.0,
                 color: theme::LT_TEXT_SECONDARY,
-                monospace: false,
+                ..Default::default()
             });
 
             ctx.push_text_run(TextRun {
@@ -335,7 +340,7 @@ impl Widget for ServerCard {
                 text: self.display_name.clone(),
                 font_size: 16.0,
                 color: theme::LT_TEXT_PRIMARY,
-                monospace: false,
+                ..Default::default()
             });
 
             ctx.push_text_run(TextRun {
@@ -344,7 +349,7 @@ impl Widget for ServerCard {
                 text: self.address.clone(),
                 font_size: 11.0,
                 color: theme::LT_TEXT_MUTED,
-                monospace: false,
+                ..Default::default()
             });
 
             ctx.push_text_run(TextRun {
@@ -353,7 +358,7 @@ impl Widget for ServerCard {
                 text: self.relative_last_connected(),
                 font_size: 11.0,
                 color: theme::LT_TEXT_SECONDARY,
-                monospace: false,
+                ..Default::default()
             });
 
             ctx.push_text_run(TextRun {
@@ -362,7 +367,7 @@ impl Widget for ServerCard {
                 text: self.last_info.clone(),
                 font_size: 11.0,
                 color: theme::LT_TEXT_MUTED,
-                monospace: false,
+                ..Default::default()
             });
         } else {
             // Row text placement
@@ -381,6 +386,7 @@ impl Widget for ServerCard {
                 font_size: 14.0,
                 color: accent,
                 monospace: true,
+                ..Default::default()
             });
             ctx.push_text_run(TextRun {
                 x: r.x + 64.0,
@@ -388,7 +394,7 @@ impl Widget for ServerCard {
                 text: self.display_name.clone(),
                 font_size: 14.0,
                 color: theme::LT_TEXT_PRIMARY,
-                monospace: false,
+                ..Default::default()
             });
             ctx.push_text_run(TextRun {
                 x: r.x + 64.0,
@@ -396,7 +402,7 @@ impl Widget for ServerCard {
                 text: self.address.clone(),
                 font_size: 11.0,
                 color: theme::LT_TEXT_MUTED,
-                monospace: false,
+                ..Default::default()
             });
 
             let status_end = status_rect.x + status_rect.w;
@@ -406,7 +412,7 @@ impl Widget for ServerCard {
                 text: self.relative_last_connected(),
                 font_size: 12.0,
                 color: theme::LT_TEXT_SECONDARY,
-                monospace: false,
+                ..Default::default()
             });
         }
 

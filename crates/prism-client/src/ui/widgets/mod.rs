@@ -42,6 +42,13 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub const ZERO: Rect = Rect {
+        x: 0.0,
+        y: 0.0,
+        w: 0.0,
+        h: 0.0,
+    };
+
     pub fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
         Self { x, y, w, h }
     }
@@ -80,6 +87,19 @@ pub struct GlassQuad {
     pub noise_intensity: f32,
 }
 
+impl Default for GlassQuad {
+    fn default() -> Self {
+        Self {
+            rect: Rect::ZERO,
+            blur_rect: Rect::ZERO,
+            tint: [0.0; 4],
+            border_color: [0.0; 4],
+            corner_radius: 0.0,
+            noise_intensity: 0.0,
+        }
+    }
+}
+
 /// Text draw command.
 #[derive(Debug, Clone)]
 pub struct TextRun {
@@ -89,6 +109,23 @@ pub struct TextRun {
     pub font_size: f32,
     pub color: [f32; 4],
     pub monospace: bool,
+    pub bold: bool,
+    pub icon: bool,
+}
+
+impl Default for TextRun {
+    fn default() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            text: String::new(),
+            font_size: 14.0,
+            color: [0.0, 0.0, 0.0, 1.0],
+            monospace: false,
+            bold: false,
+            icon: false,
+        }
+    }
 }
 
 /// Accent glow draw command.
@@ -350,7 +387,7 @@ mod tests {
             text: "hello".into(),
             font_size: 14.0,
             color: [1.0; 4],
-            monospace: false,
+            ..Default::default()
         });
         assert_eq!(ctx.text_runs.len(), 1);
     }

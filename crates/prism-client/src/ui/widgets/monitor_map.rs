@@ -127,7 +127,7 @@ impl Widget for MonitorMap {
                 } else {
                     theme::TEXT_SECONDARY
                 },
-                monospace: false,
+                ..Default::default()
             });
         }
     }

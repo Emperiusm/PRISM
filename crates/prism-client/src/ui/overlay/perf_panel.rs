@@ -132,7 +132,7 @@ impl Widget for PerfPanel {
             text: "Performance".into(),
             font_size: 13.0,
             color: theme::TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
 
         self.fps_label.paint(ctx);

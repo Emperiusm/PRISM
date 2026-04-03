@@ -234,7 +234,7 @@ impl LauncherShell {
             text: self.active_tab.title().to_string(),
             font_size: theme::FONT_DISPLAY,
             color: theme::LT_TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
         ctx.push_text_run(TextRun {
             x: title_x,
@@ -242,7 +242,7 @@ impl LauncherShell {
             text: self.active_tab.subtitle().to_string(),
             font_size: theme::FONT_BODY,
             color: theme::LT_TEXT_SECONDARY,
-            monospace: false,
+            ..Default::default()
         });
 
         if self.ui_state == UiState::Connecting {
@@ -264,7 +264,7 @@ impl LauncherShell {
                 text: chip_text.to_string(),
                 font_size: 12.0,
                 color: theme::launcher_chip_text_color(theme::ChipTone::Accent),
-                monospace: false,
+                ..Default::default()
             });
         }
     }
@@ -280,7 +280,7 @@ impl LauncherShell {
                     text: "Recent Connections".to_string(),
                     font_size: 13.0,
                     color: theme::LT_TEXT_SECONDARY,
-                    monospace: false,
+                    ..Default::default()
                 });
                 ctx.push_glass_quad(theme::launcher_separator(Rect::new(
                     self.content_rect.x,
@@ -340,7 +340,7 @@ impl LauncherShell {
                         text: "Delete connection".to_string(),
                         font_size: theme::FONT_HEADLINE,
                         color: theme::LT_TEXT_PRIMARY,
-                        monospace: false,
+                        ..Default::default()
                     });
                     ctx.push_text_run(TextRun {
                         x: panel.x + 20.0,
@@ -348,7 +348,7 @@ impl LauncherShell {
                         text: format!("Are you sure you want to remove \"{name}\"?"),
                         font_size: theme::FONT_BODY,
                         color: theme::LT_TEXT_SECONDARY,
-                        monospace: false,
+                        ..Default::default()
                     });
                     let (cancel_rect, confirm_rect) = Self::delete_modal_buttons(panel);
                     ctx.push_glass_quad(theme::glass_quad(
@@ -372,7 +372,7 @@ impl LauncherShell {
                         text: cancel_label.to_string(),
                         font_size: 12.0,
                         color: theme::LT_TEXT_SECONDARY,
-                        monospace: false,
+                        ..Default::default()
                     });
                     ctx.push_text_run(TextRun {
                         x: confirm_rect.x
@@ -381,7 +381,7 @@ impl LauncherShell {
                         text: delete_label.to_string(),
                         font_size: 12.0,
                         color: [1.0, 1.0, 1.0, 1.0],
-                        monospace: false,
+                        ..Default::default()
                     });
                 }
             }

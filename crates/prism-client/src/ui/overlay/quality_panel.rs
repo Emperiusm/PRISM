@@ -112,7 +112,7 @@ impl Widget for QualityPanel {
             text: "Quality".into(),
             font_size: 13.0,
             color: theme::TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
 
         self.profile_dropdown.paint(ctx);
