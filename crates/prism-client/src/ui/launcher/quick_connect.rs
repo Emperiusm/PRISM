@@ -37,6 +37,18 @@ impl QuickConnect {
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
         }
     }
+
+    /// Number of focusable widgets inside this component.
+    pub fn focusable_count(&self) -> usize {
+        2 // address_input, connect_button
+    }
+
+    /// Set keyboard focus on the child at `local_index` (0 = input, 1 = button).
+    /// Clears focus from all children first.
+    pub fn set_focus(&mut self, local_index: Option<usize>) {
+        self.address_input.set_focused(local_index == Some(0));
+        self.connect_button.set_focused(local_index == Some(1));
+    }
 }
 
 impl Default for QuickConnect {

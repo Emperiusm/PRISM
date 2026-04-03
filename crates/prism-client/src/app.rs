@@ -65,6 +65,8 @@ pub struct PrismApp {
     // Mouse position tracking
     mouse_x: f32,
     mouse_y: f32,
+    // Keyboard modifier tracking
+    shift_held: bool,
 }
 
 /// Result sent from the background connection task back to the main thread.
@@ -147,6 +149,7 @@ impl PrismApp {
             scene_target: None,
             mouse_x: 0.0,
             mouse_y: 0.0,
+            shift_held: false,
         }
     }
 
@@ -864,6 +867,9 @@ impl PrismApp {
                 self.bridge
                     .send_control(ControlCommand::SelectMonitor(index));
             }
+            UiAction::OpenSettingsSection(_section) => {
+                // Handled internally by LauncherShell/Nav — no app-level action needed.
+            }
         }
     }
 
@@ -1305,6 +1311,9 @@ impl ApplicationHandler for PrismApp {
                     }
                 }
             }
+            WindowEvent::ModifiersChanged(modifiers) => {
+                self.shift_held = modifiers.state().shift_key();
+            }
             WindowEvent::KeyboardInput { event, .. } => {
                 // ── Double-tap Left Ctrl detection for overlay toggle ─────
                 if let Key::Named(NamedKey::Control) = event.logical_key {
@@ -1339,7 +1348,11 @@ impl ApplicationHandler for PrismApp {
                     let ui_key = match event.logical_key {
                         Key::Named(NamedKey::Enter) => Some(KeyCode::Enter),
                         Key::Named(NamedKey::Escape) => Some(KeyCode::Escape),
-                        Key::Named(NamedKey::Tab) => Some(KeyCode::Tab),
+                        Key::Named(NamedKey::Tab) => Some(if self.shift_held {
+                            KeyCode::ShiftTab
+                        } else {
+                            KeyCode::Tab
+                        }),
                         Key::Named(NamedKey::Backspace) => Some(KeyCode::Backspace),
                         Key::Named(NamedKey::Delete) => Some(KeyCode::Delete),
                         Key::Named(NamedKey::ArrowLeft) => Some(KeyCode::Left),

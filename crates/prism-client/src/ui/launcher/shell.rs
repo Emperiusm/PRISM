@@ -39,6 +39,8 @@ pub struct LauncherShell {
     home_scroll_y: f32,
     home_max_scroll: f32,
     ui_state: UiState,
+    /// Keyboard focus index — cycles through interactive widgets with Tab/Shift+Tab.
+    focused_widget: Option<usize>,
 }
 
 impl LauncherShell {
@@ -68,6 +70,7 @@ impl LauncherShell {
             home_scroll_y: 0.0,
             home_max_scroll: 0.0,
             ui_state: UiState::Launcher,
+            focused_widget: None,
         };
         shell.configure_widgets();
         shell.nav.set_active_tab(shell.active_tab);
@@ -152,6 +155,10 @@ impl LauncherShell {
     }
 
     fn configure_widgets(&mut self) {
+        // Reset focus when switching tabs
+        self.focused_widget = None;
+        self.apply_focus();
+
         match self.active_tab {
             LauncherTab::Home => {
                 // Home uses RecentList, not CardGrid
@@ -241,17 +248,40 @@ impl LauncherShell {
     fn paint_header(&self, ctx: &mut PaintContext) {
         let bar_rect = Rect::new(self.content_rect.x, 0.0, self.content_rect.w, HEADER_H);
 
-        // Page title (bold)
-        let title = self.active_tab.title();
-        ctx.push_text_run(TextRun {
-            x: bar_rect.x + 16.0,
-            y: bar_rect.y + 14.0,
-            text: title.to_string(),
-            font_size: theme::FONT_HEADLINE,
-            color: theme::LT_TEXT_PRIMARY,
-            bold: true,
-            ..Default::default()
-        });
+        // Page title — breadcrumb for Settings, plain title for others
+        if self.active_tab == LauncherTab::Settings {
+            let section_label = self.nav.active_section().label();
+            let prefix = "Settings / ";
+            ctx.push_text_run(TextRun {
+                x: bar_rect.x + 16.0,
+                y: bar_rect.y + 14.0,
+                text: prefix.to_string(),
+                font_size: theme::FONT_HEADLINE,
+                color: theme::LT_TEXT_SECONDARY,
+                ..Default::default()
+            });
+            let crumb_x = bar_rect.x + 16.0 + theme::text_width(prefix, theme::FONT_HEADLINE);
+            ctx.push_text_run(TextRun {
+                x: crumb_x,
+                y: bar_rect.y + 14.0,
+                text: section_label.to_string(),
+                font_size: theme::FONT_HEADLINE,
+                color: theme::LT_TEXT_PRIMARY,
+                bold: true,
+                ..Default::default()
+            });
+        } else {
+            let title = self.active_tab.title();
+            ctx.push_text_run(TextRun {
+                x: bar_rect.x + 16.0,
+                y: bar_rect.y + 14.0,
+                text: title.to_string(),
+                font_size: theme::FONT_HEADLINE,
+                color: theme::LT_TEXT_PRIMARY,
+                bold: true,
+                ..Default::default()
+            });
+        }
 
         // Profiles tab: search input placeholder
         if self.active_tab == LauncherTab::Profiles {
@@ -439,6 +469,40 @@ impl LauncherShell {
             }
         }
     }
+
+    /// Number of focusable widgets on the current tab.
+    fn focusable_count(&self) -> usize {
+        match self.active_tab {
+            LauncherTab::Home => {
+                self.quick_connect.focusable_count() + self.recent_list.focusable_count()
+            }
+            // Other tabs have no focusable widgets wired up yet
+            _ => 0,
+        }
+    }
+
+    /// Apply the current `focused_widget` index to the actual widget focus state.
+    fn apply_focus(&mut self) {
+        match self.active_tab {
+            LauncherTab::Home => {
+                let qc_count = self.quick_connect.focusable_count();
+                let idx = self.focused_widget;
+                if let Some(i) = idx {
+                    if i < qc_count {
+                        self.quick_connect.set_focus(Some(i));
+                        self.recent_list.set_focus(None);
+                    } else {
+                        self.quick_connect.set_focus(None);
+                        self.recent_list.set_focus(Some(i - qc_count));
+                    }
+                } else {
+                    self.quick_connect.set_focus(None);
+                    self.recent_list.set_focus(None);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 impl Widget for LauncherShell {
@@ -505,9 +569,59 @@ impl Widget for LauncherShell {
             return EventResponse::Ignored;
         }
 
+        // TASK-076: Keyboard focus — Tab/Shift+Tab cycles through interactive widgets
+        if let UiEvent::KeyDown { key } = event {
+            use crate::ui::widgets::KeyCode;
+            match key {
+                KeyCode::Tab => {
+                    let max = self.focusable_count();
+                    if max > 0 {
+                        self.focused_widget = Some(
+                            self.focused_widget.map_or(0, |i| (i + 1) % max),
+                        );
+                        self.apply_focus();
+                    }
+                    return EventResponse::Consumed;
+                }
+                KeyCode::ShiftTab => {
+                    let max = self.focusable_count();
+                    if max > 0 {
+                        self.focused_widget = Some(
+                            self.focused_widget
+                                .map_or(max - 1, |i| if i == 0 { max - 1 } else { i - 1 }),
+                        );
+                        self.apply_focus();
+                    }
+                    return EventResponse::Consumed;
+                }
+                KeyCode::Escape => {
+                    if self.has_modal() {
+                        self.dismiss_modal();
+                        return EventResponse::Consumed;
+                    }
+                    self.focused_widget = None;
+                    self.apply_focus();
+                    return EventResponse::Consumed;
+                }
+                _ => {}
+            }
+        }
+
+        // Mouse click clears keyboard focus
+        if matches!(event, UiEvent::MouseDown { .. }) && self.focused_widget.is_some() {
+            self.focused_widget = None;
+            self.apply_focus();
+        }
+
         let nav_resp = self.nav.handle_event(event);
         if let EventResponse::Action(UiAction::OpenLauncherTab(tab)) = &nav_resp {
             self.set_tab(*tab);
+        }
+        if let EventResponse::Action(UiAction::OpenSettingsSection(section)) = &nav_resp {
+            self.nav.set_active_section(*section);
+            if self.screen_rect.w > 0.0 && self.screen_rect.h > 0.0 {
+                self.layout(self.screen_rect);
+            }
         }
         if !matches!(nav_resp, EventResponse::Ignored) {
             return nav_resp;
