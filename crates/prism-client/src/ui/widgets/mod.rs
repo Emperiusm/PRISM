@@ -6,6 +6,7 @@ pub mod checkbox;
 pub mod dropdown;
 pub mod label;
 pub mod monitor_map;
+pub mod segmented;
 pub mod separator;
 pub mod slider;
 pub mod sparkline;

@@ -7,6 +7,7 @@ use crate::config::profiles::{AudioMode, ProfileConfig, ProfileStore};
 use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::dropdown::Dropdown;
+use crate::ui::widgets::segmented::SegmentedControl;
 use crate::ui::widgets::slider::Slider;
 use crate::ui::widgets::toggle::Toggle;
 use crate::ui::widgets::{
@@ -31,7 +32,7 @@ pub struct ProfilesPanel {
     list_rows: Vec<Rect>,
     bitrate_slider: Slider,
     fps_dropdown: Dropdown,
-    encoder_dropdown: Dropdown,
+    encoder_dropdown: SegmentedControl,
     native_scaling_toggle: Toggle,
     audio_mode_dropdown: Dropdown,
     av1_toggle: Toggle,
@@ -59,7 +60,7 @@ impl ProfilesPanel {
             bitrate_slider: Slider::new("Bitrate", 5.0, 80.0, 35.0)
                 .with_format(|v| format!("{} Mbps", v.round() as u32)),
             fps_dropdown: Dropdown::new(Self::fps_options(), 2),
-            encoder_dropdown: Dropdown::new(Self::encoder_options(), 0),
+            encoder_dropdown: SegmentedControl::new(Self::encoder_options(), 0),
             native_scaling_toggle: Toggle::new(true),
             audio_mode_dropdown: Dropdown::new(Self::audio_options(), 0),
             av1_toggle: Toggle::new(true),
@@ -160,9 +161,9 @@ impl ProfilesPanel {
 
     fn encoder_options() -> Vec<String> {
         vec![
-            "UltraLowLatency".into(),
+            "Lowest Latency".into(),
             "Balanced".into(),
-            "Quality".into(),
+            "Highest Quality".into(),
         ]
     }
 
@@ -348,31 +349,49 @@ impl Widget for ProfilesPanel {
         let editor = self.editor_rect();
         let x = editor.x + PANEL_PAD;
         let w = (editor.w - PANEL_PAD * 2.0).max(260.0);
-        let mut y = editor.y + 98.0;
 
-        self.bitrate_slider.layout(Rect::new(x, y, w, 32.0));
-        y += 54.0;
-        self.fps_dropdown.layout(Rect::new(x, y, w, 40.0));
-        y += 52.0;
-        self.encoder_dropdown.layout(Rect::new(x, y, w, 40.0));
-        y += 52.0;
-        self.native_scaling_toggle.layout(Rect::new(x, y, w, 22.0));
-        y += 34.0;
-        self.audio_mode_dropdown.layout(Rect::new(x, y, w, 40.0));
-        y += 52.0;
-        self.av1_toggle.layout(Rect::new(x, y, w, 22.0));
-        y += 34.0;
-        self.exclusive_input_toggle.layout(Rect::new(x, y, w, 22.0));
-        y += 34.0;
-        self.touch_mode_toggle.layout(Rect::new(x, y, w, 22.0));
-        y += 34.0;
-        self.auto_reconnect_toggle.layout(Rect::new(x, y, w, 22.0));
+        let header_h = 90.0;
+        let right_edge = editor.x + w;
+        let buttons_y = editor.y + 24.0;
 
-        let buttons_y = (editor.y + editor.h - 48.0).max(y + 16.0);
         self.discard_button
-            .layout(Rect::new(x, buttons_y, 132.0, 40.0));
+            .layout(Rect::new(right_edge - 264.0, buttons_y, 120.0, 36.0));
         self.save_button
-            .layout(Rect::new(x + 146.0, buttons_y, 132.0, 40.0));
+            .layout(Rect::new(right_edge - 132.0, buttons_y, 132.0, 36.0));
+
+        let y_start = editor.y + header_h + 32.0;
+        let col_w = ((w - 40.0) / 2.0).max(180.0);
+        let col1_x = x;
+        let col2_x = x + col_w + 40.0;
+
+        let mut y = y_start;
+        self.bitrate_slider
+            .layout(Rect::new(col1_x, y + 20.0, col_w, 32.0));
+        y += 70.0;
+        self.encoder_dropdown
+            .layout(Rect::new(col1_x, y + 20.0, col_w, 36.0));
+        y += 70.0;
+        self.native_scaling_toggle
+            .layout(Rect::new(col1_x, y + 20.0, col_w, 22.0));
+        y += 70.0;
+        self.av1_toggle
+            .layout(Rect::new(col1_x, y + 20.0, col_w, 22.0));
+
+        let mut y = y_start;
+        self.fps_dropdown
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 40.0));
+        y += 70.0;
+        self.audio_mode_dropdown
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 40.0));
+        y += 70.0;
+        self.exclusive_input_toggle
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 22.0));
+        y += 70.0;
+        self.touch_mode_toggle
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 22.0));
+        y += 70.0;
+        self.auto_reconnect_toggle
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 22.0));
 
         Size {
             w: available.w,
@@ -399,22 +418,48 @@ impl Widget for ProfilesPanel {
             let selected = idx == self.selected_index;
             let profile = &self.profiles[idx];
             ctx.push_glass_quad(theme::nav_item_surface(*row, selected, false));
+
+            if selected {
+                ctx.push_glass_quad(theme::glass_quad(
+                    Rect::new(row.x, row.y, 4.0, row.h),
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.9],
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
+                    2.0,
+                ));
+            }
+
+            let name_y = row.y + 14.0;
             ctx.push_text_run(TextRun {
-                x: row.x + 12.0,
-                y: row.y + 12.0,
+                x: row.x + 16.0,
+                y: name_y,
                 text: profile.name.clone(),
                 font_size: 14.0,
-                color: theme::TEXT_PRIMARY,
+                color: if selected {
+                    theme::TEXT_PRIMARY
+                } else {
+                    theme::TEXT_SECONDARY
+                },
                 monospace: false,
             });
+
+            let subtitle = if profile.builtin {
+                format!(
+                    "Built-in • {} FPS • {} Mbps",
+                    profile.max_fps,
+                    profile.bitrate_bps / 1_000_000
+                )
+            } else {
+                format!(
+                    "{} FPS • {} Mbps",
+                    profile.max_fps,
+                    profile.bitrate_bps / 1_000_000
+                )
+            };
+
             ctx.push_text_run(TextRun {
-                x: row.x + 12.0,
-                y: row.y + 32.0,
-                text: if profile.builtin {
-                    "Built-in".to_string()
-                } else {
-                    "Custom".to_string()
-                },
+                x: row.x + 16.0,
+                y: row.y + 34.0,
+                text: subtitle,
                 font_size: 11.0,
                 color: theme::TEXT_MUTED,
                 monospace: false,
@@ -422,59 +467,102 @@ impl Widget for ProfilesPanel {
         }
 
         if let Some(draft) = &self.draft {
+            ctx.push_glass_quad(theme::glass_quad(
+                Rect::new(editor.x, editor.y, editor.w, 90.0),
+                [1.0, 1.0, 1.0, 0.2],
+                [1.0, 1.0, 1.0, 0.4],
+                0.0,
+            ));
+
+            let tw = theme::text_width(&draft.name, theme::FONT_HERO);
             ctx.push_text_run(TextRun {
                 x: editor.x + PANEL_PAD,
-                y: editor.y + 24.0,
+                y: editor.y + 20.0,
                 text: draft.name.clone(),
-                font_size: theme::FONT_HEADLINE,
+                font_size: theme::FONT_HERO,
                 color: theme::TEXT_PRIMARY,
                 monospace: false,
             });
+
+            if draft.builtin {
+                let badge = Rect::new(
+                    editor.x + PANEL_PAD + tw + 16.0,
+                    editor.y + 24.0,
+                    60.0,
+                    20.0,
+                );
+                ctx.push_glass_quad(theme::status_chip(badge, theme::ChipTone::Success));
+                ctx.push_text_run(TextRun {
+                    x: badge.x + 10.0,
+                    y: badge.y + 3.0,
+                    text: "SYSTEM".to_string(),
+                    font_size: 10.0,
+                    color: theme::TEXT_PRIMARY,
+                    monospace: false,
+                });
+            }
+
+            if self.dirty {
+                let badge_x =
+                    editor.x + PANEL_PAD + tw + 16.0 + if draft.builtin { 70.0 } else { 0.0 };
+                let chip = Rect::new(badge_x, editor.y + 24.0, 80.0, 20.0);
+                ctx.push_glass_quad(theme::status_chip(chip, theme::ChipTone::Warning));
+                ctx.push_text_run(TextRun {
+                    x: chip.x + 10.0,
+                    y: chip.y + 3.0,
+                    text: "UNSAVED".to_string(),
+                    font_size: 10.0,
+                    color: theme::TEXT_PRIMARY,
+                    monospace: false,
+                });
+            }
+
             ctx.push_text_run(TextRun {
                 x: editor.x + PANEL_PAD,
-                y: editor.y + 52.0,
-                text: "Streaming profile tuning".to_string(),
+                y: editor.y + 60.0,
+                text: "Optimized for high-performance interaction".to_string(),
                 font_size: theme::FONT_BODY,
                 color: theme::TEXT_SECONDARY,
                 monospace: false,
             });
         }
 
-        if self.dirty {
-            let chip = Rect::new(editor.x + editor.w - 132.0, editor.y + 14.0, 114.0, 24.0);
-            ctx.push_glass_quad(theme::status_chip(chip, theme::ChipTone::Warning));
-            ctx.push_text_run(TextRun {
-                x: chip.x + 10.0,
-                y: chip.y + 5.0,
-                text: "Unsaved".to_string(),
-                font_size: 11.0,
-                color: theme::TEXT_PRIMARY,
-                monospace: false,
-            });
-        }
+        let header_h = 90.0;
+        let y_start = editor.y + header_h + 32.0;
+        let col_w = ((editor.w - PANEL_PAD * 2.0 - 40.0) / 2.0).max(180.0);
+        let col1_x = editor.x + PANEL_PAD;
+        let col2_x = editor.x + PANEL_PAD + col_w + 40.0;
 
-        let editor_x = editor.x + PANEL_PAD;
-        let mut y = editor.y + 148.0;
-        for label in [
-            "Max FPS",
-            "Encoder Preset",
-            "Native Scaling",
-            "Audio Mode",
-            "Prefer AV1",
-            "Exclusive Input",
-            "Touch Mode",
-            "Auto Reconnect",
-        ] {
+        let mut draw_label = |x, y, text: &str| {
             ctx.push_text_run(TextRun {
-                x: editor_x,
+                x,
                 y,
-                text: label.to_string(),
+                text: text.to_string(),
                 font_size: theme::FONT_CAPTION,
                 color: theme::TEXT_MUTED,
                 monospace: false,
             });
-            y += 52.0;
-        }
+        };
+
+        let mut y = y_start;
+        draw_label(col1_x, y, "Bitrate Preference");
+        y += 70.0;
+        draw_label(col1_x, y, "Latency vs Quality");
+        y += 70.0;
+        draw_label(col1_x, y, "Native Scaling");
+        y += 70.0;
+        draw_label(col1_x, y, "Prefer AV1");
+
+        let mut y = y_start;
+        draw_label(col2_x, y, "Max FPS");
+        y += 70.0;
+        draw_label(col2_x, y, "Audio Mode");
+        y += 70.0;
+        draw_label(col2_x, y, "Exclusive Input");
+        y += 70.0;
+        draw_label(col2_x, y, "Touch Mode");
+        y += 70.0;
+        draw_label(col2_x, y, "Auto Reconnect");
 
         self.bitrate_slider.paint(ctx);
         self.fps_dropdown.paint(ctx);

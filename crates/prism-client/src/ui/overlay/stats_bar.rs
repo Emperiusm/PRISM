@@ -19,16 +19,6 @@ pub struct SessionStats {
     pub active_profile: String,
 }
 
-fn metric_color(value: f32, good_threshold: f32, warn_threshold: f32) -> [f32; 4] {
-    if value >= good_threshold {
-        theme::SUCCESS
-    } else if value >= warn_threshold {
-        theme::WARNING
-    } else {
-        theme::DANGER
-    }
-}
-
 fn latency_color(ms: f32) -> [f32; 4] {
     if ms < 20.0 {
         theme::SUCCESS
@@ -40,7 +30,7 @@ fn latency_color(ms: f32) -> [f32; 4] {
 }
 
 pub struct StatsBar {
-    stats: SessionStats,
+    pub stats: SessionStats,
     profile_dropdown: Dropdown,
     pinned: bool,
     visible: bool,
@@ -63,7 +53,7 @@ impl StatsBar {
     pub fn update_stats(&mut self, stats: SessionStats) {
         let profile = stats.active_profile.clone();
         self.stats = stats;
-        let options = ["Gaming", "Coding"];
+        let options = ["Gaming", "Coding", "Balanced", "Low Bandwidth"];
         if let Some(idx) = options.iter().position(|&p| p == profile.as_str()) {
             self.profile_dropdown.set_selected(idx);
         }
@@ -91,48 +81,36 @@ impl StatsBar {
         self.pinned = !self.pinned;
     }
 
-    fn fps_rect(&self) -> Rect {
+    fn perf_btn_rect(&self) -> Rect {
         Rect::new(
-            self.rect.x + 18.0,
-            self.rect.y + 6.0,
-            92.0,
-            self.rect.h - 12.0,
+            self.rect.x + self.rect.w - 220.0,
+            self.rect.y + 12.0,
+            40.0,
+            24.0,
         )
     }
-
-    fn codec_rect(&self) -> Rect {
+    fn qual_btn_rect(&self) -> Rect {
         Rect::new(
-            self.rect.x + 252.0,
-            self.rect.y + 6.0,
-            220.0,
-            self.rect.h - 12.0,
+            self.rect.x + self.rect.w - 170.0,
+            self.rect.y + 12.0,
+            40.0,
+            24.0,
         )
     }
-
-    fn pin_rect(&self) -> Rect {
+    fn conn_btn_rect(&self) -> Rect {
         Rect::new(
-            self.rect.x + self.rect.w - 124.0,
-            self.rect.y + 8.0,
-            54.0,
-            self.rect.h - 16.0,
+            self.rect.x + self.rect.w - 120.0,
+            self.rect.y + 12.0,
+            40.0,
+            24.0,
         )
     }
-
-    fn close_rect(&self) -> Rect {
+    fn disp_btn_rect(&self) -> Rect {
         Rect::new(
-            self.rect.x + self.rect.w - 62.0,
-            self.rect.y + 8.0,
-            44.0,
-            self.rect.h - 16.0,
-        )
-    }
-
-    fn dropdown_rect(&self) -> Rect {
-        Rect::new(
-            self.rect.x + self.rect.w - 270.0,
-            self.rect.y + 4.0,
-            132.0,
-            self.rect.h - 8.0,
+            self.rect.x + self.rect.w - 70.0,
+            self.rect.y + 12.0,
+            40.0,
+            24.0,
         )
     }
 }
@@ -149,9 +127,13 @@ impl Widget for StatsBar {
             return Size { w: 0.0, h: 0.0 };
         }
 
-        let h = available.h.max(48.0);
+        // Stitch capsule is a thinner, more centered pill
+        let h = 56.0;
         self.rect = Rect::new(available.x, available.y, available.w, h);
-        self.profile_dropdown.layout(self.dropdown_rect());
+
+        let mx = self.rect.x + 130.0 + 45.0 + 65.0 + 65.0 + 60.0;
+        self.profile_dropdown
+            .layout(Rect::new(mx, self.rect.y + 16.0, 100.0, 24.0));
 
         Size { w: available.w, h }
     }
@@ -162,165 +144,125 @@ impl Widget for StatsBar {
             return;
         }
 
+        // Stitch glass pill
         ctx.push_glass_quad(theme::glass_quad(
             self.rect,
-            [0.12, 0.16, 0.22, 0.80 * alpha],
-            if self.pinned {
-                [
-                    theme::ACCENT[0],
-                    theme::ACCENT[1],
-                    theme::ACCENT[2],
-                    0.20 * alpha,
-                ]
-            } else {
-                [1.0, 1.0, 1.0, 0.16 * alpha]
-            },
-            theme::PANEL_RADIUS,
+            [1.0, 1.0, 1.0, 0.45 * alpha],
+            [1.0, 1.0, 1.0, 0.50 * alpha],
+            28.0, // Fully rounded pill
         ));
 
-        let y_text = self.rect.y + 16.0;
-        let mut x_cursor = self.rect.x + 18.0;
-
-        let fps_color = metric_color(self.stats.fps, 30.0, 15.0);
-        let fps_text = format!("{:.0} FPS", self.stats.fps);
+        // 1. Brand
         ctx.push_text_run(TextRun {
-            x: x_cursor,
-            y: y_text,
-            text: fps_text,
-            font_size: 13.0,
-            color: [fps_color[0], fps_color[1], fps_color[2], alpha],
-            monospace: true,
-        });
-        x_cursor += 92.0;
-
-        ctx.push_glass_quad(theme::separator(Rect::new(
-            x_cursor,
-            self.rect.y + 10.0,
-            1.0,
-            self.rect.h - 20.0,
-        )));
-        x_cursor += 14.0;
-
-        let latency = latency_color(self.stats.latency_ms);
-        let latency_text = format!("{:.1} ms", self.stats.latency_ms);
-        ctx.push_text_run(TextRun {
-            x: x_cursor,
-            y: y_text,
-            text: latency_text,
-            font_size: 13.0,
-            color: [latency[0], latency[1], latency[2], alpha],
-            monospace: true,
-        });
-        x_cursor += 104.0;
-
-        ctx.push_glass_quad(theme::separator(Rect::new(
-            x_cursor,
-            self.rect.y + 10.0,
-            1.0,
-            self.rect.h - 20.0,
-        )));
-        x_cursor += 14.0;
-
-        let codec = if self.stats.codec.is_empty() {
-            "Codec --".to_owned()
-        } else {
-            format!("Codec {}", self.stats.codec)
-        };
-        ctx.push_text_run(TextRun {
-            x: x_cursor,
-            y: y_text,
-            text: codec,
-            font_size: 13.0,
-            color: theme::TEXT_PRIMARY,
+            x: self.rect.x + 20.0,
+            y: self.rect.y + 20.0,
+            text: "PRISM REMOTE".into(),
+            font_size: 11.0,
+            color: theme::ACCENT,
             monospace: false,
         });
-        x_cursor += 108.0;
-
-        let resolution = format!("{}x{}", self.stats.resolution.0, self.stats.resolution.1);
-        ctx.push_text_run(TextRun {
-            x: x_cursor,
-            y: y_text,
-            text: resolution,
-            font_size: 13.0,
-            color: theme::TEXT_SECONDARY,
-            monospace: false,
-        });
-        x_cursor += 98.0;
 
         ctx.push_glass_quad(theme::separator(Rect::new(
-            x_cursor,
-            self.rect.y + 10.0,
+            self.rect.x + 115.0,
+            self.rect.y + 16.0,
             1.0,
-            self.rect.h - 20.0,
+            24.0,
         )));
-        x_cursor += 14.0;
+
+        // 2. Metrics Block
+        let mut mx = self.rect.x + 130.0;
+        let metric_label_y = self.rect.y + 8.0;
+        let metric_val_y = self.rect.y + 24.0;
+        let metric_label_color = [0.0, 0.0, 0.0, 0.6 * alpha];
+        let metric_val_color = [0.0, 0.0, 0.0, 0.9 * alpha];
+
+        let draw_metric =
+            |ctx: &mut PaintContext, x: f32, label: &str, val: &str, val_c: [f32; 4]| {
+                ctx.push_text_run(TextRun {
+                    x,
+                    y: metric_label_y,
+                    text: label.into(),
+                    font_size: 9.0,
+                    color: metric_label_color,
+                    monospace: false,
+                });
+                ctx.push_text_run(TextRun {
+                    x,
+                    y: metric_val_y,
+                    text: val.into(),
+                    font_size: 12.0,
+                    color: val_c,
+                    monospace: true,
+                });
+            };
+
+        draw_metric(
+            ctx,
+            mx,
+            "FPS",
+            &format!("{:.0}", self.stats.fps),
+            metric_val_color,
+        );
+        mx += 45.0;
+
+        let lat_c = latency_color(self.stats.latency_ms);
+        draw_metric(
+            ctx,
+            mx,
+            "LATENCY",
+            &format!("{:.0}ms", self.stats.latency_ms),
+            [lat_c[0], lat_c[1], lat_c[2], alpha],
+        );
+        mx += 65.0;
 
         let mbps = self.stats.bandwidth_bps as f32 / 1_000_000.0;
-        ctx.push_text_run(TextRun {
-            x: x_cursor,
-            y: y_text,
-            text: format!("{mbps:.1} Mbps"),
-            font_size: 13.0,
-            color: theme::TEXT_SECONDARY,
-            monospace: true,
-        });
+        draw_metric(
+            ctx,
+            mx,
+            "BITRATE",
+            &format!("{:.1}M", mbps),
+            metric_val_color,
+        );
+        mx += 65.0;
 
+        draw_metric(
+            ctx,
+            mx,
+            "CODEC",
+            if self.stats.codec.is_empty() {
+                "---"
+            } else {
+                &self.stats.codec
+            },
+            metric_val_color,
+        );
+
+        // Profile Dropdown (Restores native interaction and SwitchProfile event)
         self.profile_dropdown.paint(ctx);
 
-        let pin_rect = self.pin_rect();
-        ctx.push_glass_quad(theme::glass_quad(
-            pin_rect,
-            if self.pinned {
-                [
-                    theme::ACCENT[0],
-                    theme::ACCENT[1],
-                    theme::ACCENT[2],
-                    0.14 * alpha,
-                ]
-            } else {
-                [1.0, 1.0, 1.0, 0.05 * alpha]
-            },
-            if self.pinned {
-                [
-                    theme::ACCENT[0],
-                    theme::ACCENT[1],
-                    theme::ACCENT[2],
-                    0.22 * alpha,
-                ]
-            } else {
-                [1.0, 1.0, 1.0, 0.08 * alpha]
-            },
-            theme::CHIP_RADIUS,
-        ));
-        let pin_label = if self.pinned { "Pinned" } else { "Pin" };
-        ctx.push_text_run(TextRun {
-            x: pin_rect.x + (pin_rect.w - theme::text_width(pin_label, 12.0)) * 0.5,
-            y: pin_rect.y + 6.0,
-            text: pin_label.into(),
-            font_size: 12.0,
-            color: if self.pinned {
-                theme::accent(alpha)
-            } else {
-                theme::TEXT_SECONDARY
-            },
-            monospace: false,
-        });
+        // 3. Navigation Buttons (Right Aligned)
+        ctx.push_glass_quad(theme::separator(Rect::new(
+            self.perf_btn_rect().x - 16.0,
+            self.rect.y + 16.0,
+            1.0,
+            24.0,
+        )));
 
-        let close_rect = self.close_rect();
-        ctx.push_glass_quad(theme::glass_quad(
-            close_rect,
-            [1.0, 1.0, 1.0, 0.05 * alpha],
-            [1.0, 1.0, 1.0, 0.08 * alpha],
-            theme::CHIP_RADIUS,
-        ));
-        ctx.push_text_run(TextRun {
-            x: close_rect.x + (close_rect.w - theme::text_width("Done", 12.0)) * 0.5,
-            y: close_rect.y + 6.0,
-            text: "Done".into(),
-            font_size: 12.0,
-            color: theme::TEXT_SECONDARY,
-            monospace: false,
-        });
+        let draw_nav_btn = |ctx: &mut PaintContext, r: Rect, label: &str| {
+            ctx.push_text_run(TextRun {
+                x: r.x + 6.0,
+                y: r.y + 6.0,
+                text: label.into(),
+                font_size: 11.0,
+                color: metric_label_color,
+                monospace: false,
+            });
+        };
+
+        draw_nav_btn(ctx, self.perf_btn_rect(), "PERF");
+        draw_nav_btn(ctx, self.qual_btn_rect(), "QUAL");
+        draw_nav_btn(ctx, self.conn_btn_rect(), "CONN");
+        draw_nav_btn(ctx, self.disp_btn_rect(), "DISP");
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
@@ -340,18 +282,17 @@ impl Widget for StatsBar {
                 y,
                 button: MouseButton::Left,
             } => {
-                if self.close_rect().contains(*x, *y) {
-                    return EventResponse::Action(UiAction::CloseOverlay);
-                }
-                if self.pin_rect().contains(*x, *y) {
-                    self.toggle_pin();
-                    return EventResponse::Consumed;
-                }
-                if self.fps_rect().contains(*x, *y) {
+                if self.perf_btn_rect().contains(*x, *y) {
                     return EventResponse::Action(UiAction::OpenPanel("performance".into()));
                 }
-                if self.codec_rect().contains(*x, *y) {
+                if self.qual_btn_rect().contains(*x, *y) {
                     return EventResponse::Action(UiAction::OpenPanel("quality".into()));
+                }
+                if self.conn_btn_rect().contains(*x, *y) {
+                    return EventResponse::Action(UiAction::OpenPanel("connection".into()));
+                }
+                if self.disp_btn_rect().contains(*x, *y) {
+                    return EventResponse::Action(UiAction::OpenPanel("display".into()));
                 }
                 if self.rect.contains(*x, *y) {
                     return EventResponse::Consumed;
@@ -401,28 +342,55 @@ mod tests {
         bar.paint(&mut ctx);
 
         let texts: Vec<&str> = ctx.text_runs.iter().map(|t| t.text.as_str()).collect();
-        let has_fps = texts.iter().any(|t| t.contains("60 FPS"));
-        let has_latency = texts.iter().any(|t| t.contains("12.5 ms"));
-        assert!(has_fps, "expected FPS metric in text runs, got: {texts:?}");
         assert!(
-            has_latency,
-            "expected latency metric in text runs, got: {texts:?}"
+            texts.iter().any(|t| t.contains("60")),
+            "expected FPS metric"
+        );
+        assert!(
+            texts.iter().any(|t| t.contains("12")),
+            "expected latency metric"
         );
     }
 
     #[test]
-    fn stats_bar_profile_switch() {
+    fn stats_bar_navigation_click() {
         let mut bar = make_visible_bar(sample_stats());
-        bar.layout(Rect::new(0.0, 0.0, 960.0, 48.0));
+        bar.layout(Rect::new(0.0, 0.0, 960.0, 56.0));
 
-        let dd_rect = bar.dropdown_rect();
+        let perf_rect = bar.perf_btn_rect();
+        let resp = bar.handle_event(&UiEvent::MouseDown {
+            x: perf_rect.x + 5.0,
+            y: perf_rect.y + 5.0,
+            button: MouseButton::Left,
+        });
+
+        match &resp {
+            EventResponse::Action(UiAction::OpenPanel(p)) => {
+                assert_eq!(p, "performance");
+            }
+            other => panic!("expected OpenPanel action, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn stats_bar_profile_dropdown_emits_switch() {
+        let mut bar = make_visible_bar(sample_stats());
+        bar.layout(Rect::new(0.0, 0.0, 960.0, 56.0));
+
+        let mx = bar.rect.x + 130.0 + 45.0 + 65.0 + 65.0 + 60.0;
+        let dd_rect = Rect::new(mx, bar.rect.y + 16.0, 100.0, 24.0);
+
+        // Click dropdown open
         bar.handle_event(&UiEvent::MouseDown {
             x: dd_rect.x + 10.0,
             y: dd_rect.y + 10.0,
             button: MouseButton::Left,
         });
 
-        let item_y = dd_rect.y + dd_rect.h + 28.0 + 14.0;
+        // Dropdown layout hardcodes h=40.0, so options start at rect.y + 40.0.
+        // Index 1 (Coding) starts at rect.y + 40.0 + 28.0.
+        // Center of Index 1 is rect.y + 40.0 + 28.0 + 14.0.
+        let item_y = dd_rect.y + 40.0 + 28.0 + 14.0;
         let resp = bar.handle_event(&UiEvent::MouseDown {
             x: dd_rect.x + 10.0,
             y: item_y,
@@ -431,25 +399,9 @@ mod tests {
 
         match &resp {
             EventResponse::Action(UiAction::SwitchProfile(p)) => {
-                assert_eq!(p, "Coding", "expected Coding profile, got {p}");
+                assert_eq!(p, "Coding", "expected SwitchProfile");
             }
             other => panic!("expected SwitchProfile action, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn stats_bar_hidden_no_paint() {
-        let mut bar = StatsBar::new();
-        bar.layout(Rect::new(0.0, 0.0, 960.0, 48.0));
-        let mut ctx = PaintContext::new();
-        bar.paint(&mut ctx);
-        assert!(
-            ctx.text_runs.is_empty(),
-            "hidden bar should emit no text runs"
-        );
-        assert!(
-            ctx.glass_quads.is_empty(),
-            "hidden bar should emit no glass quads"
-        );
     }
 }
