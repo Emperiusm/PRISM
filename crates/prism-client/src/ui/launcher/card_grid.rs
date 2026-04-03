@@ -15,6 +15,12 @@ const FILTER_H: f32 = 32.0;
 const FILTER_GAP: f32 = 10.0;
 const TOOLBAR_H: f32 = 52.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridMode {
+    Grid,
+    Rows,
+}
+
 pub struct CardGrid {
     cards: Vec<ServerCard>,
     visible_indices: Vec<usize>,
@@ -27,6 +33,7 @@ pub struct CardGrid {
     visible_limit: Option<usize>,
     show_add_card: bool,
     show_filters: bool,
+    layout_mode: GridMode,
 }
 
 impl CardGrid {
@@ -43,6 +50,7 @@ impl CardGrid {
             visible_limit: None,
             show_add_card: true,
             show_filters: false,
+            layout_mode: GridMode::Grid,
         }
     }
 
@@ -53,8 +61,34 @@ impl CardGrid {
                 .unwrap_or(b.created_at)
                 .cmp(&a.last_connected.unwrap_or(a.created_at))
         });
-        self.cards = ordered.iter().map(ServerCard::from_saved).collect();
+        let card_mode = match self.layout_mode {
+            GridMode::Grid => super::server_card::CardLayoutMode::Card,
+            GridMode::Rows => super::server_card::CardLayoutMode::Row,
+        };
+        self.cards = ordered
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                ServerCard::from_saved(s)
+                    .with_layout_mode(card_mode)
+                    .with_index(i + 1)
+            })
+            .collect();
         self.positions.clear();
+    }
+
+    pub fn set_layout_mode(&mut self, mode: GridMode) {
+        if self.layout_mode != mode {
+            self.layout_mode = mode;
+            let card_mode = match mode {
+                GridMode::Grid => super::server_card::CardLayoutMode::Card,
+                GridMode::Rows => super::server_card::CardLayoutMode::Row,
+            };
+            for card in &mut self.cards {
+                card.set_layout_mode(card_mode);
+            }
+            self.positions.clear();
+        }
     }
 
     pub fn set_visible_limit(&mut self, limit: Option<usize>) {
@@ -134,38 +168,55 @@ impl CardGrid {
         self.recompute_visible_indices();
         self.recompute_filter_chip_rects();
 
-        let cards_per_row = ((self.grid_width + CARD_GAP) / (CARD_WIDTH + CARD_GAP))
-            .floor()
-            .max(1.0) as usize;
         let total = self.total_items();
         if total == 0 {
             return;
         }
 
-        for idx in 0..total {
-            let col = idx % cards_per_row;
-            let row = idx / cards_per_row;
-            let items_in_row = if row == total / cards_per_row {
-                let remainder = total % cards_per_row;
-                if remainder == 0 {
-                    cards_per_row
-                } else {
-                    remainder
+        match self.layout_mode {
+            GridMode::Grid => {
+                let cards_per_row = ((self.grid_width + CARD_GAP) / (CARD_WIDTH + CARD_GAP))
+                    .floor()
+                    .max(1.0) as usize;
+
+                for idx in 0..total {
+                    let col = idx % cards_per_row;
+                    let row = idx / cards_per_row;
+                    let items_in_row = if row == total / cards_per_row {
+                        let remainder = total % cards_per_row;
+                        if remainder == 0 {
+                            cards_per_row
+                        } else {
+                            remainder
+                        }
+                    } else {
+                        cards_per_row
+                    };
+
+                    let row_pixel_w = items_in_row as f32 * CARD_WIDTH
+                        + (items_in_row.saturating_sub(1)) as f32 * CARD_GAP;
+                    let x_offset = ((self.grid_width - row_pixel_w) / 2.0).max(0.0);
+
+                    self.positions.push(Rect::new(
+                        self.rect.x + x_offset + col as f32 * (CARD_WIDTH + CARD_GAP),
+                        self.rect.y + self.toolbar_height() + row as f32 * (CARD_HEIGHT + CARD_GAP),
+                        CARD_WIDTH,
+                        CARD_HEIGHT,
+                    ));
                 }
-            } else {
-                cards_per_row
-            };
-
-            let row_pixel_w = items_in_row as f32 * CARD_WIDTH
-                + (items_in_row.saturating_sub(1)) as f32 * CARD_GAP;
-            let x_offset = ((self.grid_width - row_pixel_w) / 2.0).max(0.0);
-
-            self.positions.push(Rect::new(
-                self.rect.x + x_offset + col as f32 * (CARD_WIDTH + CARD_GAP),
-                self.rect.y + self.toolbar_height() + row as f32 * (CARD_HEIGHT + CARD_GAP),
-                CARD_WIDTH,
-                CARD_HEIGHT,
-            ));
+            }
+            GridMode::Rows => {
+                let row_height = 64.0;
+                let row_gap = 12.0;
+                for idx in 0..total {
+                    self.positions.push(Rect::new(
+                        self.rect.x,
+                        self.rect.y + self.toolbar_height() + idx as f32 * (row_height + row_gap),
+                        self.grid_width,
+                        row_height,
+                    ));
+                }
+            }
         }
 
         let visible = self.visible_card_count();
@@ -185,13 +236,24 @@ impl CardGrid {
             return self.toolbar_height();
         }
 
-        let cards_per_row = ((self.grid_width + CARD_GAP) / (CARD_WIDTH + CARD_GAP))
-            .floor()
-            .max(1.0) as usize;
-        let rows = total.div_ceil(cards_per_row);
-        self.toolbar_height()
-            + rows as f32 * CARD_HEIGHT
-            + (rows.saturating_sub(1)) as f32 * CARD_GAP
+        match self.layout_mode {
+            GridMode::Grid => {
+                let cards_per_row = ((self.grid_width + CARD_GAP) / (CARD_WIDTH + CARD_GAP))
+                    .floor()
+                    .max(1.0) as usize;
+                let rows = total.div_ceil(cards_per_row);
+                self.toolbar_height()
+                    + rows as f32 * CARD_HEIGHT
+                    + (rows.saturating_sub(1)) as f32 * CARD_GAP
+            }
+            GridMode::Rows => {
+                let row_height = 64.0;
+                let row_gap = 12.0;
+                self.toolbar_height()
+                    + total as f32 * row_height
+                    + (total.saturating_sub(1)) as f32 * row_gap
+            }
+        }
     }
 
     fn add_card_rect(&self) -> Option<Rect> {
@@ -232,34 +294,45 @@ impl Widget for CardGrid {
             for (filter, rect) in &self.filter_chip_rects {
                 let active = *filter == self.active_filter;
                 let hovered = self.hovered_filter == Some(*filter);
-                ctx.push_glass_quad(theme::glass_quad(
-                    *rect,
-                    if active {
-                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.20]
-                    } else if hovered {
-                        [1.0, 1.0, 1.0, 0.08]
-                    } else {
-                        [1.0, 1.0, 1.0, 0.04]
-                    },
-                    if active {
-                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.26]
-                    } else {
-                        [1.0, 1.0, 1.0, 0.10]
-                    },
-                    theme::CHIP_RADIUS,
-                ));
-                ctx.push_text_run(TextRun {
-                    x: rect.x + 14.0,
-                    y: rect.y + 8.0,
-                    text: filter.label(self.cards.len()),
-                    font_size: 11.0,
-                    color: if active {
-                        theme::TEXT_PRIMARY
-                    } else {
-                        theme::TEXT_SECONDARY
-                    },
-                    monospace: false,
-                });
+                
+                let pill_radius = 16.0;
+                if active {
+                    // Solid primary look for active text chip
+                    ctx.push_glass_quad(theme::glass_quad(
+                        *rect,
+                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.9],
+                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
+                        pill_radius,
+                    ));
+                    ctx.push_text_run(TextRun {
+                        x: rect.x + 14.0,
+                        y: rect.y + 10.0,
+                        text: filter.label(self.cards.len()),
+                        font_size: 11.0,
+                        color: [1.0, 1.0, 1.0, 1.0],
+                        monospace: false,
+                    });
+                } else {
+                    // Glass pill for inactive
+                    ctx.push_glass_quad(theme::glass_quad(
+                        *rect,
+                        if hovered {
+                            [1.0, 1.0, 1.0, 0.08]
+                        } else {
+                            [1.0, 1.0, 1.0, 0.04]
+                        },
+                        [1.0, 1.0, 1.0, 0.10],
+                        pill_radius,
+                    ));
+                    ctx.push_text_run(TextRun {
+                        x: rect.x + 14.0,
+                        y: rect.y + 10.0,
+                        text: filter.label(self.cards.len()),
+                        font_size: 11.0,
+                        color: theme::TEXT_SECONDARY,
+                        monospace: false,
+                    });
+                }
             }
         }
 
@@ -280,39 +353,51 @@ impl Widget for CardGrid {
         }
 
         if let Some(add_rect) = self.add_card_rect() {
+            // Mimic Stitch's dashed border with a high-contrast thin border
             ctx.push_glass_quad(theme::glass_quad(
                 add_rect,
-                [1.0, 1.0, 1.0, 0.05],
-                [1.0, 1.0, 1.0, 0.16],
+                [1.0, 1.0, 1.0, 0.02],
+                [1.0, 1.0, 1.0, 0.25], // Stronger border simulating dashed style conceptually
                 theme::CARD_RADIUS,
+            ));
+
+            // Plus icon circle
+            let icon_radius = 24.0;
+            let icon_cx = add_rect.x + add_rect.w * 0.5;
+            let icon_cy = add_rect.y + add_rect.h * 0.4;
+            ctx.push_glass_quad(theme::glass_quad(
+                Rect::new(icon_cx - icon_radius, icon_cy - icon_radius, icon_radius * 2.0, icon_radius * 2.0),
+                [1.0, 1.0, 1.0, 0.1],
+                [1.0, 1.0, 1.0, 0.2],
+                icon_radius,
             ));
 
             let plus = "+";
             ctx.push_text_run(TextRun {
-                x: add_rect.x + (CARD_WIDTH - theme::text_width(plus, 32.0)) * 0.5,
-                y: add_rect.y + 58.0,
+                x: icon_cx - theme::text_width(plus, 28.0) * 0.5,
+                y: icon_cy - 14.0,
                 text: plus.to_string(),
-                font_size: 32.0,
-                color: theme::TEXT_SECONDARY,
+                font_size: 28.0,
+                color: [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
                 monospace: false,
             });
 
-            let title = "Add Connection";
+            let title = "Add New Connection";
             ctx.push_text_run(TextRun {
-                x: add_rect.x + (CARD_WIDTH - theme::text_width(title, 15.0)) * 0.5,
-                y: add_rect.y + 114.0,
+                x: add_rect.x + (add_rect.w - theme::text_width(title, 14.0)) * 0.5,
+                y: icon_cy + 40.0,
                 text: title.to_string(),
-                font_size: 15.0,
+                font_size: 14.0,
                 color: theme::TEXT_PRIMARY,
                 monospace: false,
             });
 
-            let body = "Manual IP or quick setup";
+            let body = "Manual IP or Network Discovery";
             ctx.push_text_run(TextRun {
-                x: add_rect.x + (CARD_WIDTH - theme::text_width(body, 12.0)) * 0.5,
-                y: add_rect.y + 138.0,
+                x: add_rect.x + (add_rect.w - theme::text_width(body, 11.0)) * 0.5,
+                y: icon_cy + 60.0,
                 text: body.to_string(),
-                font_size: 12.0,
+                font_size: 11.0,
                 color: theme::TEXT_MUTED,
                 monospace: false,
             });

@@ -43,22 +43,26 @@ impl Default for QuickConnect {
 
 impl Widget for QuickConnect {
     fn layout(&mut self, available: Rect) -> Size {
-        let panel_h = 94.0;
+        // Hero container sizes
+        let panel_h = 260.0;
         self.rect = Rect::new(available.x, available.y, available.w, panel_h);
 
-        let controls_y = available.y + 38.0;
+        let pad_x = 32.0;
+        let content_w = available.w - (pad_x * 2.0);
+        let input_y = available.y + 128.0;
+        let btn_y = input_y + 54.0;
 
         self.address_input.layout(Rect::new(
-            available.x + 18.0,
-            controls_y,
-            available.w - 156.0,
+            available.x + pad_x,
+            input_y,
+            content_w,
             42.0,
         ));
 
         self.connect_button.layout(Rect::new(
-            available.x + available.w - 120.0,
-            controls_y,
-            102.0,
+            available.x + pad_x,
+            btn_y,
+            content_w,
             42.0,
         ));
 
@@ -70,12 +74,27 @@ impl Widget for QuickConnect {
 
     fn paint(&self, ctx: &mut PaintContext) {
         ctx.push_glass_quad(theme::hero_surface(self.rect));
+        
+        // Match Stitch visual intent with FONT_HERO heading centered
+        let title = "Quick Connect";
+        let title_w = theme::text_width(title, theme::FONT_HERO);
         ctx.push_text_run(TextRun {
-            x: self.rect.x + 18.0,
-            y: self.rect.y + 14.0,
-            text: "Quick connect".into(),
-            font_size: 12.0,
-            color: theme::TEXT_SECONDARY,
+            x: self.rect.x + (self.rect.w - title_w) * 0.5,
+            y: self.rect.y + 40.0,
+            text: title.into(),
+            font_size: theme::FONT_HERO,
+            color: theme::TEXT_PRIMARY,
+            monospace: false,
+        });
+
+        let subtitle = "Enter a hostname or IP address";
+        let sub_w = theme::text_width(subtitle, theme::FONT_BODY);
+        ctx.push_text_run(TextRun {
+            x: self.rect.x + (self.rect.w - sub_w) * 0.5,
+            y: self.rect.y + 80.0,
+            text: subtitle.into(),
+            font_size: theme::FONT_BODY,
+            color: theme::TEXT_MUTED,
             monospace: false,
         });
 

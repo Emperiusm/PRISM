@@ -11,6 +11,7 @@ pub mod slider;
 pub mod sparkline;
 pub mod text_input;
 pub mod toggle;
+pub mod segmented;
 
 use crate::ui::launcher::LauncherTab;
 

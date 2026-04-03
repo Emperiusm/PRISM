@@ -23,6 +23,7 @@ pub const CARD_RADIUS: f32 = 20.0;
 pub const CONTROL_RADIUS: f32 = 14.0;
 pub const CHIP_RADIUS: f32 = 12.0;
 pub const SIDEBAR_RADIUS: f32 = 28.0;
+pub const FONT_HERO: f32 = 36.0;
 pub const FONT_DISPLAY: f32 = 30.0;
 pub const FONT_HEADLINE: f32 = 20.0;
 pub const FONT_BODY: f32 = 14.0;
@@ -127,10 +128,24 @@ pub fn separator(rect: Rect) -> GlassQuad {
     glass_quad(rect, [1.0, 1.0, 1.0, 0.08], [0.0, 0.0, 0.0, 0.0], 0.0)
 }
 
+pub fn list_row_surface(rect: Rect, hovered: bool) -> GlassQuad {
+    glass_quad(
+        rect,
+        if hovered {
+            [0.16, 0.20, 0.27, 0.82]
+        } else {
+            [0.14, 0.18, 0.24, 0.76]
+        },
+        [1.0, 1.0, 1.0, 0.10],
+        CONTROL_RADIUS,
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChipTone {
     Success,
     Warning,
+    Danger,
     Accent,
     Neutral,
 }
@@ -144,6 +159,10 @@ pub fn status_chip(rect: Rect, tone: ChipTone) -> GlassQuad {
         ChipTone::Warning => (
             [WARNING[0], WARNING[1], WARNING[2], 0.14],
             [WARNING[0], WARNING[1], WARNING[2], 0.22],
+        ),
+        ChipTone::Danger => (
+            [DANGER[0], DANGER[1], DANGER[2], 0.14],
+            [DANGER[0], DANGER[1], DANGER[2], 0.22],
         ),
         ChipTone::Accent => (
             [ACCENT[0], ACCENT[1], ACCENT[2], 0.12],
