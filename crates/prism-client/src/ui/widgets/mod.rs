@@ -4,6 +4,7 @@
 pub mod button;
 pub mod checkbox;
 pub mod dropdown;
+pub mod icon;
 pub mod label;
 pub mod monitor_map;
 pub mod segmented;

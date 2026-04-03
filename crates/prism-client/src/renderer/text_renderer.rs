@@ -30,7 +30,15 @@ impl TextPipeline {
         queue: &wgpu::Queue,
         surface_format: wgpu::TextureFormat,
     ) -> Self {
-        let font_system = FontSystem::new();
+        let mut font_system = FontSystem::new();
+
+        // Load Material Symbols icon font — once, persistent in font database.
+        let icon_font_data =
+            include_bytes!("../../assets/fonts/MaterialSymbolsOutlined.ttf").to_vec();
+        font_system
+            .db_mut()
+            .load_font_data(icon_font_data);
+
         let swash_cache = SwashCache::new();
         let gpu_cache = Cache::new(device);
         let mut atlas = TextAtlas::new(device, queue, &gpu_cache, surface_format);
@@ -85,7 +93,9 @@ impl TextPipeline {
                 Metrics::new(run.font_size, line_height),
             );
 
-            let family = if run.monospace {
+            let family = if run.icon {
+                Family::Name("Material Symbols Outlined")
+            } else if run.monospace {
                 Family::Monospace
             } else {
                 Family::SansSerif
@@ -155,5 +165,36 @@ impl TextPipeline {
     /// Trim unused atlas entries. Call periodically (e.g. every few seconds).
     pub fn trim(&mut self) {
         self.atlas.trim();
+    }
+
+    /// Borrow the font system (for text measurement).
+    pub fn font_system_mut(&mut self) -> &mut FontSystem {
+        &mut self.font_system
+    }
+
+    /// Measure the exact pixel width of shaped text. Use for critical layout
+    /// (centering, breadcrumbs, header alignment). For non-critical layout,
+    /// continue using `theme::text_width()` heuristic.
+    pub fn text_width_exact(
+        font_system: &mut FontSystem,
+        text: &str,
+        font_size: f32,
+        bold: bool,
+    ) -> f32 {
+        let metrics = Metrics::new(font_size, font_size * 1.2);
+        let mut buffer = Buffer::new(font_system, metrics);
+        let weight = if bold {
+            Weight::BOLD
+        } else {
+            Weight::NORMAL
+        };
+        let attrs = Attrs::new().family(Family::SansSerif).weight(weight);
+        buffer.set_text(font_system, text, attrs, Shaping::Advanced);
+        buffer.shape_until_scroll(font_system, false);
+        buffer
+            .layout_runs()
+            .map(|run| run.line_w)
+            .next()
+            .unwrap_or(0.0)
     }
 }
