@@ -55,7 +55,7 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 ### Phases
 
 - [x] Phase 0 — Data-Layer Prerequisites (6 tasks: P01–P06)
-- [ ] Phase 1 — Bold Text Support (3 tasks: 002–004)
+- [x] Phase 1 — Bold Text Support (3 tasks: 002–004)
 - [ ] Phase 2 — Primary Button Color Fix (3 tasks: 005–007)
 - [ ] Phase 3 — Sidebar Geometry Overhaul (7 tasks: 008–015)
 - [ ] Phase 4 — Home Screen: Recent Connections (4 tasks: 016–019)
@@ -585,11 +585,11 @@ impl Default for GlassQuad {
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-002 | In `crates/prism-client/src/renderer/text_renderer.rs`, update the `prepare()` method where `Attrs` is built. Thread the `bold` flag (added to `TextRun` in Phase 0 TASK-P05): `Attrs::new().family(family).weight(if run.bold { Weight::BOLD } else { Weight::NORMAL })`. No new `.ttf` file needed — `FontSystem::new()` already loaded system bold variants. | | |
-| TASK-003 | In `ui/launcher/quick_connect.rs`, set `bold: true` on the hero title `TextRun` ("Quick Connect") and the section header `TextRun` ("Recent Connections"). Verify they render in the heavier weight at `FONT_HERO` / `FONT_HEADLINE` sizes respectively. | | |
-| TASK-003a | **Micro-polish (REQ-010):** In `ui/launcher/quick_connect.rs`, locate and remove the subtitle `TextRun` under "Quick Connect" (e.g. "Enter a hostname or IP address..."). Only the bold "Quick Connect" title should remain above the input. | | |
-| TASK-004 | In `ui/widgets/button.rs`, audit the `paint()` method's `ColorMode::Light` + `ButtonStyle::Primary` branch. Confirm the background quad uses `theme::PRIMARY_BLUE` (`[0.059, 0.424, 0.741, 1.0]`) and text color is `[1.0, 1.0, 1.0, 1.0]`. If the branch is using `theme::ACCENT` or a cyan-tinted `glass_quad()` instead, replace it with `PRIMARY_BLUE`. | | |
-| TASK-005 | `cargo check -p prism-client` — verify compilation. | | |
+| TASK-002 | In `crates/prism-client/src/renderer/text_renderer.rs`, update the `prepare()` method where `Attrs` is built. Thread the `bold` flag (added to `TextRun` in Phase 0 TASK-P05): `Attrs::new().family(family).weight(if run.bold { Weight::BOLD } else { Weight::NORMAL })`. No new `.ttf` file needed — `FontSystem::new()` already loaded system bold variants. | ✅ | 2026-04-03 |
+| TASK-003 | In `ui/launcher/quick_connect.rs`, set `bold: true` on the hero title `TextRun` ("Quick Connect") and the section header `TextRun` ("Recent Connections"). Verify they render in the heavier weight at `FONT_HERO` / `FONT_HEADLINE` sizes respectively. | ✅ | 2026-04-03 |
+| TASK-003a | **Micro-polish (REQ-010):** In `ui/launcher/quick_connect.rs`, locate and remove the subtitle `TextRun` under "Quick Connect" (e.g. "Enter a hostname or IP address..."). Only the bold "Quick Connect" title should remain above the input. | ✅ | 2026-04-03 |
+| TASK-004 | In `ui/widgets/button.rs`, audit the `paint()` method's `ColorMode::Light` + `ButtonStyle::Primary` branch. Confirm the background quad uses `theme::PRIMARY_BLUE` (`[0.059, 0.424, 0.741, 1.0]`) and text color is `[1.0, 1.0, 1.0, 1.0]`. If the branch is using `theme::ACCENT` or a cyan-tinted `glass_quad()` instead, replace it with `PRIMARY_BLUE`. | ✅ | 2026-04-03 |
+| TASK-005 | `cargo check -p prism-client` — verify compilation. | ✅ | 2026-04-03 |
 
 #### Phase 1 — Implementation Detail
 

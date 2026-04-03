@@ -51,7 +51,7 @@ impl Widget for QuickConnect {
 
         let pad_x = 32.0;
         let content_w = available.w - (pad_x * 2.0);
-        let input_y = available.y + 128.0;
+        let input_y = available.y + 108.0;
         let btn_y = input_y + 54.0;
 
         self.address_input
@@ -78,17 +78,7 @@ impl Widget for QuickConnect {
             text: title.into(),
             font_size: theme::FONT_HERO,
             color: theme::LT_TEXT_PRIMARY,
-            ..Default::default()
-        });
-
-        let subtitle = "Enter a hostname or IP address";
-        let sub_w = theme::text_width(subtitle, theme::FONT_BODY);
-        ctx.push_text_run(TextRun {
-            x: self.rect.x + (self.rect.w - sub_w) * 0.5,
-            y: self.rect.y + 80.0,
-            text: subtitle.into(),
-            font_size: theme::FONT_BODY,
-            color: theme::LT_TEXT_MUTED,
+            bold: true,
             ..Default::default()
         });
 
