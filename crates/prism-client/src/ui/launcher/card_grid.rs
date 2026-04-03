@@ -294,7 +294,7 @@ impl Widget for CardGrid {
             for (filter, rect) in &self.filter_chip_rects {
                 let active = *filter == self.active_filter;
                 let hovered = self.hovered_filter == Some(*filter);
-                
+
                 let pill_radius = 16.0;
                 if active {
                     // Solid primary look for active text chip
@@ -366,7 +366,12 @@ impl Widget for CardGrid {
             let icon_cx = add_rect.x + add_rect.w * 0.5;
             let icon_cy = add_rect.y + add_rect.h * 0.4;
             ctx.push_glass_quad(theme::glass_quad(
-                Rect::new(icon_cx - icon_radius, icon_cy - icon_radius, icon_radius * 2.0, icon_radius * 2.0),
+                Rect::new(
+                    icon_cx - icon_radius,
+                    icon_cy - icon_radius,
+                    icon_radius * 2.0,
+                    icon_radius * 2.0,
+                ),
                 [1.0, 1.0, 1.0, 0.1],
                 [1.0, 1.0, 1.0, 0.2],
                 icon_radius,
@@ -531,7 +536,7 @@ mod tests {
         let mut ctx = PaintContext::new();
         grid.paint(&mut ctx);
 
-        assert!(ctx.glass_quads.len() >= 1);
+        assert!(!ctx.glass_quads.is_empty());
     }
 
     #[test]

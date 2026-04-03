@@ -81,15 +81,44 @@ impl StatsBar {
         self.pinned = !self.pinned;
     }
 
-    fn perf_btn_rect(&self) -> Rect { Rect::new(self.rect.x + self.rect.w - 220.0, self.rect.y + 12.0, 40.0, 24.0) }
-    fn qual_btn_rect(&self) -> Rect { Rect::new(self.rect.x + self.rect.w - 170.0, self.rect.y + 12.0, 40.0, 24.0) }
-    fn conn_btn_rect(&self) -> Rect { Rect::new(self.rect.x + self.rect.w - 120.0, self.rect.y + 12.0, 40.0, 24.0) }
-    fn disp_btn_rect(&self) -> Rect { Rect::new(self.rect.x + self.rect.w - 70.0,  self.rect.y + 12.0, 40.0, 24.0) }
-
+    fn perf_btn_rect(&self) -> Rect {
+        Rect::new(
+            self.rect.x + self.rect.w - 220.0,
+            self.rect.y + 12.0,
+            40.0,
+            24.0,
+        )
+    }
+    fn qual_btn_rect(&self) -> Rect {
+        Rect::new(
+            self.rect.x + self.rect.w - 170.0,
+            self.rect.y + 12.0,
+            40.0,
+            24.0,
+        )
+    }
+    fn conn_btn_rect(&self) -> Rect {
+        Rect::new(
+            self.rect.x + self.rect.w - 120.0,
+            self.rect.y + 12.0,
+            40.0,
+            24.0,
+        )
+    }
+    fn disp_btn_rect(&self) -> Rect {
+        Rect::new(
+            self.rect.x + self.rect.w - 70.0,
+            self.rect.y + 12.0,
+            40.0,
+            24.0,
+        )
+    }
 }
 
 impl Default for StatsBar {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Widget for StatsBar {
@@ -101,10 +130,11 @@ impl Widget for StatsBar {
         // Stitch capsule is a thinner, more centered pill
         let h = 56.0;
         self.rect = Rect::new(available.x, available.y, available.w, h);
-        
+
         let mx = self.rect.x + 130.0 + 45.0 + 65.0 + 65.0 + 60.0;
-        self.profile_dropdown.layout(Rect::new(mx, self.rect.y + 16.0, 100.0, 24.0));
-        
+        self.profile_dropdown
+            .layout(Rect::new(mx, self.rect.y + 16.0, 100.0, 24.0));
+
         Size { w: available.w, h }
     }
 
@@ -122,7 +152,7 @@ impl Widget for StatsBar {
             28.0, // Fully rounded pill
         ));
 
-        // 1. Brand 
+        // 1. Brand
         ctx.push_text_run(TextRun {
             x: self.rect.x + 20.0,
             y: self.rect.y + 20.0,
@@ -146,23 +176,66 @@ impl Widget for StatsBar {
         let metric_label_color = [0.0, 0.0, 0.0, 0.6 * alpha];
         let metric_val_color = [0.0, 0.0, 0.0, 0.9 * alpha];
 
-        let draw_metric = |ctx: &mut PaintContext, x: f32, label: &str, val: &str, val_c: [f32; 4]| {
-            ctx.push_text_run(TextRun { x, y: metric_label_y, text: label.into(), font_size: 9.0, color: metric_label_color, monospace: false });
-            ctx.push_text_run(TextRun { x, y: metric_val_y,   text: val.into(),   font_size: 12.0, color: val_c, monospace: true });
-        };
+        let draw_metric =
+            |ctx: &mut PaintContext, x: f32, label: &str, val: &str, val_c: [f32; 4]| {
+                ctx.push_text_run(TextRun {
+                    x,
+                    y: metric_label_y,
+                    text: label.into(),
+                    font_size: 9.0,
+                    color: metric_label_color,
+                    monospace: false,
+                });
+                ctx.push_text_run(TextRun {
+                    x,
+                    y: metric_val_y,
+                    text: val.into(),
+                    font_size: 12.0,
+                    color: val_c,
+                    monospace: true,
+                });
+            };
 
-        draw_metric(ctx, mx, "FPS", &format!("{:.0}", self.stats.fps), metric_val_color);
+        draw_metric(
+            ctx,
+            mx,
+            "FPS",
+            &format!("{:.0}", self.stats.fps),
+            metric_val_color,
+        );
         mx += 45.0;
 
         let lat_c = latency_color(self.stats.latency_ms);
-        draw_metric(ctx, mx, "LATENCY", &format!("{:.0}ms", self.stats.latency_ms), [lat_c[0], lat_c[1], lat_c[2], alpha]);
+        draw_metric(
+            ctx,
+            mx,
+            "LATENCY",
+            &format!("{:.0}ms", self.stats.latency_ms),
+            [lat_c[0], lat_c[1], lat_c[2], alpha],
+        );
         mx += 65.0;
 
         let mbps = self.stats.bandwidth_bps as f32 / 1_000_000.0;
-        draw_metric(ctx, mx, "BITRATE", &format!("{:.1}M", mbps), metric_val_color);
+        draw_metric(
+            ctx,
+            mx,
+            "BITRATE",
+            &format!("{:.1}M", mbps),
+            metric_val_color,
+        );
         mx += 65.0;
 
-        draw_metric(ctx, mx, "CODEC", if self.stats.codec.is_empty() { "---" } else { &self.stats.codec }, metric_val_color);
+        draw_metric(
+            ctx,
+            mx,
+            "CODEC",
+            if self.stats.codec.is_empty() {
+                "---"
+            } else {
+                &self.stats.codec
+            },
+            metric_val_color,
+        );
 
         // Profile Dropdown (Restores native interaction and SwitchProfile event)
         self.profile_dropdown.paint(ctx);
@@ -204,7 +277,11 @@ impl Widget for StatsBar {
         }
 
         match event {
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 if self.perf_btn_rect().contains(*x, *y) {
                     return EventResponse::Action(UiAction::OpenPanel("performance".into()));
                 }
@@ -265,8 +342,14 @@ mod tests {
         bar.paint(&mut ctx);
 
         let texts: Vec<&str> = ctx.text_runs.iter().map(|t| t.text.as_str()).collect();
-        assert!(texts.iter().any(|t| t.contains("60")), "expected FPS metric");
-        assert!(texts.iter().any(|t| t.contains("12")), "expected latency metric");
+        assert!(
+            texts.iter().any(|t| t.contains("60")),
+            "expected FPS metric"
+        );
+        assert!(
+            texts.iter().any(|t| t.contains("12")),
+            "expected latency metric"
+        );
     }
 
     #[test]
@@ -293,7 +376,7 @@ mod tests {
     fn stats_bar_profile_dropdown_emits_switch() {
         let mut bar = make_visible_bar(sample_stats());
         bar.layout(Rect::new(0.0, 0.0, 960.0, 56.0));
-        
+
         let mx = bar.rect.x + 130.0 + 45.0 + 65.0 + 65.0 + 60.0;
         let dd_rect = Rect::new(mx, bar.rect.y + 16.0, 100.0, 24.0);
 

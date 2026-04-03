@@ -263,7 +263,7 @@ mod tests {
         form.paint(&mut ctx);
 
         assert!(
-            ctx.glass_quads.len() > 0,
+            !ctx.glass_quads.is_empty(),
             "expected glass quads when form is visible"
         );
     }

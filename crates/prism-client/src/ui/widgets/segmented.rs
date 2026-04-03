@@ -108,7 +108,11 @@ impl Widget for SegmentedControl {
                 self.hovered_index = None;
                 EventResponse::Ignored
             }
-            UiEvent::MouseDown { x, y, button: MouseButton::Left } => {
+            UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } => {
                 if !self.rect.contains(*x, *y) {
                     return EventResponse::Ignored;
                 }
@@ -139,7 +143,7 @@ mod tests {
     fn click_changes_selection() {
         let mut seg = SegmentedControl::new(vec!["A".into(), "B".into()], 0);
         seg.layout(Rect::new(0.0, 0.0, 100.0, 30.0));
-        
+
         let resp = seg.handle_event(&UiEvent::MouseDown {
             x: 75.0,
             y: 15.0,

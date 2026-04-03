@@ -139,10 +139,18 @@ impl Widget for OverlayCapsule {
             let panel_rect = Rect::new(panel_x, panel_y, panel_w, 320.0);
             self.panel_rect = Some(panel_rect);
             match panel {
-                CapsulePanel::Performance => { self.perf_panel.layout(panel_rect); }
-                CapsulePanel::Quality => { self.quality_panel.layout(panel_rect); }
-                CapsulePanel::Connection => { self.conn_panel.layout(panel_rect); }
-                CapsulePanel::Display => { self.display_panel.layout(panel_rect); }
+                CapsulePanel::Performance => {
+                    self.perf_panel.layout(panel_rect);
+                }
+                CapsulePanel::Quality => {
+                    self.quality_panel.layout(panel_rect);
+                }
+                CapsulePanel::Connection => {
+                    self.conn_panel.layout(panel_rect);
+                }
+                CapsulePanel::Display => {
+                    self.display_panel.layout(panel_rect);
+                }
             }
         }
 
@@ -173,22 +181,60 @@ impl Widget for OverlayCapsule {
             [1.0, 1.0, 1.0, 0.50],
             20.0,
         ));
-        
+
         let mut bl_x = self.bottom_bar_rect.x + 30.0;
         let bl_y = self.bottom_bar_rect.y + 24.0;
         let txt_c = [0.0, 0.0, 0.0, 0.8];
 
-        ctx.push_text_run(TextRun { x: bl_x, y: bl_y, text: "DECODE".into(), font_size: 10.0, color: txt_c, monospace: false });
+        ctx.push_text_run(TextRun {
+            x: bl_x,
+            y: bl_y,
+            text: "DECODE".into(),
+            font_size: 10.0,
+            color: txt_c,
+            monospace: false,
+        });
         bl_x += 46.0;
-        ctx.push_text_run(TextRun { x: bl_x, y: bl_y, text: format!("{:.1}ms", self.stats_bar.stats.decode_time_ms), font_size: 11.0, color: theme::ACCENT, monospace: true });
+        ctx.push_text_run(TextRun {
+            x: bl_x,
+            y: bl_y,
+            text: format!("{:.1}ms", self.stats_bar.stats.decode_time_ms),
+            font_size: 11.0,
+            color: theme::ACCENT,
+            monospace: true,
+        });
         bl_x += 50.0;
 
-        ctx.push_text_run(TextRun { x: bl_x, y: bl_y, text: "RES".into(), font_size: 10.0, color: txt_c, monospace: false });
+        ctx.push_text_run(TextRun {
+            x: bl_x,
+            y: bl_y,
+            text: "RES".into(),
+            font_size: 10.0,
+            color: txt_c,
+            monospace: false,
+        });
         bl_x += 24.0;
-        ctx.push_text_run(TextRun { x: bl_x, y: bl_y, text: format!("{}x{}", self.stats_bar.stats.resolution.0, self.stats_bar.stats.resolution.1), font_size: 11.0, color: theme::ACCENT, monospace: true });
+        ctx.push_text_run(TextRun {
+            x: bl_x,
+            y: bl_y,
+            text: format!(
+                "{}x{}",
+                self.stats_bar.stats.resolution.0, self.stats_bar.stats.resolution.1
+            ),
+            font_size: 11.0,
+            color: theme::ACCENT,
+            monospace: true,
+        });
         bl_x += 80.0;
-        
-        ctx.push_text_run(TextRun { x: bl_x, y: bl_y, text: "ACTIVE SESSION".into(), font_size: 10.0, color: theme::SUCCESS, monospace: false });
+
+        ctx.push_text_run(TextRun {
+            x: bl_x,
+            y: bl_y,
+            text: "ACTIVE SESSION".into(),
+            font_size: 10.0,
+            color: theme::SUCCESS,
+            monospace: false,
+        });
 
         // Paint Disconnect Button (Bottom Corner)
         ctx.push_glass_quad(theme::glass_quad(
@@ -205,7 +251,6 @@ impl Widget for OverlayCapsule {
             color: [1.0, 1.0, 1.0, 1.0],
             monospace: false,
         });
-
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
@@ -236,18 +281,25 @@ impl Widget for OverlayCapsule {
                     x,
                     y,
                     button: MouseButton::Left,
-                } = event {
+                } = event
+                {
                     if self.disconnect_rect.contains(*x, *y) {
                         return EventResponse::Action(UiAction::Disconnect);
                     }
                     if let Some(panel_rect) = self.panel_rect {
-                        if !panel_rect.contains(*x, *y) && !self.capsule_rect.contains(*x, *y) && !self.bottom_bar_rect.contains(*x, *y) {
+                        if !panel_rect.contains(*x, *y)
+                            && !self.capsule_rect.contains(*x, *y)
+                            && !self.bottom_bar_rect.contains(*x, *y)
+                        {
                             self.set_active_panel(None);
                             return EventResponse::Consumed;
                         }
                     } else {
                         // Clicked outside capsule when no panel open = dismiss overlay
-                        if !self.capsule_rect.contains(*x, *y) && !self.disconnect_rect.contains(*x, *y) && !self.bottom_bar_rect.contains(*x, *y) {
+                        if !self.capsule_rect.contains(*x, *y)
+                            && !self.disconnect_rect.contains(*x, *y)
+                            && !self.bottom_bar_rect.contains(*x, *y)
+                        {
                             return EventResponse::Action(UiAction::CloseOverlay);
                         }
                     }

@@ -52,19 +52,11 @@ impl Widget for QuickConnect {
         let input_y = available.y + 128.0;
         let btn_y = input_y + 54.0;
 
-        self.address_input.layout(Rect::new(
-            available.x + pad_x,
-            input_y,
-            content_w,
-            42.0,
-        ));
+        self.address_input
+            .layout(Rect::new(available.x + pad_x, input_y, content_w, 42.0));
 
-        self.connect_button.layout(Rect::new(
-            available.x + pad_x,
-            btn_y,
-            content_w,
-            42.0,
-        ));
+        self.connect_button
+            .layout(Rect::new(available.x + pad_x, btn_y, content_w, 42.0));
 
         Size {
             w: available.w,
@@ -74,7 +66,7 @@ impl Widget for QuickConnect {
 
     fn paint(&self, ctx: &mut PaintContext) {
         ctx.push_glass_quad(theme::hero_surface(self.rect));
-        
+
         // Match Stitch visual intent with FONT_HERO heading centered
         let title = "Quick Connect";
         let title_w = theme::text_width(title, theme::FONT_HERO);
@@ -180,7 +172,10 @@ mod tests {
         qc.paint(&mut ctx);
 
         // At least 1 glass_quad for the panel background (plus sub-widget quads)
-        assert!(ctx.glass_quads.len() >= 1, "expected at least 1 glass quad");
+        assert!(
+            !ctx.glass_quads.is_empty(),
+            "expected at least 1 glass quad"
+        );
         // Sub-widgets contribute text runs
         assert!(!ctx.text_runs.is_empty(), "expected text from sub-widgets");
     }

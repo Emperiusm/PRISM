@@ -201,7 +201,7 @@ impl LauncherShell {
                     self.content_rect.w,
                     300.0,
                 ));
-                
+
                 let section_y = quick_y + quick_size.h + 38.0;
                 self.home_recent_y = section_y;
                 let card_y = section_y + 34.0;

@@ -7,8 +7,8 @@ use crate::config::profiles::{AudioMode, ProfileConfig, ProfileStore};
 use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::dropdown::Dropdown;
-use crate::ui::widgets::slider::Slider;
 use crate::ui::widgets::segmented::SegmentedControl;
+use crate::ui::widgets::slider::Slider;
 use crate::ui::widgets::toggle::Toggle;
 use crate::ui::widgets::{
     EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
@@ -349,11 +349,11 @@ impl Widget for ProfilesPanel {
         let editor = self.editor_rect();
         let x = editor.x + PANEL_PAD;
         let w = (editor.w - PANEL_PAD * 2.0).max(260.0);
-        
+
         let header_h = 90.0;
         let right_edge = editor.x + w;
         let buttons_y = editor.y + 24.0;
-        
+
         self.discard_button
             .layout(Rect::new(right_edge - 264.0, buttons_y, 120.0, 36.0));
         self.save_button
@@ -365,17 +365,33 @@ impl Widget for ProfilesPanel {
         let col2_x = x + col_w + 40.0;
 
         let mut y = y_start;
-        self.bitrate_slider.layout(Rect::new(col1_x, y + 20.0, col_w, 32.0)); y += 70.0;
-        self.encoder_dropdown.layout(Rect::new(col1_x, y + 20.0, col_w, 36.0)); y += 70.0;
-        self.native_scaling_toggle.layout(Rect::new(col1_x, y + 20.0, col_w, 22.0)); y += 70.0;
-        self.av1_toggle.layout(Rect::new(col1_x, y + 20.0, col_w, 22.0));
+        self.bitrate_slider
+            .layout(Rect::new(col1_x, y + 20.0, col_w, 32.0));
+        y += 70.0;
+        self.encoder_dropdown
+            .layout(Rect::new(col1_x, y + 20.0, col_w, 36.0));
+        y += 70.0;
+        self.native_scaling_toggle
+            .layout(Rect::new(col1_x, y + 20.0, col_w, 22.0));
+        y += 70.0;
+        self.av1_toggle
+            .layout(Rect::new(col1_x, y + 20.0, col_w, 22.0));
 
         let mut y = y_start;
-        self.fps_dropdown.layout(Rect::new(col2_x, y + 20.0, col_w, 40.0)); y += 70.0;
-        self.audio_mode_dropdown.layout(Rect::new(col2_x, y + 20.0, col_w, 40.0)); y += 70.0;
-        self.exclusive_input_toggle.layout(Rect::new(col2_x, y + 20.0, col_w, 22.0)); y += 70.0;
-        self.touch_mode_toggle.layout(Rect::new(col2_x, y + 20.0, col_w, 22.0)); y += 70.0;
-        self.auto_reconnect_toggle.layout(Rect::new(col2_x, y + 20.0, col_w, 22.0));
+        self.fps_dropdown
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 40.0));
+        y += 70.0;
+        self.audio_mode_dropdown
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 40.0));
+        y += 70.0;
+        self.exclusive_input_toggle
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 22.0));
+        y += 70.0;
+        self.touch_mode_toggle
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 22.0));
+        y += 70.0;
+        self.auto_reconnect_toggle
+            .layout(Rect::new(col2_x, y + 20.0, col_w, 22.0));
 
         Size {
             w: available.w,
@@ -402,7 +418,7 @@ impl Widget for ProfilesPanel {
             let selected = idx == self.selected_index;
             let profile = &self.profiles[idx];
             ctx.push_glass_quad(theme::nav_item_surface(*row, selected, false));
-            
+
             if selected {
                 ctx.push_glass_quad(theme::glass_quad(
                     Rect::new(row.x, row.y, 4.0, row.h),
@@ -418,16 +434,28 @@ impl Widget for ProfilesPanel {
                 y: name_y,
                 text: profile.name.clone(),
                 font_size: 14.0,
-                color: if selected { theme::TEXT_PRIMARY } else { theme::TEXT_SECONDARY },
+                color: if selected {
+                    theme::TEXT_PRIMARY
+                } else {
+                    theme::TEXT_SECONDARY
+                },
                 monospace: false,
             });
 
             let subtitle = if profile.builtin {
-                format!("Built-in • {} FPS • {} Mbps", profile.max_fps, profile.bitrate_bps / 1_000_000)
+                format!(
+                    "Built-in • {} FPS • {} Mbps",
+                    profile.max_fps,
+                    profile.bitrate_bps / 1_000_000
+                )
             } else {
-                format!("{} FPS • {} Mbps", profile.max_fps, profile.bitrate_bps / 1_000_000)
+                format!(
+                    "{} FPS • {} Mbps",
+                    profile.max_fps,
+                    profile.bitrate_bps / 1_000_000
+                )
             };
-            
+
             ctx.push_text_run(TextRun {
                 x: row.x + 16.0,
                 y: row.y + 34.0,
@@ -445,7 +473,7 @@ impl Widget for ProfilesPanel {
                 [1.0, 1.0, 1.0, 0.4],
                 0.0,
             ));
-        
+
             let tw = theme::text_width(&draft.name, theme::FONT_HERO);
             ctx.push_text_run(TextRun {
                 x: editor.x + PANEL_PAD,
@@ -455,9 +483,14 @@ impl Widget for ProfilesPanel {
                 color: theme::TEXT_PRIMARY,
                 monospace: false,
             });
-            
+
             if draft.builtin {
-                let badge = Rect::new(editor.x + PANEL_PAD + tw + 16.0, editor.y + 24.0, 60.0, 20.0);
+                let badge = Rect::new(
+                    editor.x + PANEL_PAD + tw + 16.0,
+                    editor.y + 24.0,
+                    60.0,
+                    20.0,
+                );
                 ctx.push_glass_quad(theme::status_chip(badge, theme::ChipTone::Success));
                 ctx.push_text_run(TextRun {
                     x: badge.x + 10.0,
@@ -470,7 +503,8 @@ impl Widget for ProfilesPanel {
             }
 
             if self.dirty {
-                let badge_x = editor.x + PANEL_PAD + tw + 16.0 + if draft.builtin { 70.0 } else { 0.0 };
+                let badge_x =
+                    editor.x + PANEL_PAD + tw + 16.0 + if draft.builtin { 70.0 } else { 0.0 };
                 let chip = Rect::new(badge_x, editor.y + 24.0, 80.0, 20.0);
                 ctx.push_glass_quad(theme::status_chip(chip, theme::ChipTone::Warning));
                 ctx.push_text_run(TextRun {
@@ -501,7 +535,8 @@ impl Widget for ProfilesPanel {
 
         let mut draw_label = |x, y, text: &str| {
             ctx.push_text_run(TextRun {
-                x, y,
+                x,
+                y,
                 text: text.to_string(),
                 font_size: theme::FONT_CAPTION,
                 color: theme::TEXT_MUTED,
@@ -510,16 +545,23 @@ impl Widget for ProfilesPanel {
         };
 
         let mut y = y_start;
-        draw_label(col1_x, y, "Bitrate Preference"); y += 70.0;
-        draw_label(col1_x, y, "Latency vs Quality"); y += 70.0;
-        draw_label(col1_x, y, "Native Scaling"); y += 70.0;
+        draw_label(col1_x, y, "Bitrate Preference");
+        y += 70.0;
+        draw_label(col1_x, y, "Latency vs Quality");
+        y += 70.0;
+        draw_label(col1_x, y, "Native Scaling");
+        y += 70.0;
         draw_label(col1_x, y, "Prefer AV1");
 
         let mut y = y_start;
-        draw_label(col2_x, y, "Max FPS"); y += 70.0;
-        draw_label(col2_x, y, "Audio Mode"); y += 70.0;
-        draw_label(col2_x, y, "Exclusive Input"); y += 70.0;
-        draw_label(col2_x, y, "Touch Mode"); y += 70.0;
+        draw_label(col2_x, y, "Max FPS");
+        y += 70.0;
+        draw_label(col2_x, y, "Audio Mode");
+        y += 70.0;
+        draw_label(col2_x, y, "Exclusive Input");
+        y += 70.0;
+        draw_label(col2_x, y, "Touch Mode");
+        y += 70.0;
         draw_label(col2_x, y, "Auto Reconnect");
 
         self.bitrate_slider.paint(ctx);
