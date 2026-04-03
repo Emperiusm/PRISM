@@ -114,11 +114,15 @@ impl Widget for Button {
                 ),
             },
         };
+        let radius = match self.color_mode {
+            ColorMode::Light => 8.0,
+            ColorMode::Dark => theme::CONTROL_RADIUS,
+        };
         ctx.push_glass_quad(theme::glass_quad(
             self.rect,
             tint,
             border,
-            theme::CONTROL_RADIUS,
+            radius,
         ));
 
         if hover > 0.01 {
@@ -143,7 +147,7 @@ impl Widget for Button {
                 self.rect,
                 overlay,
                 [0.0, 0.0, 0.0, 0.0],
-                theme::CONTROL_RADIUS,
+                radius,
             ));
         }
 

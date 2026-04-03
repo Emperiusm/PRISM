@@ -12,6 +12,8 @@ use crate::ui::widgets::{
 // QuickConnect
 // ---------------------------------------------------------------------------
 
+const MAX_INPUT_W: f32 = 480.0;
+
 pub struct QuickConnect {
     address_input: TextInput,
     connect_button: Button,
@@ -50,15 +52,16 @@ impl Widget for QuickConnect {
         self.rect = Rect::new(available.x, available.y, available.w, panel_h);
 
         let pad_x = 32.0;
-        let content_w = available.w - (pad_x * 2.0);
+        let input_w = (available.w - pad_x * 2.0).min(MAX_INPUT_W);
+        let input_x = available.x + (available.w - input_w) / 2.0;
         let input_y = available.y + 108.0;
         let btn_y = input_y + 54.0;
 
         self.address_input
-            .layout(Rect::new(available.x + pad_x, input_y, content_w, 42.0));
+            .layout(Rect::new(input_x, input_y, input_w, 42.0));
 
         self.connect_button
-            .layout(Rect::new(available.x + pad_x, btn_y, content_w, 42.0));
+            .layout(Rect::new(input_x, btn_y, input_w, 42.0));
 
         Size {
             w: available.w,
