@@ -98,7 +98,7 @@ impl Widget for TextInput {
             text: display_text,
             font_size: 14.0,
             color,
-            monospace: false,
+            ..Default::default()
         });
     }
 

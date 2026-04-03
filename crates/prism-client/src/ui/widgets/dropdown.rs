@@ -107,7 +107,7 @@ impl Widget for Dropdown {
             text: label,
             font_size: 13.0,
             color: header_text_color,
-            monospace: false,
+            ..Default::default()
         });
 
         // Open dropdown items
@@ -174,7 +174,7 @@ impl Widget for Dropdown {
                     text: option.clone(),
                     font_size: 13.0,
                     color: item_text_color,
-                    monospace: false,
+                    ..Default::default()
                 });
             }
         }

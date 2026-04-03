@@ -122,7 +122,7 @@ impl Widget for Slider {
             text: self.label.clone(),
             font_size: 12.0,
             color: label_color,
-            monospace: false,
+            ..Default::default()
         });
         ctx.push_text_run(TextRun {
             x: self.rect.x + self.rect.w - theme::text_width(&value_text, 12.0),
@@ -131,6 +131,7 @@ impl Widget for Slider {
             font_size: 12.0,
             color: value_color,
             monospace: true,
+            ..Default::default()
         });
 
         // Track background

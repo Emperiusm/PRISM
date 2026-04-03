@@ -60,6 +60,19 @@ fn hsl_to_rgb(h: f64, s: f64, l: f64) -> [u8; 3] {
 }
 
 // ---------------------------------------------------------------------------
+// ServerStatus
+// ---------------------------------------------------------------------------
+
+/// Derived connection status for UI rendering.
+/// TODO: Replace heuristic derivation with runtime discovery/ping probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ServerStatus {
+    Online,
+    Sleeping,
+    Unreachable,
+}
+
+// ---------------------------------------------------------------------------
 // SavedServer
 // ---------------------------------------------------------------------------
 
@@ -75,6 +88,14 @@ pub struct SavedServer {
     pub last_resolution: Option<(u32, u32)>,
     pub last_codec: Option<String>,
     pub created_at: u64,
+    #[serde(default)]
+    pub os_label: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub wol_supported: bool,
+    #[serde(default)]
+    pub last_latency_ms: Option<u32>,
 }
 
 impl SavedServer {
@@ -98,6 +119,33 @@ impl SavedServer {
             last_resolution: None,
             last_codec: None,
             created_at,
+            os_label: None,
+            tags: Vec::new(),
+            wol_supported: false,
+            last_latency_ms: None,
+        }
+    }
+
+    /// Heuristic status until real-time probing is implemented.
+    pub fn derived_status(&self) -> ServerStatus {
+        const SECS_6H: u64 = 6 * 60 * 60;
+        const SECS_7D: u64 = 7 * 24 * 60 * 60;
+        match self.last_connected {
+            None => ServerStatus::Unreachable,
+            Some(epoch_secs) => {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let age = now.saturating_sub(epoch_secs);
+                if age < SECS_6H {
+                    ServerStatus::Online
+                } else if age < SECS_7D {
+                    ServerStatus::Sleeping
+                } else {
+                    ServerStatus::Unreachable
+                }
+            }
         }
     }
 }

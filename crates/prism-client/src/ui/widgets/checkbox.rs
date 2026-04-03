@@ -81,7 +81,7 @@ impl Widget for Checkbox {
                 text: "x".into(),
                 font_size: 12.0,
                 color: theme::accent(0.60 + self.fill_anim.value() * 0.30),
-                monospace: false,
+                ..Default::default()
             });
         }
 
@@ -92,7 +92,7 @@ impl Widget for Checkbox {
             text: self.label.clone(),
             font_size: 13.0,
             color: theme::TEXT_SECONDARY,
-            monospace: false,
+            ..Default::default()
         });
     }
 

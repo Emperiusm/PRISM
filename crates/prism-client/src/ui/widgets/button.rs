@@ -156,7 +156,7 @@ impl Widget for Button {
             text: self.label.clone(),
             font_size,
             color: text_color,
-            monospace: false,
+            ..Default::default()
         });
     }
 
