@@ -95,7 +95,7 @@ jobs:
                 base_branch: 'main',
                 custom_instructions: `Follow the issue body instructions exactly. The plan is at docs/superpowers/plans/2026-04-03-launcher-ui-polish.md. Previous phase merged: ${context.payload.pull_request.html_url}`,
                 custom_agent: '',
-                model: ''
+                model: 'claude-opus-4'
               }
             });
             console.log(`Assigned copilot-swe-agent to issue #${next.issue}`);
