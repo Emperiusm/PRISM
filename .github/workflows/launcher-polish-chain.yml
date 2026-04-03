@@ -77,22 +77,18 @@ jobs:
             }
 
             const next = sequence[completedIndex + 1];
-            console.log(`Assigning next phase: ${next.label} (issue #${next.issue})`);
+            console.log(`Triggering next phase: ${next.label} (issue #${next.issue})`);
 
-            // Assign Copilot to the next issue
-            await github.rest.issues.addAssignees({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: next.issue,
-              assignees: ['copilot']
-            });
-
-            // Add a comment to surface context
+            // Trigger Copilot cloud agent via @copilot mention
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: next.issue,
-              body: `🔗 Previous phase merged: ${context.payload.pull_request.html_url}\n\nCopilot, you may begin this phase now. The plan is at \`docs/superpowers/plans/2026-04-03-launcher-ui-polish.md\`.`
+              body: [
+                `Previous phase merged: ${context.payload.pull_request.html_url}`,
+                '',
+                `@copilot Create a PR for this issue. The base branch is \`main\`. Follow the issue body instructions exactly. The plan is at \`docs/superpowers/plans/2026-04-03-launcher-ui-polish.md\`.`
+              ].join('\n')
             });
 
   # Safety: notify on 2 consecutive CI failures for the same phase
@@ -139,15 +135,7 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: phase.issue,
-                  body: `⚠️ **Chain halted**: ${failedAttempts} failed attempts for ${phaseLabel}. Manual intervention needed.\n\ncc @Emperiusm`
-                });
-
-                // Remove copilot assignment to stop retries
-                await github.rest.issues.removeAssignees({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: phase.issue,
-                  assignees: ['copilot']
+                  body: `**Chain halted**: ${failedAttempts} failed attempts for ${phaseLabel}. Manual intervention needed.\n\ncc @Emperiusm`
                 });
               }
             }
