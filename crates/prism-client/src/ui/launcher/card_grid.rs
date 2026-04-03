@@ -4,8 +4,10 @@
 use super::server_card::{CardFilter, ServerCard};
 use crate::config::servers::SavedServer;
 use crate::ui::theme;
+use crate::ui::widgets::icon::{Icon, ICON_ADD, ICON_FILTER, ICON_SORT};
 use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
+    Widget,
 };
 
 const CARD_WIDTH: f32 = ServerCard::WIDTH;
@@ -14,6 +16,12 @@ const CARD_GAP: f32 = 20.0;
 const FILTER_H: f32 = 32.0;
 const FILTER_GAP: f32 = 10.0;
 const TOOLBAR_H: f32 = 52.0;
+const SUBTITLE_H: f32 = 28.0;
+const FAB_SIZE: f32 = 56.0;
+const FAB_PAD: f32 = 24.0;
+
+const PAGE_SUBTITLE: &str =
+    "Browse saved desktops, reconnect quickly, and keep your machines organized.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GridMode {
@@ -26,6 +34,8 @@ pub struct CardGrid {
     visible_indices: Vec<usize>,
     positions: Vec<Rect>,
     filter_chip_rects: Vec<(CardFilter, Rect)>,
+    filter_btn_rect: Rect,
+    sort_btn_rect: Rect,
     active_filter: CardFilter,
     hovered_filter: Option<CardFilter>,
     grid_width: f32,
@@ -34,6 +44,8 @@ pub struct CardGrid {
     show_add_card: bool,
     show_filters: bool,
     layout_mode: GridMode,
+    scroll_y: f32,
+    max_scroll: f32,
 }
 
 impl CardGrid {
@@ -43,6 +55,8 @@ impl CardGrid {
             visible_indices: Vec::new(),
             positions: Vec::new(),
             filter_chip_rects: Vec::new(),
+            filter_btn_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
+            sort_btn_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             active_filter: CardFilter::All,
             hovered_filter: None,
             grid_width: 800.0,
@@ -51,6 +65,8 @@ impl CardGrid {
             show_add_card: true,
             show_filters: false,
             layout_mode: GridMode::Grid,
+            scroll_y: 0.0,
+            max_scroll: 0.0,
         }
     }
 
@@ -119,7 +135,11 @@ impl CardGrid {
     }
 
     fn toolbar_height(&self) -> f32 {
-        if self.show_filters { TOOLBAR_H } else { 0.0 }
+        if self.show_filters {
+            SUBTITLE_H + TOOLBAR_H
+        } else {
+            0.0
+        }
     }
 
     fn visible_card_count(&self) -> usize {
@@ -148,7 +168,7 @@ impl CardGrid {
         }
 
         let mut x = self.rect.x;
-        let y = self.rect.y;
+        let y = self.rect.y + SUBTITLE_H;
         for filter in [
             CardFilter::All,
             CardFilter::Recent,
@@ -161,6 +181,29 @@ impl CardGrid {
             self.filter_chip_rects.push((filter, rect));
             x += w + FILTER_GAP;
         }
+
+        // Append tag-based pills from visible cards
+        let mut seen_tags = std::collections::HashSet::new();
+        for card in &self.cards {
+            for tag in card.tags() {
+                if seen_tags.insert(tag.clone()) {
+                    let w = theme::text_width(&tag, 11.0) + 28.0;
+                    let rect = Rect::new(x, y, w, FILTER_H);
+                    self.filter_chip_rects.push((CardFilter::Tag(tag.to_string()), rect));
+                    x += w + FILTER_GAP;
+                }
+            }
+        }
+
+        // Right-aligned Filter and Sort buttons
+        let sort_label = "Last Connected";
+        let filter_label = "Filter";
+        let sort_w = theme::text_width(sort_label, 11.0) + 36.0;
+        let filter_w = theme::text_width(filter_label, 11.0) + 36.0;
+        let right_edge = self.rect.x + self.grid_width;
+        self.sort_btn_rect = Rect::new(right_edge - sort_w, y, sort_w, FILTER_H);
+        self.filter_btn_rect =
+            Rect::new(right_edge - sort_w - 8.0 - filter_w, y, filter_w, FILTER_H);
     }
 
     fn recompute_layout(&mut self) {
@@ -170,6 +213,7 @@ impl CardGrid {
 
         let total = self.total_items();
         if total == 0 {
+            self.max_scroll = 0.0;
             return;
         }
 
@@ -182,23 +226,9 @@ impl CardGrid {
                 for idx in 0..total {
                     let col = idx % cards_per_row;
                     let row = idx / cards_per_row;
-                    let items_in_row = if row == total / cards_per_row {
-                        let remainder = total % cards_per_row;
-                        if remainder == 0 {
-                            cards_per_row
-                        } else {
-                            remainder
-                        }
-                    } else {
-                        cards_per_row
-                    };
-
-                    let row_pixel_w = items_in_row as f32 * CARD_WIDTH
-                        + (items_in_row.saturating_sub(1)) as f32 * CARD_GAP;
-                    let x_offset = ((self.grid_width - row_pixel_w) / 2.0).max(0.0);
 
                     self.positions.push(Rect::new(
-                        self.rect.x + x_offset + col as f32 * (CARD_WIDTH + CARD_GAP),
+                        self.rect.x + col as f32 * (CARD_WIDTH + CARD_GAP),
                         self.rect.y + self.toolbar_height() + row as f32 * (CARD_HEIGHT + CARD_GAP),
                         CARD_WIDTH,
                         CARD_HEIGHT,
@@ -228,6 +258,12 @@ impl CardGrid {
         {
             self.cards[*card_index].layout(*pos);
         }
+
+        // Compute max scroll
+        let content_h = self.total_height();
+        let view_h = self.rect.h;
+        self.max_scroll = (content_h - view_h).max(0.0);
+        self.scroll_y = self.scroll_y.clamp(0.0, self.max_scroll);
     }
 
     fn total_height(&self) -> f32 {
@@ -290,25 +326,33 @@ impl Widget for CardGrid {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
+        // Page subtitle (above filter bar)
+        if self.show_filters {
+            ctx.push_text_run(TextRun {
+                x: self.rect.x,
+                y: self.rect.y + 4.0,
+                text: PAGE_SUBTITLE.to_string(),
+                font_size: theme::FONT_BODY,
+                color: theme::LT_TEXT_SECONDARY,
+                ..Default::default()
+            });
+        }
+
+        // Filter chips
         if self.show_filters {
             for (filter, rect) in &self.filter_chip_rects {
                 let active = filter == &self.active_filter;
                 let hovered = self.hovered_filter.as_ref() == Some(filter);
 
-                let pill_radius = 16.0;
+                let pill_radius = rect.h / 2.0;
                 if active {
-                    // Solid primary look for active chip
-                    ctx.push_glass_quad(theme::glass_quad(
-                        *rect,
-                        theme::PRIMARY_BLUE,
-                        [
-                            theme::PRIMARY_BLUE[0],
-                            theme::PRIMARY_BLUE[1],
-                            theme::PRIMARY_BLUE[2],
-                            0.80,
-                        ],
-                        pill_radius,
-                    ));
+                    // Solid PRIMARY_BLUE pill
+                    ctx.push_glass_quad(GlassQuad {
+                        rect: *rect,
+                        tint: theme::PRIMARY_BLUE,
+                        corner_radius: pill_radius,
+                        ..Default::default()
+                    });
                     ctx.push_text_run(TextRun {
                         x: rect.x + 14.0,
                         y: rect.y + 10.0,
@@ -318,8 +362,13 @@ impl Widget for CardGrid {
                         ..Default::default()
                     });
                 } else {
-                    // Light frosted pill for inactive
-                    ctx.push_glass_quad(theme::launcher_control_surface(*rect, false));
+                    // Outlined chip
+                    ctx.push_glass_quad(theme::glass_quad(
+                        *rect,
+                        [1.0, 1.0, 1.0, 0.50],
+                        [1.0, 1.0, 1.0, 0.60],
+                        pill_radius,
+                    ));
                     if hovered {
                         ctx.push_glass_quad(theme::glass_quad(
                             *rect,
@@ -338,17 +387,69 @@ impl Widget for CardGrid {
                     });
                 }
             }
+
+            // Right-aligned Filter button
+            let fb = self.filter_btn_rect;
+            ctx.push_glass_quad(theme::launcher_control_surface(fb, false));
+            Icon::new(ICON_FILTER)
+                .with_size(14.0)
+                .with_color(theme::LT_TEXT_SECONDARY)
+                .at(fb.x + 8.0, fb.y + 9.0)
+                .paint(ctx);
+            ctx.push_text_run(TextRun {
+                x: fb.x + 26.0,
+                y: fb.y + 10.0,
+                text: "Filter".to_string(),
+                font_size: 11.0,
+                color: theme::LT_TEXT_SECONDARY,
+                ..Default::default()
+            });
+
+            // Right-aligned Sort button
+            let sb = self.sort_btn_rect;
+            ctx.push_glass_quad(theme::launcher_control_surface(sb, false));
+            Icon::new(ICON_SORT)
+                .with_size(14.0)
+                .with_color(theme::LT_TEXT_SECONDARY)
+                .at(sb.x + 8.0, sb.y + 9.0)
+                .paint(ctx);
+            ctx.push_text_run(TextRun {
+                x: sb.x + 26.0,
+                y: sb.y + 10.0,
+                text: "Last Connected".to_string(),
+                font_size: 11.0,
+                color: theme::LT_TEXT_SECONDARY,
+                ..Default::default()
+            });
         }
 
+        // Cards (with scroll offset applied)
+        let scroll = self.scroll_y;
         for card_index in self.visible_indices.iter().take(self.visible_card_count()) {
-            self.cards[*card_index].paint(ctx);
+            let card = &self.cards[*card_index];
+            // Offset card painting by scroll
+            if scroll > 0.0 {
+                let mut offset_ctx = PaintContext::new();
+                card.paint(&mut offset_ctx);
+                for mut quad in offset_ctx.glass_quads {
+                    quad.rect.y -= scroll;
+                    quad.blur_rect.y -= scroll;
+                    ctx.push_glass_quad(quad);
+                }
+                for mut run in offset_ctx.text_runs {
+                    run.y -= scroll;
+                    ctx.push_text_run(run);
+                }
+            } else {
+                card.paint(ctx);
+            }
         }
 
         if self.visible_indices.is_empty() {
             let empty = self.empty_state_rect();
             ctx.push_text_run(TextRun {
                 x: empty.x,
-                y: empty.y,
+                y: empty.y - scroll,
                 text: "No saved desktops match this filter.".to_string(),
                 font_size: 12.0,
                 color: theme::LT_TEXT_MUTED,
@@ -356,74 +457,121 @@ impl Widget for CardGrid {
             });
         }
 
+        // Add New Connection card (last item, dashed border)
         if let Some(add_rect) = self.add_card_rect() {
-            // Light dashed border card
+            let ar = Rect::new(add_rect.x, add_rect.y - scroll, add_rect.w, add_rect.h);
+
+            // Dashed-style border (approximate with reduced-opacity white border)
             ctx.push_glass_quad(theme::glass_quad(
-                add_rect,
-                [1.0, 1.0, 1.0, 0.50],
-                [0.0, 0.0, 0.0, 0.10],
+                ar,
+                [1.0, 1.0, 1.0, 0.30],
+                [1.0, 1.0, 1.0, 0.60],
                 theme::CARD_RADIUS,
             ));
 
-            // Plus icon circle
-            let icon_radius = 24.0;
-            let icon_cx = add_rect.x + add_rect.w * 0.5;
-            let icon_cy = add_rect.y + add_rect.h * 0.4;
-            ctx.push_glass_quad(theme::glass_quad(
-                Rect::new(
-                    icon_cx - icon_radius,
-                    icon_cy - icon_radius,
-                    icon_radius * 2.0,
-                    icon_radius * 2.0,
-                ),
-                [
-                    theme::PRIMARY_BLUE[0],
-                    theme::PRIMARY_BLUE[1],
-                    theme::PRIMARY_BLUE[2],
-                    0.08,
-                ],
-                [
-                    theme::PRIMARY_BLUE[0],
-                    theme::PRIMARY_BLUE[1],
-                    theme::PRIMARY_BLUE[2],
-                    0.15,
-                ],
-                icon_radius,
-            ));
-
-            let plus = "+";
-            ctx.push_text_run(TextRun {
-                x: icon_cx - theme::text_width(plus, 28.0) * 0.5,
-                y: icon_cy - 14.0,
-                text: plus.to_string(),
-                font_size: 28.0,
-                color: theme::PRIMARY_BLUE,
+            // White filled circle with ICON_ADD
+            let circle_r = 24.0;
+            let cx = ar.x + ar.w * 0.5;
+            let cy = ar.y + ar.h * 0.38;
+            ctx.push_glass_quad(GlassQuad {
+                rect: Rect::new(cx - circle_r, cy - circle_r, circle_r * 2.0, circle_r * 2.0),
+                tint: [1.0, 1.0, 1.0, 0.90],
+                corner_radius: circle_r,
                 ..Default::default()
             });
+            Icon::new(ICON_ADD)
+                .with_size(24.0)
+                .with_color(theme::PRIMARY_BLUE)
+                .at(cx - 12.0, cy - 12.0)
+                .paint(ctx);
 
             let title = "Add New Connection";
             ctx.push_text_run(TextRun {
-                x: add_rect.x + (add_rect.w - theme::text_width(title, 14.0)) * 0.5,
-                y: icon_cy + 40.0,
+                x: ar.x + (ar.w - theme::text_width(title, 14.0)) * 0.5,
+                y: cy + 36.0,
                 text: title.to_string(),
                 font_size: 14.0,
-                color: theme::LT_TEXT_PRIMARY,
+                color: theme::LT_TEXT_SECONDARY,
                 ..Default::default()
             });
 
             let body = "Manual IP or Network Discovery";
             ctx.push_text_run(TextRun {
-                x: add_rect.x + (add_rect.w - theme::text_width(body, 11.0)) * 0.5,
-                y: icon_cy + 60.0,
+                x: ar.x + (ar.w - theme::text_width(body, 11.0)) * 0.5,
+                y: cy + 56.0,
                 text: body.to_string(),
                 font_size: 11.0,
                 color: theme::LT_TEXT_MUTED,
                 ..Default::default()
             });
         }
+
+        // FAB (Floating Action Button) — only when showing filters (Connections tab)
+        if self.show_filters {
+            let fab_rect = Rect::new(
+                self.rect.x + self.rect.w - FAB_SIZE - FAB_PAD,
+                self.rect.y + self.rect.h - FAB_SIZE - FAB_PAD,
+                FAB_SIZE,
+                FAB_SIZE,
+            );
+            ctx.push_glass_quad(GlassQuad {
+                rect: fab_rect,
+                tint: theme::PRIMARY_BLUE,
+                corner_radius: FAB_SIZE / 2.0,
+                ..Default::default()
+            });
+            Icon::new(ICON_ADD)
+                .with_size(24.0)
+                .with_color([1.0, 1.0, 1.0, 1.0])
+                .at(fab_rect.x + 16.0, fab_rect.y + 16.0)
+                .paint(ctx);
+        }
+
+        // Scroll indicator
+        if self.max_scroll > 0.0 {
+            let track_h = self.rect.h - self.toolbar_height();
+            let thumb_h = (track_h * track_h / (track_h + self.max_scroll)).max(24.0);
+            let thumb_y = self.rect.y + self.toolbar_height()
+                + (track_h - thumb_h) * (self.scroll_y / self.max_scroll);
+            let track_x = self.rect.x + self.rect.w - 4.0;
+            ctx.push_glass_quad(GlassQuad {
+                rect: Rect::new(track_x, thumb_y, 4.0, thumb_h),
+                tint: [0.0, 0.0, 0.0, 0.15],
+                corner_radius: 2.0,
+                ..Default::default()
+            });
+        }
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
+        // Scroll handling
+        if let UiEvent::Scroll { dy, .. } = event {
+            if self.max_scroll > 0.0 {
+                self.scroll_y = (self.scroll_y - dy).clamp(0.0, self.max_scroll);
+                return EventResponse::Consumed;
+            }
+        }
+
+        // FAB click
+        if self.show_filters {
+            if let UiEvent::MouseDown {
+                x,
+                y,
+                button: MouseButton::Left,
+            } = event
+            {
+                let fab_rect = Rect::new(
+                    self.rect.x + self.rect.w - FAB_SIZE - FAB_PAD,
+                    self.rect.y + self.rect.h - FAB_SIZE - FAB_PAD,
+                    FAB_SIZE,
+                    FAB_SIZE,
+                );
+                if fab_rect.contains(*x, *y) {
+                    return EventResponse::Action(UiAction::AddServer);
+                }
+            }
+        }
+
         match event {
             UiEvent::MouseMove { x, y } => {
                 self.hovered_filter = self

@@ -47,6 +47,10 @@ impl Button {
         self.color_mode = mode;
         self
     }
+
+    pub fn rect(&self) -> Rect {
+        self.rect
+    }
 }
 
 impl Widget for Button {

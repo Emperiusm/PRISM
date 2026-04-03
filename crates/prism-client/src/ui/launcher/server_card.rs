@@ -3,13 +3,14 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::config::servers::SavedServer;
+use crate::config::servers::{SavedServer, ServerStatus};
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
+use crate::ui::widgets::icon::{Icon, ICON_EDIT, ICON_HEART, ICON_MORE_VERT};
 use crate::ui::widgets::{
-    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
-    Widget,
+    ColorMode, EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction,
+    UiEvent, Widget,
 };
 
 const WEEK_SECS: u64 = 7 * 24 * 60 * 60;
@@ -57,14 +58,6 @@ impl CardStatus {
         }
     }
 
-    fn tone(self) -> [f32; 4] {
-        match self {
-            CardStatus::Recent => theme::SUCCESS,
-            CardStatus::Dormant => theme::WARNING,
-            CardStatus::New => theme::ACCENT,
-        }
-    }
-
     fn chip_tone(self) -> theme::ChipTone {
         match self {
             CardStatus::Recent => theme::ChipTone::Success,
@@ -78,11 +71,15 @@ pub struct ServerCard {
     server_id: uuid::Uuid,
     display_name: String,
     address: String,
-    last_profile: String,
+    _last_profile: String,
     last_connected: Option<u64>,
-    last_info: String,
+    _last_info: String,
     accent_color: [f32; 3],
     tags: Vec<String>,
+    os_label: Option<String>,
+    wol_supported: bool,
+    last_latency_ms: Option<u32>,
+    server_status: ServerStatus,
     connect_button: Button,
     edit_button: Button,
     delete_button: Button,
@@ -110,27 +107,38 @@ impl ServerCard {
             _ => String::from("No previous session details"),
         };
 
+        let status = server.derived_status();
+        let (connect_label, connect_style) = match status {
+            ServerStatus::Online => ("Connect", ButtonStyle::Primary),
+            ServerStatus::Sleeping => ("Wake & Connect", ButtonStyle::Secondary),
+            ServerStatus::Unreachable => ("Retry Discovery", ButtonStyle::Secondary),
+        };
+
         Self {
             server_id: server.id,
             display_name: server.display_name.clone(),
             address: server.address.clone(),
-            last_profile: if server.default_profile.is_empty() {
+            _last_profile: if server.default_profile.is_empty() {
                 "Default".to_string()
             } else {
                 server.default_profile.clone()
             },
             last_connected: server.last_connected,
-            last_info,
+            _last_info: last_info,
             accent_color,
             tags: server.tags.clone(),
+            os_label: server.os_label.clone(),
+            wol_supported: server.wol_supported,
+            last_latency_ms: server.last_latency_ms,
+            server_status: status,
             connect_button: Button::new(
-                "Connect",
+                connect_label,
                 UiAction::Connect {
                     address: server.address.clone(),
                     noise_key: None,
                 },
             )
-            .with_style(ButtonStyle::Primary)
+            .with_style(connect_style)
             .with_color_mode(ColorMode::Light),
             edit_button: Button::new("Edit", UiAction::EditServer(server.id))
                 .with_style(ButtonStyle::Secondary)
@@ -160,6 +168,10 @@ impl ServerCard {
         self.layout_mode = mode;
     }
 
+    pub fn tags(&self) -> &[String] {
+        &self.tags
+    }
+
     pub fn matches_filter(&self, filter: &CardFilter) -> bool {
         match filter {
             CardFilter::All => true,
@@ -185,23 +197,6 @@ impl ServerCard {
             }
             None => CardStatus::New,
         }
-    }
-
-    fn status_chip_rect(&self) -> Rect {
-        let w = theme::text_width(self.status().label(), 10.0) + 26.0;
-        Rect::new(self.rect.x + 18.0, self.rect.y + 16.0, w, 20.0)
-    }
-
-    fn profile_chip_rect(&self) -> Rect {
-        let status_w = theme::text_width(self.status().label(), 10.0) + 26.0;
-        let label = self.last_profile.to_uppercase();
-        let w = theme::text_width(&label, 10.0) + 26.0;
-        Rect::new(
-            self.rect.x + 18.0 + status_w + 6.0,
-            self.rect.y + 16.0,
-            w,
-            20.0,
-        )
     }
 
     fn buttons_y(&self) -> f32 {
@@ -230,6 +225,80 @@ impl ServerCard {
             }
             None => "Never connected".to_string(),
         }
+    }
+
+    fn paint_row(&self, ctx: &mut PaintContext, r: Rect, hover: f32) {
+        let accent = [
+            self.accent_color[0],
+            self.accent_color[1],
+            self.accent_color[2],
+            1.0,
+        ];
+        let status = self.status();
+
+        ctx.push_glass_quad(theme::launcher_row_surface(r, hover > 0.01));
+
+        let status_label = status.label();
+        let status_w = theme::text_width(status_label, 10.0) + 26.0;
+        let status_rect = Rect::new(r.x + 220.0, r.y + 22.0, status_w, 20.0);
+
+        ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
+        ctx.push_text_run(TextRun {
+            x: status_rect.x + 12.0,
+            y: status_rect.y + 4.0,
+            text: status_label.to_string(),
+            font_size: 10.0,
+            color: theme::launcher_chip_text_color(status.chip_tone()),
+            ..Default::default()
+        });
+
+        ctx.push_glass_quad(theme::glass_quad(
+            Rect::new(r.x + 18.0, r.y + 16.0, 32.0, 32.0),
+            [accent[0], accent[1], accent[2], 0.1],
+            [0.0, 0.0, 0.0, 0.0],
+            8.0,
+        ));
+        let index_text = format!("{:02}", self.index.unwrap_or(0));
+        let idx_w = theme::text_width(&index_text, 14.0);
+        ctx.push_text_run(TextRun {
+            x: r.x + 18.0 + (32.0 - idx_w) * 0.5,
+            y: r.y + 26.0,
+            text: index_text,
+            font_size: 14.0,
+            color: accent,
+            monospace: true,
+            ..Default::default()
+        });
+        ctx.push_text_run(TextRun {
+            x: r.x + 64.0,
+            y: r.y + 16.0,
+            text: self.display_name.clone(),
+            font_size: 14.0,
+            color: theme::LT_TEXT_PRIMARY,
+            ..Default::default()
+        });
+        ctx.push_text_run(TextRun {
+            x: r.x + 64.0,
+            y: r.y + 36.0,
+            text: self.address.clone(),
+            font_size: 11.0,
+            color: theme::LT_TEXT_MUTED,
+            ..Default::default()
+        });
+
+        let status_end = status_rect.x + status_rect.w;
+        ctx.push_text_run(TextRun {
+            x: status_end + 32.0,
+            y: r.y + 24.0,
+            text: self.relative_last_connected(),
+            font_size: 12.0,
+            color: theme::LT_TEXT_SECONDARY,
+            ..Default::default()
+        });
+
+        self.connect_button.paint(ctx);
+        self.edit_button.paint(ctx);
+        self.delete_button.paint(ctx);
     }
 }
 
@@ -261,17 +330,18 @@ impl Widget for ServerCard {
             self.delete_button
                 .layout(Rect::new(delete_x, button_y, SECONDARY_W, 40.0));
         } else {
-            let sec_w = 48.0;
-            let delete_x = self.rect.x + self.rect.w - 18.0 - sec_w;
-            let edit_x = delete_x - ACTION_GAP - sec_w;
-            let connect_x = self.rect.x + 18.0;
+            // Card mode: action button + edit icon in footer
+            let edit_icon_w = 32.0;
+            let connect_x = self.rect.x + 12.0;
+            let edit_x = self.rect.x + self.rect.w - 12.0 - edit_icon_w;
             let connect_w = (edit_x - ACTION_GAP - connect_x).max(80.0);
             self.connect_button
-                .layout(Rect::new(connect_x, button_y, connect_w, 36.0));
+                .layout(Rect::new(connect_x, button_y, connect_w, 32.0));
             self.edit_button
-                .layout(Rect::new(edit_x, button_y, sec_w, 36.0));
+                .layout(Rect::new(edit_x, button_y, edit_icon_w, 32.0));
+            // delete button not shown in card grid view — keep offscreen
             self.delete_button
-                .layout(Rect::new(delete_x, button_y, sec_w, 36.0));
+                .layout(Rect::new(-100.0, -100.0, 0.0, 0.0));
         }
 
         Size { w, h }
@@ -280,145 +350,186 @@ impl Widget for ServerCard {
     fn paint(&self, ctx: &mut PaintContext) {
         let r = self.rect;
         let hover = self.hover_anim.value();
-        let status = self.status();
-        let _status_tone = status.tone();
-        let accent = [
-            self.accent_color[0],
-            self.accent_color[1],
-            self.accent_color[2],
-            1.0,
-        ];
+        let is_unreachable = self.server_status == ServerStatus::Unreachable;
+        let card_alpha = if is_unreachable { 0.80 } else { 1.0 };
 
         if self.layout_mode == CardLayoutMode::Row {
-            ctx.push_glass_quad(theme::launcher_row_surface(r, hover > 0.01));
-        } else {
-            ctx.push_glass_quad(theme::launcher_card_surface(r));
-            if hover > 0.01 {
-                ctx.push_glass_quad(theme::launcher_card_hover(r));
-            }
+            self.paint_row(ctx, r, hover);
+            return;
         }
 
-        let status_rect = if self.layout_mode == CardLayoutMode::Row {
-            let label = status.label();
-            let w = theme::text_width(label, 10.0) + 26.0;
-            Rect::new(r.x + 220.0, r.y + 22.0, w, 20.0)
-        } else {
-            self.status_chip_rect()
-        };
+        // ── Card surface ──
+        let mut card_quad = theme::launcher_card_surface(r);
+        card_quad.tint[3] *= card_alpha;
+        ctx.push_glass_quad(card_quad);
+        if hover > 0.01 {
+            ctx.push_glass_quad(theme::launcher_card_hover(r));
+        }
 
+        // ── Hero placeholder area (top ~55%) ──
+        let hero_h = (r.h * 0.55).round();
+        let hero_rect = Rect::new(r.x, r.y, r.w, hero_h);
+        ctx.push_glass_quad(GlassQuad {
+            rect: hero_rect,
+            tint: [0.85, 0.90, 0.95, card_alpha],
+            corner_radius: theme::CARD_RADIUS,
+            ..Default::default()
+        });
+
+        // ── Badges over hero ──
+        let badge_y = r.y + 8.0;
+        let badge_x = r.x + 8.0;
+
+        // Status badge
+        let status = self.status();
+        let status_label = status.label();
+        let status_w = theme::text_width(status_label, 10.0) + 20.0;
+        let status_rect = Rect::new(badge_x, badge_y, status_w, 20.0);
         ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
         ctx.push_text_run(TextRun {
-            x: status_rect.x + 12.0,
+            x: status_rect.x + 10.0,
             y: status_rect.y + 4.0,
-            text: status.label().to_string(),
+            text: status_label.to_string(),
             font_size: 10.0,
             color: theme::launcher_chip_text_color(status.chip_tone()),
             ..Default::default()
         });
 
-        if self.layout_mode == CardLayoutMode::Card {
-            let profile_rect = self.profile_chip_rect();
-            let profile_label = self.last_profile.to_uppercase();
+        // Tag badge (first tag, if any)
+        if let Some(tag) = self.tags.first() {
+            let tag_upper = tag.to_uppercase();
+            let tag_w = theme::text_width(&tag_upper, 10.0) + 20.0;
+            let tag_rect = Rect::new(status_rect.x + status_rect.w + 4.0, badge_y, tag_w, 20.0);
             ctx.push_glass_quad(theme::glass_quad(
-                profile_rect,
-                [1.0, 1.0, 1.0, 0.60],
-                [0.0, 0.0, 0.0, 0.06],
+                tag_rect,
+                [1.0, 1.0, 1.0, 0.70],
+                [1.0, 1.0, 1.0, 0.40],
                 theme::CHIP_RADIUS,
             ));
             ctx.push_text_run(TextRun {
-                x: profile_rect.x + 12.0,
-                y: profile_rect.y + 4.0,
-                text: profile_label,
+                x: tag_rect.x + 10.0,
+                y: tag_rect.y + 4.0,
+                text: tag_upper,
                 font_size: 10.0,
-                color: theme::LT_TEXT_SECONDARY,
-                ..Default::default()
-            });
-
-            ctx.push_text_run(TextRun {
-                x: r.x + 18.0,
-                y: r.y + 60.0,
-                text: self.display_name.clone(),
-                font_size: 16.0,
-                color: theme::LT_TEXT_PRIMARY,
-                ..Default::default()
-            });
-
-            ctx.push_text_run(TextRun {
-                x: r.x + 18.0,
-                y: r.y + 80.0,
-                text: self.address.clone(),
-                font_size: 11.0,
-                color: theme::LT_TEXT_MUTED,
-                ..Default::default()
-            });
-
-            ctx.push_text_run(TextRun {
-                x: r.x + 18.0,
-                y: r.y + 116.0,
-                text: self.relative_last_connected(),
-                font_size: 11.0,
-                color: theme::LT_TEXT_SECONDARY,
-                ..Default::default()
-            });
-
-            ctx.push_text_run(TextRun {
-                x: r.x + 18.0,
-                y: r.y + 134.0,
-                text: self.last_info.clone(),
-                font_size: 11.0,
-                color: theme::LT_TEXT_MUTED,
-                ..Default::default()
-            });
-        } else {
-            // Row text placement
-            ctx.push_glass_quad(theme::glass_quad(
-                Rect::new(r.x + 18.0, r.y + 16.0, 32.0, 32.0),
-                [accent[0], accent[1], accent[2], 0.1],
-                [0.0, 0.0, 0.0, 0.0],
-                8.0,
-            ));
-            let index_text = format!("{:02}", self.index.unwrap_or(0));
-            let idx_w = theme::text_width(&index_text, 14.0);
-            ctx.push_text_run(TextRun {
-                x: r.x + 18.0 + (32.0 - idx_w) * 0.5,
-                y: r.y + 26.0,
-                text: index_text,
-                font_size: 14.0,
-                color: accent,
-                monospace: true,
-                ..Default::default()
-            });
-            ctx.push_text_run(TextRun {
-                x: r.x + 64.0,
-                y: r.y + 16.0,
-                text: self.display_name.clone(),
-                font_size: 14.0,
-                color: theme::LT_TEXT_PRIMARY,
-                ..Default::default()
-            });
-            ctx.push_text_run(TextRun {
-                x: r.x + 64.0,
-                y: r.y + 36.0,
-                text: self.address.clone(),
-                font_size: 11.0,
-                color: theme::LT_TEXT_MUTED,
-                ..Default::default()
-            });
-
-            let status_end = status_rect.x + status_rect.w;
-            ctx.push_text_run(TextRun {
-                x: status_end + 32.0,
-                y: r.y + 24.0,
-                text: self.relative_last_connected(),
-                font_size: 12.0,
                 color: theme::LT_TEXT_SECONDARY,
                 ..Default::default()
             });
         }
 
+        // Heart icon (top-right)
+        Icon::new(ICON_HEART)
+            .with_size(16.0)
+            .with_color([1.0, 1.0, 1.0, 0.80])
+            .at(r.x + r.w - 24.0, badge_y + 2.0)
+            .paint(ctx);
+
+        // ── Card body (below hero) ──
+        let body_y = r.y + hero_h + 6.0;
+        let body_pad = 12.0;
+
+        // Server name (bold) + kebab menu
+        let name_color = if is_unreachable {
+            theme::LT_TEXT_MUTED
+        } else {
+            theme::LT_TEXT_PRIMARY
+        };
+        ctx.push_text_run(TextRun {
+            x: r.x + body_pad,
+            y: body_y,
+            text: self.display_name.clone(),
+            font_size: 13.0,
+            color: name_color,
+            bold: true,
+            ..Default::default()
+        });
+
+        // Kebab menu (⋮)
+        Icon::new(ICON_MORE_VERT)
+            .with_size(16.0)
+            .with_color(theme::LT_TEXT_MUTED)
+            .at(r.x + r.w - body_pad - 16.0, body_y)
+            .paint(ctx);
+
+        // OS + IP subtitle
+        let subtitle = match &self.os_label {
+            Some(os) => format!("{os} • {}", self.address),
+            None => self.address.clone(),
+        };
+        ctx.push_text_run(TextRun {
+            x: r.x + body_pad,
+            y: body_y + 16.0,
+            text: subtitle,
+            font_size: 10.0,
+            color: theme::LT_TEXT_MUTED,
+            ..Default::default()
+        });
+
+        // Last connected timestamp + latency chip
+        let mut info_x = r.x + body_pad;
+        let info_y = body_y + 30.0;
+        ctx.push_text_run(TextRun {
+            x: info_x,
+            y: info_y,
+            text: self.relative_last_connected(),
+            font_size: 10.0,
+            color: theme::LT_TEXT_MUTED,
+            ..Default::default()
+        });
+
+        info_x += theme::text_width(&self.relative_last_connected(), 10.0) + 8.0;
+
+        // Latency chip
+        if let Some(ms) = self.last_latency_ms {
+            let lat_text = format!("{ms}ms");
+            let lat_w = theme::text_width(&lat_text, 9.0) + 14.0;
+            let lat_rect = Rect::new(info_x, info_y - 1.0, lat_w, 16.0);
+            ctx.push_glass_quad(theme::glass_quad(
+                lat_rect,
+                [1.0, 1.0, 1.0, 0.50],
+                [0.0, 0.0, 0.0, 0.06],
+                8.0,
+            ));
+            ctx.push_text_run(TextRun {
+                x: lat_rect.x + 7.0,
+                y: lat_rect.y + 2.0,
+                text: lat_text,
+                font_size: 9.0,
+                color: theme::LT_TEXT_SECONDARY,
+                ..Default::default()
+            });
+            info_x += lat_w + 6.0;
+        }
+
+        // WOL chip (for sleeping servers)
+        if self.wol_supported && self.server_status == ServerStatus::Sleeping {
+            let wol_text = "WOL";
+            let wol_w = theme::text_width(wol_text, 9.0) + 14.0;
+            let wol_rect = Rect::new(info_x, info_y - 1.0, wol_w, 16.0);
+            ctx.push_glass_quad(theme::glass_quad(
+                wol_rect,
+                [1.0, 1.0, 1.0, 0.50],
+                [0.0, 0.0, 0.0, 0.06],
+                8.0,
+            ));
+            ctx.push_text_run(TextRun {
+                x: wol_rect.x + 7.0,
+                y: wol_rect.y + 2.0,
+                text: wol_text.to_string(),
+                font_size: 9.0,
+                color: theme::LT_TEXT_SECONDARY,
+                ..Default::default()
+            });
+        }
+
+        // ── Footer: action button + edit icon ──
         self.connect_button.paint(ctx);
-        self.edit_button.paint(ctx);
-        self.delete_button.paint(ctx);
+        // Edit icon button
+        let edit_rect = self.edit_button.rect();
+        Icon::new(ICON_EDIT)
+            .with_size(16.0)
+            .with_color(theme::LT_TEXT_SECONDARY)
+            .at(edit_rect.x + 8.0, edit_rect.y + 8.0)
+            .paint(ctx);
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
@@ -540,11 +651,13 @@ mod tests {
         let server = make_server();
         let server_id = server.id;
         let mut card = ServerCard::from_saved(&server);
+        card.set_layout_mode(CardLayoutMode::Row);
         card.layout(Rect::new(0.0, 0.0, 800.0, 600.0));
 
+        let edit_rect = card.edit_button.rect();
         let resp = card.handle_event(&UiEvent::MouseDown {
-            x: card.rect.x + card.rect.w - 104.0,
-            y: card.rect.y + card.rect.h - 30.0,
+            x: edit_rect.x + edit_rect.w * 0.5,
+            y: edit_rect.y + edit_rect.h * 0.5,
             button: MouseButton::Left,
         });
 
@@ -559,11 +672,13 @@ mod tests {
         let server = make_server();
         let server_id = server.id;
         let mut card = ServerCard::from_saved(&server);
+        card.set_layout_mode(CardLayoutMode::Row);
         card.layout(Rect::new(0.0, 0.0, 800.0, 600.0));
 
+        let del_rect = card.delete_button.rect();
         let resp = card.handle_event(&UiEvent::MouseDown {
-            x: card.rect.x + card.rect.w - 32.0,
-            y: card.rect.y + card.rect.h - 30.0,
+            x: del_rect.x + del_rect.w * 0.5,
+            y: del_rect.y + del_rect.h * 0.5,
             button: MouseButton::Left,
         });
 
