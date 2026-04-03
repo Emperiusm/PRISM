@@ -6,10 +6,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::config::servers::{SavedServer, ServerStatus};
 use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
-use crate::ui::widgets::icon::{Icon, ICON_SYNC};
+use crate::ui::widgets::icon::{ICON_SYNC, Icon};
 use crate::ui::widgets::{
-    ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
-    Widget,
+    ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
 const ROW_H: f32 = 54.0;
@@ -117,7 +116,7 @@ impl RecentList {
         self.rows = ordered
             .iter()
             .take(MAX_VISIBLE)
-            .map(|s| RecentRow::from_saved(s))
+            .map(RecentRow::from_saved)
             .collect();
     }
 

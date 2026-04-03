@@ -7,7 +7,7 @@ use crate::config::servers::{SavedServer, ServerStatus};
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
-use crate::ui::widgets::icon::{Icon, ICON_EDIT, ICON_HEART, ICON_MORE_VERT};
+use crate::ui::widgets::icon::{ICON_EDIT, ICON_HEART, ICON_MORE_VERT, Icon};
 use crate::ui::widgets::{
     ColorMode, EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction,
     UiEvent, Widget,

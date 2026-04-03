@@ -3,7 +3,7 @@
 
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
-use crate::ui::widgets::icon::{Icon, ICON_CHEVRON_DOWN};
+use crate::ui::widgets::icon::{ICON_CHEVRON_DOWN, Icon};
 use crate::ui::widgets::{
     ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
 };

@@ -4,7 +4,7 @@
 use super::server_card::{CardFilter, ServerCard};
 use crate::config::servers::SavedServer;
 use crate::ui::theme;
-use crate::ui::widgets::icon::{Icon, ICON_ADD, ICON_FILTER, ICON_SORT};
+use crate::ui::widgets::icon::{ICON_ADD, ICON_FILTER, ICON_SORT, Icon};
 use crate::ui::widgets::{
     EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
     Widget,
@@ -187,9 +187,10 @@ impl CardGrid {
         for card in &self.cards {
             for tag in card.tags() {
                 if seen_tags.insert(tag.clone()) {
-                    let w = theme::text_width(&tag, 11.0) + 28.0;
+                    let w = theme::text_width(tag, 11.0) + 28.0;
                     let rect = Rect::new(x, y, w, FILTER_H);
-                    self.filter_chip_rects.push((CardFilter::Tag(tag.to_string()), rect));
+                    self.filter_chip_rects
+                        .push((CardFilter::Tag(tag.to_string()), rect));
                     x += w + FILTER_GAP;
                 }
             }
@@ -531,7 +532,8 @@ impl Widget for CardGrid {
         if self.max_scroll > 0.0 {
             let track_h = self.rect.h - self.toolbar_height();
             let thumb_h = (track_h * track_h / (track_h + self.max_scroll)).max(24.0);
-            let thumb_y = self.rect.y + self.toolbar_height()
+            let thumb_y = self.rect.y
+                + self.toolbar_height()
                 + (track_h - thumb_h) * (self.scroll_y / self.max_scroll);
             let track_x = self.rect.x + self.rect.w - 4.0;
             ctx.push_glass_quad(GlassQuad {
@@ -545,30 +547,29 @@ impl Widget for CardGrid {
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
         // Scroll handling
-        if let UiEvent::Scroll { dy, .. } = event {
-            if self.max_scroll > 0.0 {
-                self.scroll_y = (self.scroll_y - dy).clamp(0.0, self.max_scroll);
-                return EventResponse::Consumed;
-            }
+        if let UiEvent::Scroll { dy, .. } = event
+            && self.max_scroll > 0.0
+        {
+            self.scroll_y = (self.scroll_y - dy).clamp(0.0, self.max_scroll);
+            return EventResponse::Consumed;
         }
 
         // FAB click
-        if self.show_filters {
-            if let UiEvent::MouseDown {
+        if self.show_filters
+            && let UiEvent::MouseDown {
                 x,
                 y,
                 button: MouseButton::Left,
             } = event
-            {
-                let fab_rect = Rect::new(
-                    self.rect.x + self.rect.w - FAB_SIZE - FAB_PAD,
-                    self.rect.y + self.rect.h - FAB_SIZE - FAB_PAD,
-                    FAB_SIZE,
-                    FAB_SIZE,
-                );
-                if fab_rect.contains(*x, *y) {
-                    return EventResponse::Action(UiAction::AddServer);
-                }
+        {
+            let fab_rect = Rect::new(
+                self.rect.x + self.rect.w - FAB_SIZE - FAB_PAD,
+                self.rect.y + self.rect.h - FAB_SIZE - FAB_PAD,
+                FAB_SIZE,
+                FAB_SIZE,
+            );
+            if fab_rect.contains(*x, *y) {
+                return EventResponse::Action(UiAction::AddServer);
             }
         }
 
