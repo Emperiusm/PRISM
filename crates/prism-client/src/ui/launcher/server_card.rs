@@ -245,18 +245,24 @@ impl Widget for ServerCard {
             let delete_x = self.rect.x + self.rect.w - 18.0 - SECONDARY_W;
             let edit_x = delete_x - ACTION_GAP - SECONDARY_W;
             let connect_x = edit_x - ACTION_GAP - 90.0;
-            self.connect_button.layout(Rect::new(connect_x, button_y, 90.0, 40.0));
-            self.edit_button.layout(Rect::new(edit_x, button_y, SECONDARY_W, 40.0));
-            self.delete_button.layout(Rect::new(delete_x, button_y, SECONDARY_W, 40.0));
+            self.connect_button
+                .layout(Rect::new(connect_x, button_y, 90.0, 40.0));
+            self.edit_button
+                .layout(Rect::new(edit_x, button_y, SECONDARY_W, 40.0));
+            self.delete_button
+                .layout(Rect::new(delete_x, button_y, SECONDARY_W, 40.0));
         } else {
             let sec_w = 48.0;
             let delete_x = self.rect.x + self.rect.w - 18.0 - sec_w;
             let edit_x = delete_x - ACTION_GAP - sec_w;
             let connect_x = self.rect.x + 18.0;
             let connect_w = (edit_x - ACTION_GAP - connect_x).max(80.0);
-            self.connect_button.layout(Rect::new(connect_x, button_y, connect_w, 36.0));
-            self.edit_button.layout(Rect::new(edit_x, button_y, sec_w, 36.0));
-            self.delete_button.layout(Rect::new(delete_x, button_y, sec_w, 36.0));
+            self.connect_button
+                .layout(Rect::new(connect_x, button_y, connect_w, 36.0));
+            self.edit_button
+                .layout(Rect::new(edit_x, button_y, sec_w, 36.0));
+            self.delete_button
+                .layout(Rect::new(delete_x, button_y, sec_w, 36.0));
         }
 
         Size { w, h }
@@ -332,7 +338,7 @@ impl Widget for ServerCard {
                 color: theme::TEXT_SECONDARY,
                 monospace: false,
             });
-            
+
             ctx.push_text_run(TextRun {
                 x: r.x + 18.0,
                 y: r.y + 60.0,

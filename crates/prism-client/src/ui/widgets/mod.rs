@@ -6,12 +6,12 @@ pub mod checkbox;
 pub mod dropdown;
 pub mod label;
 pub mod monitor_map;
+pub mod segmented;
 pub mod separator;
 pub mod slider;
 pub mod sparkline;
 pub mod text_input;
 pub mod toggle;
-pub mod segmented;
 
 use crate::ui::launcher::LauncherTab;
 

@@ -23,7 +23,7 @@ pub struct SettingsPanel {
     relative_mouse_toggle: Toggle,
     audio_output_dropdown: Dropdown,
     mic_dropdown: Dropdown,
-    
+
     // Simplest native scroll tracking possible without overengineering clipped contexts
     scroll_y: f32,
     max_scroll: f32,
@@ -127,10 +127,10 @@ impl SettingsPanel {
 impl Widget for SettingsPanel {
     fn layout(&mut self, available: Rect) -> Size {
         self.rect = available;
-        
+
         let content_x = available.x + 40.0;
-        let content_w = (available.w - 80.0).max(400.0).min(900.0);
-        
+        let content_w = (available.w - 80.0).clamp(400.0, 900.0);
+
         // Settings inner components width mappings (split layout logic)
         let _left_w = content_w * 0.35;
         let right_w = content_w * 0.65;
@@ -142,32 +142,45 @@ impl Widget for SettingsPanel {
         // Sections
         // Identity
         cursor_y += 34.0;
-        
+
         // Device Trust
         cursor_y += ROW_GAP + 20.0 + 34.0;
 
         // Streaming Defaults
         cursor_y += ROW_GAP + 20.0;
-        self.default_profile_dropdown.layout(Rect::new(right_x, cursor_y, right_w, 40.0));
+        self.default_profile_dropdown
+            .layout(Rect::new(right_x, cursor_y, right_w, 40.0));
         cursor_y += 40.0;
 
         // Input
         cursor_y += ROW_GAP + 20.0;
-        self.exclusive_keyboard_toggle.layout(Rect::new(right_x + right_w - 42.0, cursor_y + 14.0, 42.0, 22.0));
+        self.exclusive_keyboard_toggle.layout(Rect::new(
+            right_x + right_w - 42.0,
+            cursor_y + 14.0,
+            42.0,
+            22.0,
+        ));
         cursor_y += 56.0;
-        self.relative_mouse_toggle.layout(Rect::new(right_x + right_w - 42.0, cursor_y + 14.0, 42.0, 22.0));
+        self.relative_mouse_toggle.layout(Rect::new(
+            right_x + right_w - 42.0,
+            cursor_y + 14.0,
+            42.0,
+            22.0,
+        ));
         cursor_y += 50.0;
 
         // Audio
         cursor_y += ROW_GAP + 20.0;
-        self.audio_output_dropdown.layout(Rect::new(right_x, cursor_y + 24.0, right_w, 40.0));
+        self.audio_output_dropdown
+            .layout(Rect::new(right_x, cursor_y + 24.0, right_w, 40.0));
         cursor_y += 76.0;
-        self.mic_dropdown.layout(Rect::new(right_x, cursor_y + 24.0, right_w, 40.0));
+        self.mic_dropdown
+            .layout(Rect::new(right_x, cursor_y + 24.0, right_w, 40.0));
         cursor_y += 76.0;
 
         // Compute total unscaled height
-        let total_content_h = (cursor_y + self.scroll_y - available.y) + 120.0; 
-        
+        let total_content_h = (cursor_y + self.scroll_y - available.y) + 120.0;
+
         // Update valid max scroll bounds dynamically
         self.max_scroll = (total_content_h - available.h).max(0.0);
 
@@ -180,9 +193,9 @@ impl Widget for SettingsPanel {
     fn paint(&self, ctx: &mut PaintContext) {
         // Sticky Header Region Layout (unaffected by scroll_y directly, visually floats if needed, but we'll draw it to scroll for harmony with Stitch).
         let scroll_top = self.rect.y - self.scroll_y;
-        
+
         let content_x = self.rect.x + 40.0;
-        let content_w = (self.rect.w - 80.0).max(400.0).min(900.0);
+        let content_w = (self.rect.w - 80.0).clamp(400.0, 900.0);
 
         // Header
         ctx.push_text_run(TextRun {
@@ -207,7 +220,7 @@ impl Widget for SettingsPanel {
         let card_y = scroll_top + 110.0;
         let card_h = (self.max_scroll + self.rect.h) - 200.0; // Approximation of content depth
         let card_rect = Rect::new(content_x, card_y, content_w, card_h.max(680.0));
-        
+
         ctx.push_glass_quad(theme::floating_surface(card_rect));
 
         // Drawing Helper
@@ -242,10 +255,20 @@ impl Widget for SettingsPanel {
         let mut cy = card_y;
 
         // Identity Path
-        draw_row(ctx, cy, "Identity Path", "Your unique cryptographic identifier.");
+        draw_row(
+            ctx,
+            cy,
+            "Identity Path",
+            "Your unique cryptographic identifier.",
+        );
         let id_badge_w = theme::text_width(&self.identity_path, theme::FONT_LABEL) + 32.0;
         ctx.push_glass_quad(theme::glass_quad(
-            Rect::new(content_x + content_w - id_badge_w - 32.0, cy + 12.0, id_badge_w, 36.0),
+            Rect::new(
+                content_x + content_w - id_badge_w - 32.0,
+                cy + 12.0,
+                id_badge_w,
+                36.0,
+            ),
             [1.0, 1.0, 1.0, 0.6],
             [0.0, 0.0, 0.0, 0.08],
             theme::CONTROL_RADIUS,
@@ -264,7 +287,12 @@ impl Widget for SettingsPanel {
         cy += ROW_GAP;
 
         // Device Trust
-        draw_row(ctx, cy, "Device Trust", "Validation status of this hardware endpoint.");
+        draw_row(
+            ctx,
+            cy,
+            "Device Trust",
+            "Validation status of this hardware endpoint.",
+        );
         let trust_badge = Rect::new(content_x + content_w * 0.35, cy + 12.0, 110.0, 24.0);
         ctx.push_glass_quad(theme::status_chip(trust_badge, theme::ChipTone::Success));
         ctx.push_text_run(TextRun {
@@ -281,7 +309,12 @@ impl Widget for SettingsPanel {
         cy += ROW_GAP;
 
         // Streaming Defaults
-        draw_row(ctx, cy, "Streaming Defaults", "Balance latency and fidelity.");
+        draw_row(
+            ctx,
+            cy,
+            "Streaming Defaults",
+            "Balance latency and fidelity.",
+        );
         self.default_profile_dropdown.paint(ctx);
 
         cy += 84.0;
@@ -292,14 +325,26 @@ impl Widget for SettingsPanel {
         let right_x = content_x + content_w * 0.35;
         let right_w = content_w * 0.65 - 32.0;
 
-        draw_row(ctx, cy, "Input", "Configure how local peripherals interact.");
+        draw_row(
+            ctx,
+            cy,
+            "Input",
+            "Configure how local peripherals interact.",
+        );
         ctx.push_glass_quad(theme::glass_quad(
             Rect::new(right_x, cy, right_w, 56.0),
             [1.0, 1.0, 1.0, 0.4],
             [1.0, 1.0, 1.0, 0.6],
             theme::CONTROL_RADIUS,
         ));
-        ctx.push_text_run(TextRun { x: right_x + 16.0, y: cy + 16.0, text: "Exclusive Keyboard Capture".to_string(), font_size: theme::FONT_LABEL, color: theme::TEXT_PRIMARY, monospace: false });
+        ctx.push_text_run(TextRun {
+            x: right_x + 16.0,
+            y: cy + 16.0,
+            text: "Exclusive Keyboard Capture".to_string(),
+            font_size: theme::FONT_LABEL,
+            color: theme::TEXT_PRIMARY,
+            monospace: false,
+        });
         self.exclusive_keyboard_toggle.paint(ctx);
         cy += 64.0;
 
@@ -309,21 +354,47 @@ impl Widget for SettingsPanel {
             [1.0, 1.0, 1.0, 0.6],
             theme::CONTROL_RADIUS,
         ));
-        ctx.push_text_run(TextRun { x: right_x + 16.0, y: cy + 16.0, text: "Relative Mouse Movement".to_string(), font_size: theme::FONT_LABEL, color: theme::TEXT_PRIMARY, monospace: false });
+        ctx.push_text_run(TextRun {
+            x: right_x + 16.0,
+            y: cy + 16.0,
+            text: "Relative Mouse Movement".to_string(),
+            font_size: theme::FONT_LABEL,
+            color: theme::TEXT_PRIMARY,
+            monospace: false,
+        });
         self.relative_mouse_toggle.paint(ctx);
-        
+
         cy += 84.0;
         draw_separator(ctx, cy);
         cy += ROW_GAP;
 
         // Audio
-        draw_row(ctx, cy, "Audio", "Route sound between local and remote boundaries.");
+        draw_row(
+            ctx,
+            cy,
+            "Audio",
+            "Route sound between local and remote boundaries.",
+        );
         let audio_label_color = theme::TEXT_MUTED;
-        ctx.push_text_run(TextRun { x: right_x, y: cy + 6.0, text: "REMOTE OUTPUT".to_string(), font_size: 10.0, color: audio_label_color, monospace: false });
+        ctx.push_text_run(TextRun {
+            x: right_x,
+            y: cy + 6.0,
+            text: "REMOTE OUTPUT".to_string(),
+            font_size: 10.0,
+            color: audio_label_color,
+            monospace: false,
+        });
         self.audio_output_dropdown.paint(ctx);
-        
+
         cy += 76.0;
-        ctx.push_text_run(TextRun { x: right_x, y: cy + 6.0, text: "LOCAL MIC PATH".to_string(), font_size: 10.0, color: audio_label_color, monospace: false });
+        ctx.push_text_run(TextRun {
+            x: right_x,
+            y: cy + 6.0,
+            text: "LOCAL MIC PATH".to_string(),
+            font_size: 10.0,
+            color: audio_label_color,
+            monospace: false,
+        });
         self.mic_dropdown.paint(ctx);
 
         // Versioning watermark at the bottom
@@ -333,7 +404,12 @@ impl Widget for SettingsPanel {
             y: watermark_y,
             text: format!("PRISM Professional Edition • {}", self.version),
             font_size: 10.0,
-            color: [theme::TEXT_PRIMARY[0], theme::TEXT_PRIMARY[1], theme::TEXT_PRIMARY[2], 0.3],
+            color: [
+                theme::TEXT_PRIMARY[0],
+                theme::TEXT_PRIMARY[1],
+                theme::TEXT_PRIMARY[2],
+                0.3,
+            ],
             monospace: false,
         });
     }
@@ -423,7 +499,7 @@ mod tests {
 
         // Dispatch a scroll event
         let resp = panel.handle_event(&UiEvent::Scroll { dx: 0.0, dy: -20.0 });
-        
+
         assert!(matches!(resp, EventResponse::Consumed));
         assert!(panel.scroll_y > 0.0);
     }
