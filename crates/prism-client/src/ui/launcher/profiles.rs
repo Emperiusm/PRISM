@@ -11,7 +11,8 @@ use crate::ui::widgets::segmented::SegmentedControl;
 use crate::ui::widgets::slider::Slider;
 use crate::ui::widgets::toggle::Toggle;
 use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
+    Widget,
 };
 use prism_session::EncoderPreset;
 use uuid::Uuid;
@@ -58,18 +59,30 @@ impl ProfilesPanel {
             dirty: false,
             list_rows: Vec::new(),
             bitrate_slider: Slider::new("Bitrate", 5.0, 80.0, 35.0)
-                .with_format(|v| format!("{} Mbps", v.round() as u32)),
-            fps_dropdown: Dropdown::new(Self::fps_options(), 2),
-            encoder_dropdown: SegmentedControl::new(Self::encoder_options(), 0),
-            native_scaling_toggle: Toggle::new(true),
-            audio_mode_dropdown: Dropdown::new(Self::audio_options(), 0),
-            av1_toggle: Toggle::new(true),
-            exclusive_input_toggle: Toggle::new(false),
-            touch_mode_toggle: Toggle::new(false),
-            auto_reconnect_toggle: Toggle::new(true),
-            save_button: Button::new("Save", UiAction::SaveServer).with_style(ButtonStyle::Primary),
+                .with_format(|v| format!("{} Mbps", v.round() as u32))
+                .with_color_mode(ColorMode::Light),
+            fps_dropdown: Dropdown::new(Self::fps_options(), 2)
+                .with_color_mode(ColorMode::Light),
+            encoder_dropdown: SegmentedControl::new(Self::encoder_options(), 0)
+                .with_color_mode(ColorMode::Light),
+            native_scaling_toggle: Toggle::new(true)
+                .with_color_mode(ColorMode::Light),
+            audio_mode_dropdown: Dropdown::new(Self::audio_options(), 0)
+                .with_color_mode(ColorMode::Light),
+            av1_toggle: Toggle::new(true)
+                .with_color_mode(ColorMode::Light),
+            exclusive_input_toggle: Toggle::new(false)
+                .with_color_mode(ColorMode::Light),
+            touch_mode_toggle: Toggle::new(false)
+                .with_color_mode(ColorMode::Light),
+            auto_reconnect_toggle: Toggle::new(true)
+                .with_color_mode(ColorMode::Light),
+            save_button: Button::new("Save", UiAction::SaveServer)
+                .with_style(ButtonStyle::Primary)
+                .with_color_mode(ColorMode::Light),
             discard_button: Button::new("Discard", UiAction::CancelModal)
-                .with_style(ButtonStyle::Secondary),
+                .with_style(ButtonStyle::Secondary)
+                .with_color_mode(ColorMode::Light),
         };
         panel.sync_controls_from_profile(&initial);
         panel
@@ -402,28 +415,28 @@ impl Widget for ProfilesPanel {
     fn paint(&self, ctx: &mut PaintContext) {
         let list = self.list_rect();
         let editor = self.editor_rect();
-        ctx.push_glass_quad(theme::floating_surface(list));
-        ctx.push_glass_quad(theme::floating_surface(editor));
+        ctx.push_glass_quad(theme::launcher_list_surface(list));
+        ctx.push_glass_quad(theme::launcher_hero_surface(editor));
 
         ctx.push_text_run(TextRun {
             x: list.x + 18.0,
             y: list.y + 16.0,
             text: "Presets".into(),
             font_size: theme::FONT_LABEL,
-            color: theme::TEXT_MUTED,
+            color: theme::LT_TEXT_MUTED,
             monospace: false,
         });
 
         for (idx, row) in self.list_rows.iter().enumerate() {
             let selected = idx == self.selected_index;
             let profile = &self.profiles[idx];
-            ctx.push_glass_quad(theme::nav_item_surface(*row, selected, false));
+            ctx.push_glass_quad(theme::launcher_nav_item_surface(*row, selected, false));
 
             if selected {
                 ctx.push_glass_quad(theme::glass_quad(
                     Rect::new(row.x, row.y, 4.0, row.h),
-                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.9],
-                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
+                    theme::PRIMARY_BLUE,
+                    [theme::PRIMARY_BLUE[0], theme::PRIMARY_BLUE[1], theme::PRIMARY_BLUE[2], 0.80],
                     2.0,
                 ));
             }
@@ -435,9 +448,9 @@ impl Widget for ProfilesPanel {
                 text: profile.name.clone(),
                 font_size: 14.0,
                 color: if selected {
-                    theme::TEXT_PRIMARY
+                    theme::LT_TEXT_PRIMARY
                 } else {
-                    theme::TEXT_SECONDARY
+                    theme::LT_TEXT_SECONDARY
                 },
                 monospace: false,
             });
@@ -461,7 +474,7 @@ impl Widget for ProfilesPanel {
                 y: row.y + 34.0,
                 text: subtitle,
                 font_size: 11.0,
-                color: theme::TEXT_MUTED,
+                color: theme::LT_TEXT_MUTED,
                 monospace: false,
             });
         }
@@ -469,8 +482,8 @@ impl Widget for ProfilesPanel {
         if let Some(draft) = &self.draft {
             ctx.push_glass_quad(theme::glass_quad(
                 Rect::new(editor.x, editor.y, editor.w, 90.0),
-                [1.0, 1.0, 1.0, 0.2],
-                [1.0, 1.0, 1.0, 0.4],
+                [1.0, 1.0, 1.0, 0.40],
+                [0.0, 0.0, 0.0, 0.06],
                 0.0,
             ));
 
@@ -480,7 +493,7 @@ impl Widget for ProfilesPanel {
                 y: editor.y + 20.0,
                 text: draft.name.clone(),
                 font_size: theme::FONT_HERO,
-                color: theme::TEXT_PRIMARY,
+                color: theme::LT_TEXT_PRIMARY,
                 monospace: false,
             });
 
@@ -491,13 +504,13 @@ impl Widget for ProfilesPanel {
                     60.0,
                     20.0,
                 );
-                ctx.push_glass_quad(theme::status_chip(badge, theme::ChipTone::Success));
+                ctx.push_glass_quad(theme::launcher_status_chip(badge, theme::ChipTone::Success));
                 ctx.push_text_run(TextRun {
                     x: badge.x + 10.0,
                     y: badge.y + 3.0,
                     text: "SYSTEM".to_string(),
                     font_size: 10.0,
-                    color: theme::TEXT_PRIMARY,
+                    color: theme::launcher_chip_text_color(theme::ChipTone::Success),
                     monospace: false,
                 });
             }
@@ -506,13 +519,13 @@ impl Widget for ProfilesPanel {
                 let badge_x =
                     editor.x + PANEL_PAD + tw + 16.0 + if draft.builtin { 70.0 } else { 0.0 };
                 let chip = Rect::new(badge_x, editor.y + 24.0, 80.0, 20.0);
-                ctx.push_glass_quad(theme::status_chip(chip, theme::ChipTone::Warning));
+                ctx.push_glass_quad(theme::launcher_status_chip(chip, theme::ChipTone::Warning));
                 ctx.push_text_run(TextRun {
                     x: chip.x + 10.0,
                     y: chip.y + 3.0,
                     text: "UNSAVED".to_string(),
                     font_size: 10.0,
-                    color: theme::TEXT_PRIMARY,
+                    color: theme::launcher_chip_text_color(theme::ChipTone::Warning),
                     monospace: false,
                 });
             }
@@ -522,7 +535,7 @@ impl Widget for ProfilesPanel {
                 y: editor.y + 60.0,
                 text: "Optimized for high-performance interaction".to_string(),
                 font_size: theme::FONT_BODY,
-                color: theme::TEXT_SECONDARY,
+                color: theme::LT_TEXT_SECONDARY,
                 monospace: false,
             });
         }
@@ -539,7 +552,7 @@ impl Widget for ProfilesPanel {
                 y,
                 text: text.to_string(),
                 font_size: theme::FONT_CAPTION,
-                color: theme::TEXT_MUTED,
+                color: theme::LT_TEXT_MUTED,
                 monospace: false,
             });
         };

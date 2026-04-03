@@ -996,6 +996,11 @@ impl PrismApp {
 
         {
             let scene = self.scene_target.as_ref().expect("scene target");
+            let bg = if self.ui_state.shows_launcher() {
+                theme::LAUNCHER_BACKDROP
+            } else {
+                theme::BACKDROP
+            };
             let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1003,9 +1008,9 @@ impl PrismApp {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: theme::BACKDROP[0],
-                            g: theme::BACKDROP[1],
-                            b: theme::BACKDROP[2],
+                            r: bg[0],
+                            g: bg[1],
+                            b: bg[2],
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -1050,6 +1055,11 @@ impl PrismApp {
         {
             let scene = self.scene_target.as_ref().expect("scene target");
             let renderer = self.renderer.as_ref().expect("renderer exists");
+            let bg = if self.ui_state.shows_launcher() {
+                theme::LAUNCHER_BACKDROP
+            } else {
+                theme::BACKDROP
+            };
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Composite Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1057,9 +1067,9 @@ impl PrismApp {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: theme::BACKDROP[0],
-                            g: theme::BACKDROP[1],
-                            b: theme::BACKDROP[2],
+                            r: bg[0],
+                            g: bg[1],
+                            b: bg[2],
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,

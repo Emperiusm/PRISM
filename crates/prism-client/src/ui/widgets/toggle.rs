@@ -3,7 +3,7 @@
 
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
-use crate::ui::widgets::{EventResponse, MouseButton, PaintContext, Rect, Size, UiEvent, Widget};
+use crate::ui::widgets::{ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, UiEvent, Widget};
 
 const TRACK_W: f32 = 44.0;
 const TRACK_H: f32 = 22.0;
@@ -14,6 +14,7 @@ pub struct Toggle {
     on: bool,
     rect: Rect,
     slide_anim: Animation,
+    color_mode: ColorMode,
 }
 
 impl Toggle {
@@ -27,7 +28,17 @@ impl Toggle {
             on,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             slide_anim: anim,
+            color_mode: ColorMode::Dark,
         }
+    }
+
+    pub fn with_color_mode(mut self, mode: ColorMode) -> Self {
+        self.color_mode = mode;
+        self
+    }
+
+    pub fn set_color_mode(&mut self, mode: ColorMode) {
+        self.color_mode = mode;
     }
 
     pub fn is_on(&self) -> bool {
@@ -60,13 +71,61 @@ impl Widget for Toggle {
 
     fn paint(&self, ctx: &mut PaintContext) {
         let track = self.track_rect();
-        ctx.push_glass_quad(theme::toggle_track(track, self.on));
 
-        let t = self.slide_anim.value();
-        let thumb_x = track.x + THUMB_PAD + t * (TRACK_W - THUMB_SIZE - THUMB_PAD * 2.0);
-        let thumb_y = track.y + (TRACK_H - THUMB_SIZE) * 0.5;
-        let thumb_rect = Rect::new(thumb_x, thumb_y, THUMB_SIZE, THUMB_SIZE);
-        ctx.push_glass_quad(theme::toggle_thumb(thumb_rect, self.on));
+        match self.color_mode {
+            ColorMode::Light => {
+                // Light-mode track
+                let track_tint = if self.on {
+                    [
+                        theme::PRIMARY_BLUE[0],
+                        theme::PRIMARY_BLUE[1],
+                        theme::PRIMARY_BLUE[2],
+                        0.88,
+                    ]
+                } else {
+                    [0.831, 0.843, 0.863, 0.80]
+                };
+                let track_border = if self.on {
+                    [
+                        theme::PRIMARY_BLUE[0],
+                        theme::PRIMARY_BLUE[1],
+                        theme::PRIMARY_BLUE[2],
+                        0.30,
+                    ]
+                } else {
+                    [0.0, 0.0, 0.0, 0.08]
+                };
+                ctx.push_glass_quad(theme::glass_quad(
+                    track,
+                    track_tint,
+                    track_border,
+                    theme::TOGGLE_RADIUS,
+                ));
+
+                // Light-mode thumb — always white
+                let t = self.slide_anim.value();
+                let thumb_x =
+                    track.x + THUMB_PAD + t * (TRACK_W - THUMB_SIZE - THUMB_PAD * 2.0);
+                let thumb_y = track.y + (TRACK_H - THUMB_SIZE) * 0.5;
+                let thumb_rect = Rect::new(thumb_x, thumb_y, THUMB_SIZE, THUMB_SIZE);
+                ctx.push_glass_quad(theme::glass_quad(
+                    thumb_rect,
+                    [1.0, 1.0, 1.0, 1.0],
+                    [0.0, 0.0, 0.0, 0.06],
+                    theme::TOGGLE_RADIUS,
+                ));
+            }
+            ColorMode::Dark => {
+                ctx.push_glass_quad(theme::toggle_track(track, self.on));
+
+                let t = self.slide_anim.value();
+                let thumb_x =
+                    track.x + THUMB_PAD + t * (TRACK_W - THUMB_SIZE - THUMB_PAD * 2.0);
+                let thumb_y = track.y + (TRACK_H - THUMB_SIZE) * 0.5;
+                let thumb_rect = Rect::new(thumb_x, thumb_y, THUMB_SIZE, THUMB_SIZE);
+                ctx.push_glass_quad(theme::toggle_thumb(thumb_rect, self.on));
+            }
+        }
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {

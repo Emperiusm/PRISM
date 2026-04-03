@@ -297,11 +297,11 @@ impl Widget for CardGrid {
 
                 let pill_radius = 16.0;
                 if active {
-                    // Solid primary look for active text chip
+                    // Solid primary look for active chip
                     ctx.push_glass_quad(theme::glass_quad(
                         *rect,
-                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.9],
-                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
+                        theme::PRIMARY_BLUE,
+                        [theme::PRIMARY_BLUE[0], theme::PRIMARY_BLUE[1], theme::PRIMARY_BLUE[2], 0.80],
                         pill_radius,
                     ));
                     ctx.push_text_run(TextRun {
@@ -313,23 +313,25 @@ impl Widget for CardGrid {
                         monospace: false,
                     });
                 } else {
-                    // Glass pill for inactive
-                    ctx.push_glass_quad(theme::glass_quad(
+                    // Light frosted pill for inactive
+                    ctx.push_glass_quad(theme::launcher_control_surface(
                         *rect,
-                        if hovered {
-                            [1.0, 1.0, 1.0, 0.08]
-                        } else {
-                            [1.0, 1.0, 1.0, 0.04]
-                        },
-                        [1.0, 1.0, 1.0, 0.10],
-                        pill_radius,
+                        false,
                     ));
+                    if hovered {
+                        ctx.push_glass_quad(theme::glass_quad(
+                            *rect,
+                            [0.0, 0.0, 0.0, 0.04],
+                            [0.0, 0.0, 0.0, 0.0],
+                            pill_radius,
+                        ));
+                    }
                     ctx.push_text_run(TextRun {
                         x: rect.x + 14.0,
                         y: rect.y + 10.0,
                         text: filter.label(self.cards.len()),
                         font_size: 11.0,
-                        color: theme::TEXT_SECONDARY,
+                        color: theme::LT_TEXT_SECONDARY,
                         monospace: false,
                     });
                 }
@@ -347,17 +349,17 @@ impl Widget for CardGrid {
                 y: empty.y,
                 text: "No saved desktops match this filter.".to_string(),
                 font_size: 12.0,
-                color: theme::TEXT_MUTED,
+                color: theme::LT_TEXT_MUTED,
                 monospace: false,
             });
         }
 
         if let Some(add_rect) = self.add_card_rect() {
-            // Mimic Stitch's dashed border with a high-contrast thin border
+            // Light dashed border card
             ctx.push_glass_quad(theme::glass_quad(
                 add_rect,
-                [1.0, 1.0, 1.0, 0.02],
-                [1.0, 1.0, 1.0, 0.25], // Stronger border simulating dashed style conceptually
+                [1.0, 1.0, 1.0, 0.50],
+                [0.0, 0.0, 0.0, 0.10],
                 theme::CARD_RADIUS,
             ));
 
@@ -372,8 +374,8 @@ impl Widget for CardGrid {
                     icon_radius * 2.0,
                     icon_radius * 2.0,
                 ),
-                [1.0, 1.0, 1.0, 0.1],
-                [1.0, 1.0, 1.0, 0.2],
+                [theme::PRIMARY_BLUE[0], theme::PRIMARY_BLUE[1], theme::PRIMARY_BLUE[2], 0.08],
+                [theme::PRIMARY_BLUE[0], theme::PRIMARY_BLUE[1], theme::PRIMARY_BLUE[2], 0.15],
                 icon_radius,
             ));
 
@@ -383,7 +385,7 @@ impl Widget for CardGrid {
                 y: icon_cy - 14.0,
                 text: plus.to_string(),
                 font_size: 28.0,
-                color: [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
+                color: theme::PRIMARY_BLUE,
                 monospace: false,
             });
 
@@ -393,7 +395,7 @@ impl Widget for CardGrid {
                 y: icon_cy + 40.0,
                 text: title.to_string(),
                 font_size: 14.0,
-                color: theme::TEXT_PRIMARY,
+                color: theme::LT_TEXT_PRIMARY,
                 monospace: false,
             });
 
@@ -403,7 +405,7 @@ impl Widget for CardGrid {
                 y: icon_cy + 60.0,
                 text: body.to_string(),
                 font_size: 11.0,
-                color: theme::TEXT_MUTED,
+                color: theme::LT_TEXT_MUTED,
                 monospace: false,
             });
         }

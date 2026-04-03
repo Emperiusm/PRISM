@@ -8,7 +8,8 @@ use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
+    Widget,
 };
 
 const WEEK_SECS: u64 = 7 * 24 * 60 * 60;
@@ -125,11 +126,14 @@ impl ServerCard {
                     noise_key: None,
                 },
             )
-            .with_style(ButtonStyle::Primary),
+            .with_style(ButtonStyle::Primary)
+            .with_color_mode(ColorMode::Light),
             edit_button: Button::new("Edit", UiAction::EditServer(server.id))
-                .with_style(ButtonStyle::Secondary),
+                .with_style(ButtonStyle::Secondary)
+                .with_color_mode(ColorMode::Light),
             delete_button: Button::new("Del", UiAction::DeleteServer(server.id))
-                .with_style(ButtonStyle::Destructive),
+                .with_style(ButtonStyle::Destructive)
+                .with_color_mode(ColorMode::Light),
             hover_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             hovered: false,
             layout_mode: CardLayoutMode::Card,
@@ -272,7 +276,7 @@ impl Widget for ServerCard {
         let r = self.rect;
         let hover = self.hover_anim.value();
         let status = self.status();
-        let status_tone = status.tone();
+        let _status_tone = status.tone();
         let accent = [
             self.accent_color[0],
             self.accent_color[1],
@@ -281,16 +285,11 @@ impl Widget for ServerCard {
         ];
 
         if self.layout_mode == CardLayoutMode::Row {
-            ctx.push_glass_quad(theme::list_row_surface(r, hover > 0.01));
+            ctx.push_glass_quad(theme::launcher_row_surface(r, hover > 0.01));
         } else {
-            ctx.push_glass_quad(theme::card_surface(r));
+            ctx.push_glass_quad(theme::launcher_card_surface(r));
             if hover > 0.01 {
-                ctx.push_glass_quad(theme::glass_quad(
-                    r,
-                    [accent[0], accent[1], accent[2], 0.04 + hover * 0.08],
-                    [accent[0], accent[1], accent[2], 0.08 + hover * 0.10],
-                    theme::CARD_RADIUS,
-                ));
+                ctx.push_glass_quad(theme::launcher_card_hover(r));
             }
         }
 
@@ -303,21 +302,16 @@ impl Widget for ServerCard {
         };
 
         if self.layout_mode == CardLayoutMode::Row {
-            ctx.push_glass_quad(theme::status_chip(status_rect, status.chip_tone()));
+            ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
         } else {
-            ctx.push_glass_quad(theme::glass_quad(
-                status_rect,
-                [status_tone[0], status_tone[1], status_tone[2], 0.18],
-                [status_tone[0], status_tone[1], status_tone[2], 0.22],
-                theme::CHIP_RADIUS,
-            ));
+            ctx.push_glass_quad(theme::launcher_status_chip(status_rect, status.chip_tone()));
         }
         ctx.push_text_run(TextRun {
             x: status_rect.x + 12.0,
             y: status_rect.y + 4.0,
             text: status.label().to_string(),
             font_size: 10.0,
-            color: [status_tone[0], status_tone[1], status_tone[2], 0.96],
+            color: theme::launcher_chip_text_color(status.chip_tone()),
             monospace: false,
         });
 
@@ -326,8 +320,8 @@ impl Widget for ServerCard {
             let profile_label = self.last_profile.to_uppercase();
             ctx.push_glass_quad(theme::glass_quad(
                 profile_rect,
-                [1.0, 1.0, 1.0, 0.08],
-                [1.0, 1.0, 1.0, 0.10],
+                [1.0, 1.0, 1.0, 0.60],
+                [0.0, 0.0, 0.0, 0.06],
                 theme::CHIP_RADIUS,
             ));
             ctx.push_text_run(TextRun {
@@ -335,7 +329,7 @@ impl Widget for ServerCard {
                 y: profile_rect.y + 4.0,
                 text: profile_label,
                 font_size: 10.0,
-                color: theme::TEXT_SECONDARY,
+                color: theme::LT_TEXT_SECONDARY,
                 monospace: false,
             });
 
@@ -344,7 +338,7 @@ impl Widget for ServerCard {
                 y: r.y + 60.0,
                 text: self.display_name.clone(),
                 font_size: 16.0,
-                color: theme::TEXT_PRIMARY,
+                color: theme::LT_TEXT_PRIMARY,
                 monospace: false,
             });
 
@@ -353,7 +347,7 @@ impl Widget for ServerCard {
                 y: r.y + 80.0,
                 text: self.address.clone(),
                 font_size: 11.0,
-                color: theme::TEXT_MUTED,
+                color: theme::LT_TEXT_MUTED,
                 monospace: false,
             });
 
@@ -362,7 +356,7 @@ impl Widget for ServerCard {
                 y: r.y + 116.0,
                 text: self.relative_last_connected(),
                 font_size: 11.0,
-                color: theme::TEXT_SECONDARY,
+                color: theme::LT_TEXT_SECONDARY,
                 monospace: false,
             });
 
@@ -371,7 +365,7 @@ impl Widget for ServerCard {
                 y: r.y + 134.0,
                 text: self.last_info.clone(),
                 font_size: 11.0,
-                color: theme::TEXT_TERTIARY,
+                color: theme::LT_TEXT_MUTED,
                 monospace: false,
             });
         } else {
@@ -397,7 +391,7 @@ impl Widget for ServerCard {
                 y: r.y + 16.0,
                 text: self.display_name.clone(),
                 font_size: 14.0,
-                color: theme::TEXT_PRIMARY,
+                color: theme::LT_TEXT_PRIMARY,
                 monospace: false,
             });
             ctx.push_text_run(TextRun {
@@ -405,7 +399,7 @@ impl Widget for ServerCard {
                 y: r.y + 36.0,
                 text: self.address.clone(),
                 font_size: 11.0,
-                color: theme::TEXT_MUTED,
+                color: theme::LT_TEXT_MUTED,
                 monospace: false,
             });
 
@@ -415,7 +409,7 @@ impl Widget for ServerCard {
                 y: r.y + 24.0,
                 text: self.relative_last_connected(),
                 font_size: 12.0,
-                color: theme::TEXT_SECONDARY,
+                color: theme::LT_TEXT_SECONDARY,
                 monospace: false,
             });
         }

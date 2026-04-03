@@ -4,7 +4,7 @@
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
 use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
 };
 
 pub struct Dropdown {
@@ -13,6 +13,7 @@ pub struct Dropdown {
     open: bool,
     open_anim: Animation,
     rect: Rect,
+    color_mode: ColorMode,
 }
 
 impl Dropdown {
@@ -23,7 +24,17 @@ impl Dropdown {
             open: false,
             open_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
+            color_mode: ColorMode::Dark,
         }
+    }
+
+    pub fn with_color_mode(mut self, mode: ColorMode) -> Self {
+        self.color_mode = mode;
+        self
+    }
+
+    pub fn set_color_mode(&mut self, mode: ColorMode) {
+        self.color_mode = mode;
     }
 
     pub fn selected_index(&self) -> usize {
@@ -75,7 +86,19 @@ impl Widget for Dropdown {
 
     fn paint(&self, ctx: &mut PaintContext) {
         // Closed state header
-        ctx.push_glass_quad(theme::control_surface(self.rect, self.open));
+        match self.color_mode {
+            ColorMode::Light => {
+                ctx.push_glass_quad(theme::launcher_control_surface(self.rect, self.open));
+            }
+            ColorMode::Dark => {
+                ctx.push_glass_quad(theme::control_surface(self.rect, self.open));
+            }
+        }
+
+        let header_text_color = match self.color_mode {
+            ColorMode::Light => theme::LT_TEXT_PRIMARY,
+            ColorMode::Dark => theme::TEXT_PRIMARY,
+        };
 
         let label = format!("{} v", self.selected_text());
         ctx.push_text_run(TextRun {
@@ -83,7 +106,7 @@ impl Widget for Dropdown {
             y: self.rect.y + (self.rect.h - 13.0) * 0.5 - 1.0,
             text: label,
             font_size: 13.0,
-            color: theme::TEXT_PRIMARY,
+            color: header_text_color,
             monospace: false,
         });
 
@@ -92,31 +115,65 @@ impl Widget for Dropdown {
             for (i, option) in self.options.iter().enumerate() {
                 let item_r = self.item_rect(i);
                 let is_selected = i == self.selected;
+
+                let (item_tint, item_border) = match self.color_mode {
+                    ColorMode::Light => {
+                        if is_selected {
+                            (
+                                [1.0, 1.0, 1.0, 0.95],
+                                [
+                                    theme::PRIMARY_BLUE[0],
+                                    theme::PRIMARY_BLUE[1],
+                                    theme::PRIMARY_BLUE[2],
+                                    0.40,
+                                ],
+                            )
+                        } else {
+                            ([1.0, 1.0, 1.0, 0.90], [0.831, 0.843, 0.863, 0.60])
+                        }
+                    }
+                    ColorMode::Dark => {
+                        if is_selected {
+                            (
+                                [0.22, 0.30, 0.39, 0.96],
+                                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.32],
+                            )
+                        } else {
+                            ([0.14, 0.18, 0.24, 0.92], [1.0, 1.0, 1.0, 0.10])
+                        }
+                    }
+                };
+
                 ctx.push_glass_quad(theme::glass_quad(
                     item_r,
-                    if is_selected {
-                        [0.22, 0.30, 0.39, 0.96]
-                    } else {
-                        [0.14, 0.18, 0.24, 0.92]
-                    },
-                    if is_selected {
-                        [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.32]
-                    } else {
-                        [1.0, 1.0, 1.0, 0.10]
-                    },
+                    item_tint,
+                    item_border,
                     theme::CHIP_RADIUS,
                 ));
+
+                let item_text_color = match self.color_mode {
+                    ColorMode::Light => {
+                        if is_selected {
+                            theme::LT_TEXT_PRIMARY
+                        } else {
+                            theme::LT_TEXT_SECONDARY
+                        }
+                    }
+                    ColorMode::Dark => {
+                        if is_selected {
+                            theme::TEXT_PRIMARY
+                        } else {
+                            theme::TEXT_SECONDARY
+                        }
+                    }
+                };
 
                 ctx.push_text_run(TextRun {
                     x: item_r.x + 14.0,
                     y: item_r.y + 7.0,
                     text: option.clone(),
                     font_size: 13.0,
-                    color: if is_selected {
-                        theme::TEXT_PRIMARY
-                    } else {
-                        theme::TEXT_SECONDARY
-                    },
+                    color: item_text_color,
                     monospace: false,
                 });
             }

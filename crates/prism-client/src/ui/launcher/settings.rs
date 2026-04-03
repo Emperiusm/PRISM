@@ -8,7 +8,7 @@ use crate::config::client_config_prefs::UserPrefs;
 use crate::ui::theme;
 use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::toggle::Toggle;
-use crate::ui::widgets::{EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use crate::ui::widgets::{ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
 
 const ROW_GAP: f32 = 28.0;
 
@@ -45,9 +45,12 @@ impl SettingsPanel {
                     "Low Bandwidth".to_string(),
                 ],
                 2,
-            ),
-            exclusive_keyboard_toggle: Toggle::new(true),
-            relative_mouse_toggle: Toggle::new(false),
+            )
+            .with_color_mode(ColorMode::Light),
+            exclusive_keyboard_toggle: Toggle::new(true)
+                .with_color_mode(ColorMode::Light),
+            relative_mouse_toggle: Toggle::new(false)
+                .with_color_mode(ColorMode::Light),
             audio_output_dropdown: Dropdown::new(
                 vec![
                     "System Default".to_string(),
@@ -55,7 +58,8 @@ impl SettingsPanel {
                     "Headset".to_string(),
                 ],
                 0,
-            ),
+            )
+            .with_color_mode(ColorMode::Light),
             mic_dropdown: Dropdown::new(
                 vec![
                     "System Default".to_string(),
@@ -63,7 +67,8 @@ impl SettingsPanel {
                     "USB Interface".to_string(),
                 ],
                 0,
-            ),
+            )
+            .with_color_mode(ColorMode::Light),
             scroll_y: 0.0,
             max_scroll: 0.0,
         }
@@ -203,7 +208,7 @@ impl Widget for SettingsPanel {
             y: scroll_top + 40.0,
             text: "Identity & Security".to_string(),
             font_size: theme::FONT_DISPLAY,
-            color: theme::TEXT_PRIMARY,
+            color: theme::LT_TEXT_PRIMARY,
             monospace: false,
         });
 
@@ -212,7 +217,7 @@ impl Widget for SettingsPanel {
             y: scroll_top + 74.0,
             text: "Manage your digital footprint and application settings.".to_string(),
             font_size: theme::FONT_BODY,
-            color: theme::TEXT_MUTED,
+            color: theme::LT_TEXT_MUTED,
             monospace: false,
         });
 
@@ -221,7 +226,7 @@ impl Widget for SettingsPanel {
         let card_h = (self.max_scroll + self.rect.h) - 200.0; // Approximation of content depth
         let card_rect = Rect::new(content_x, card_y, content_w, card_h.max(680.0));
 
-        ctx.push_glass_quad(theme::floating_surface(card_rect));
+        ctx.push_glass_quad(theme::launcher_hero_surface(card_rect));
 
         // Drawing Helper
         let draw_row = |ctx: &mut PaintContext, y: f32, title: &str, subtitle: &str| {
@@ -230,7 +235,7 @@ impl Widget for SettingsPanel {
                 y: y + 20.0,
                 text: title.to_string(),
                 font_size: theme::FONT_BODY,
-                color: theme::TEXT_PRIMARY,
+                color: theme::LT_TEXT_PRIMARY,
                 monospace: false,
             });
             ctx.push_text_run(TextRun {
@@ -238,18 +243,18 @@ impl Widget for SettingsPanel {
                 y: y + 42.0,
                 text: subtitle.to_string(),
                 font_size: theme::FONT_CAPTION,
-                color: theme::TEXT_MUTED,
+                color: theme::LT_TEXT_MUTED,
                 monospace: false,
             });
         };
 
         let draw_separator = |ctx: &mut PaintContext, y: f32| {
-            ctx.push_glass_quad(theme::glass_quad(
-                Rect::new(content_x + 32.0, y, content_w - 64.0, 1.0),
-                [0.0, 0.0, 0.0, 0.05],
-                [0.0, 0.0, 0.0, 0.0],
-                0.0,
-            ));
+            ctx.push_glass_quad(theme::launcher_inner_separator(Rect::new(
+                content_x + 32.0,
+                y,
+                content_w - 64.0,
+                1.0,
+            )));
         };
 
         let mut cy = card_y;
@@ -269,8 +274,8 @@ impl Widget for SettingsPanel {
                 id_badge_w,
                 36.0,
             ),
-            [1.0, 1.0, 1.0, 0.6],
-            [0.0, 0.0, 0.0, 0.08],
+            [1.0, 1.0, 1.0, 0.70],
+            [0.0, 0.0, 0.0, 0.06],
             theme::CONTROL_RADIUS,
         ));
         ctx.push_text_run(TextRun {
@@ -278,7 +283,7 @@ impl Widget for SettingsPanel {
             y: cy + 24.0,
             text: self.identity_path.clone(),
             font_size: theme::FONT_LABEL,
-            color: theme::ACCENT,
+            color: theme::PRIMARY_BLUE,
             monospace: true,
         });
 
@@ -294,13 +299,13 @@ impl Widget for SettingsPanel {
             "Validation status of this hardware endpoint.",
         );
         let trust_badge = Rect::new(content_x + content_w * 0.35, cy + 12.0, 110.0, 24.0);
-        ctx.push_glass_quad(theme::status_chip(trust_badge, theme::ChipTone::Success));
+        ctx.push_glass_quad(theme::launcher_status_chip(trust_badge, theme::ChipTone::Success));
         ctx.push_text_run(TextRun {
             x: trust_badge.x + 12.0,
             y: trust_badge.y + 5.0,
             text: "Trusted Device".to_string(),
             font_size: theme::FONT_CAPTION,
-            color: theme::SUCCESS,
+            color: theme::launcher_chip_text_color(theme::ChipTone::Success),
             monospace: false,
         });
 
@@ -331,35 +336,31 @@ impl Widget for SettingsPanel {
             "Input",
             "Configure how local peripherals interact.",
         );
-        ctx.push_glass_quad(theme::glass_quad(
+        ctx.push_glass_quad(theme::launcher_toggle_card_surface(
             Rect::new(right_x, cy, right_w, 56.0),
-            [1.0, 1.0, 1.0, 0.4],
-            [1.0, 1.0, 1.0, 0.6],
-            theme::CONTROL_RADIUS,
+            0.30,
         ));
         ctx.push_text_run(TextRun {
             x: right_x + 16.0,
             y: cy + 16.0,
             text: "Exclusive Keyboard Capture".to_string(),
             font_size: theme::FONT_LABEL,
-            color: theme::TEXT_PRIMARY,
+            color: theme::LT_TEXT_PRIMARY,
             monospace: false,
         });
         self.exclusive_keyboard_toggle.paint(ctx);
         cy += 64.0;
 
-        ctx.push_glass_quad(theme::glass_quad(
+        ctx.push_glass_quad(theme::launcher_toggle_card_surface(
             Rect::new(right_x, cy, right_w, 56.0),
-            [1.0, 1.0, 1.0, 0.4],
-            [1.0, 1.0, 1.0, 0.6],
-            theme::CONTROL_RADIUS,
+            0.30,
         ));
         ctx.push_text_run(TextRun {
             x: right_x + 16.0,
             y: cy + 16.0,
             text: "Relative Mouse Movement".to_string(),
             font_size: theme::FONT_LABEL,
-            color: theme::TEXT_PRIMARY,
+            color: theme::LT_TEXT_PRIMARY,
             monospace: false,
         });
         self.relative_mouse_toggle.paint(ctx);
@@ -375,7 +376,7 @@ impl Widget for SettingsPanel {
             "Audio",
             "Route sound between local and remote boundaries.",
         );
-        let audio_label_color = theme::TEXT_MUTED;
+        let audio_label_color = theme::LT_TEXT_MUTED;
         ctx.push_text_run(TextRun {
             x: right_x,
             y: cy + 6.0,
@@ -405,9 +406,9 @@ impl Widget for SettingsPanel {
             text: format!("PRISM Professional Edition • {}", self.version),
             font_size: 10.0,
             color: [
-                theme::TEXT_PRIMARY[0],
-                theme::TEXT_PRIMARY[1],
-                theme::TEXT_PRIMARY[2],
+                theme::LT_TEXT_PRIMARY[0],
+                theme::LT_TEXT_PRIMARY[1],
+                theme::LT_TEXT_PRIMARY[2],
                 0.3,
             ],
             monospace: false,

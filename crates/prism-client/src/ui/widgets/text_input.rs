@@ -2,7 +2,8 @@
 //! Single-line text input widget.
 
 use super::{
-    EventResponse, KeyCode, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+    ColorMode, EventResponse, KeyCode, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent,
+    Widget,
 };
 use crate::ui::theme;
 
@@ -13,6 +14,7 @@ pub struct TextInput {
     focused: bool,
     rect: Rect,
     autocomplete_candidates: Vec<String>,
+    color_mode: ColorMode,
 }
 
 impl TextInput {
@@ -24,7 +26,17 @@ impl TextInput {
             focused: false,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             autocomplete_candidates: Vec::new(),
+            color_mode: ColorMode::Dark,
         }
+    }
+
+    pub fn with_color_mode(mut self, mode: ColorMode) -> Self {
+        self.color_mode = mode;
+        self
+    }
+
+    pub fn set_color_mode(&mut self, mode: ColorMode) {
+        self.color_mode = mode;
     }
 
     pub fn text(&self) -> &str {
@@ -57,12 +69,27 @@ impl Widget for TextInput {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        ctx.push_glass_quad(theme::control_surface(self.rect, self.focused));
+        match self.color_mode {
+            ColorMode::Light => {
+                ctx.push_glass_quad(theme::launcher_control_surface(self.rect, self.focused));
+            }
+            ColorMode::Dark => {
+                ctx.push_glass_quad(theme::control_surface(self.rect, self.focused));
+            }
+        }
 
         let (display_text, color) = if self.text.is_empty() {
-            (self.placeholder.clone(), theme::TEXT_TERTIARY)
+            let placeholder_color = match self.color_mode {
+                ColorMode::Light => theme::LT_TEXT_MUTED,
+                ColorMode::Dark => theme::TEXT_TERTIARY,
+            };
+            (self.placeholder.clone(), placeholder_color)
         } else {
-            (self.text.clone(), theme::TEXT_PRIMARY)
+            let text_color = match self.color_mode {
+                ColorMode::Light => theme::LT_TEXT_PRIMARY,
+                ColorMode::Dark => theme::TEXT_PRIMARY,
+            };
+            (self.text.clone(), text_color)
         };
 
         ctx.push_text_run(TextRun {

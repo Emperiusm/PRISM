@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Horizontal value slider widget.
 
-use super::{EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use super::{ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
 use crate::ui::theme;
 
 pub struct Slider {
@@ -12,6 +12,7 @@ pub struct Slider {
     rect: Rect,
     dragging: bool,
     display_format: Box<dyn Fn(f32) -> String + Send>,
+    color_mode: ColorMode,
 }
 
 impl Slider {
@@ -25,7 +26,17 @@ impl Slider {
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             dragging: false,
             display_format: Box::new(|v| format!("{v:.0}")),
+            color_mode: ColorMode::Dark,
         }
+    }
+
+    pub fn with_color_mode(mut self, mode: ColorMode) -> Self {
+        self.color_mode = mode;
+        self
+    }
+
+    pub fn set_color_mode(&mut self, mode: ColorMode) {
+        self.color_mode = mode;
     }
 
     pub fn with_format(mut self, f: impl Fn(f32) -> String + Send + 'static) -> Self {
@@ -77,13 +88,38 @@ impl Widget for Slider {
         const THUMB_SIZE: f32 = 12.0;
         let value_text = (self.display_format)(self.value);
 
+        let (label_color, value_color, track_bg, fill_color, thumb_tint, thumb_border) =
+            match self.color_mode {
+                ColorMode::Light => (
+                    theme::LT_TEXT_SECONDARY,
+                    theme::LT_TEXT_PRIMARY,
+                    theme::SLIDER_TRACK_LIGHT,
+                    [
+                        theme::PRIMARY_BLUE[0],
+                        theme::PRIMARY_BLUE[1],
+                        theme::PRIMARY_BLUE[2],
+                        0.50,
+                    ],
+                    theme::SLIDER_THUMB_LIGHT,
+                    theme::SLIDER_THUMB_BORDER,
+                ),
+                ColorMode::Dark => (
+                    theme::TEXT_SECONDARY,
+                    theme::TEXT_PRIMARY,
+                    [0.17, 0.21, 0.28, 0.88],
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.72],
+                    [0.93, 0.96, 1.0, 0.92],
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.40],
+                ),
+            };
+
         // Label (left) and value (right)
         ctx.push_text_run(TextRun {
             x: self.rect.x,
             y: self.rect.y,
             text: self.label.clone(),
             font_size: 12.0,
-            color: theme::TEXT_SECONDARY,
+            color: label_color,
             monospace: false,
         });
         ctx.push_text_run(TextRun {
@@ -91,14 +127,14 @@ impl Widget for Slider {
             y: self.rect.y,
             text: value_text,
             font_size: 12.0,
-            color: theme::TEXT_PRIMARY,
+            color: value_color,
             monospace: true,
         });
 
         // Track background
         ctx.push_glass_quad(theme::glass_quad(
             track,
-            [0.17, 0.21, 0.28, 0.88],
+            track_bg,
             [1.0, 1.0, 1.0, 0.08],
             4.0,
         ));
@@ -109,7 +145,7 @@ impl Widget for Slider {
             let fill_rect = Rect::new(track.x, track.y, fill_w, track.h);
             ctx.push_glass_quad(theme::glass_quad(
                 fill_rect,
-                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.72],
+                fill_color,
                 [0.0, 0.0, 0.0, 0.0],
                 4.0,
             ));
@@ -124,8 +160,8 @@ impl Widget for Slider {
         );
         ctx.push_glass_quad(theme::glass_quad(
             thumb_rect,
-            [0.93, 0.96, 1.0, 0.92],
-            [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.40],
+            thumb_tint,
+            thumb_border,
             6.0,
         ));
     }

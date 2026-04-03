@@ -4,7 +4,8 @@
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
 use crate::ui::widgets::{
-    EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
+    Widget,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,6 +19,7 @@ pub struct Button {
     label: String,
     action: UiAction,
     style: ButtonStyle,
+    color_mode: ColorMode,
     rect: Rect,
     hover_anim: Animation,
     hovered: bool,
@@ -29,6 +31,7 @@ impl Button {
             label: label.to_owned(),
             action,
             style: ButtonStyle::Primary,
+            color_mode: ColorMode::Dark,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             hover_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             hovered: false,
@@ -37,6 +40,11 @@ impl Button {
 
     pub fn with_style(mut self, style: ButtonStyle) -> Self {
         self.style = style;
+        self
+    }
+
+    pub fn with_color_mode(mut self, mode: ColorMode) -> Self {
+        self.color_mode = mode;
         self
     }
 }
@@ -50,27 +58,61 @@ impl Widget for Button {
 
     fn paint(&self, ctx: &mut PaintContext) {
         let hover = self.hover_anim.value();
-        let (tint, border, text_color) = match self.style {
-            ButtonStyle::Primary => (
-                [
-                    theme::ACCENT[0],
-                    theme::ACCENT[1],
-                    theme::ACCENT[2],
-                    0.86 + hover * 0.10,
-                ],
-                [1.0, 1.0, 1.0, 0.18 + hover * 0.10],
-                theme::TEXT_PRIMARY,
-            ),
-            ButtonStyle::Secondary => (
-                [0.18, 0.22, 0.29, 0.82 + hover * 0.08],
-                [1.0, 1.0, 1.0, 0.12 + hover * 0.08],
-                theme::TEXT_PRIMARY,
-            ),
-            ButtonStyle::Destructive => (
-                [0.42, 0.18, 0.22, 0.84 + hover * 0.08],
-                [1.0, 1.0, 1.0, 0.14 + hover * 0.08],
-                theme::TEXT_PRIMARY,
-            ),
+        let (tint, border, text_color) = match self.color_mode {
+            ColorMode::Light => match self.style {
+                ButtonStyle::Primary => (
+                    [
+                        theme::PRIMARY_BLUE[0],
+                        theme::PRIMARY_BLUE[1],
+                        theme::PRIMARY_BLUE[2],
+                        0.92 + hover * 0.08,
+                    ],
+                    [
+                        theme::PRIMARY_BLUE[0],
+                        theme::PRIMARY_BLUE[1],
+                        theme::PRIMARY_BLUE[2],
+                        0.30 + hover * 0.10,
+                    ],
+                    [1.0, 1.0, 1.0, 1.0],
+                ),
+                ButtonStyle::Secondary => (
+                    [1.0, 1.0, 1.0, 0.80 + hover * 0.10],
+                    [0.831, 0.843, 0.863, 0.80 + hover * 0.10],
+                    theme::LT_TEXT_PRIMARY,
+                ),
+                ButtonStyle::Destructive => (
+                    [
+                        theme::DANGER[0],
+                        theme::DANGER[1],
+                        theme::DANGER[2],
+                        0.84 + hover * 0.08,
+                    ],
+                    [1.0, 1.0, 1.0, 0.14 + hover * 0.08],
+                    [1.0, 1.0, 1.0, 1.0],
+                ),
+            },
+            ColorMode::Dark => match self.style {
+                ButtonStyle::Primary => (
+                    [
+                        theme::ACCENT[0],
+                        theme::ACCENT[1],
+                        theme::ACCENT[2],
+                        0.86 + hover * 0.10,
+                    ],
+                    [1.0, 1.0, 1.0, 0.18 + hover * 0.10],
+                    theme::TEXT_PRIMARY,
+                ),
+                ButtonStyle::Secondary => (
+                    [0.18, 0.22, 0.29, 0.82 + hover * 0.08],
+                    [1.0, 1.0, 1.0, 0.12 + hover * 0.08],
+                    theme::TEXT_PRIMARY,
+                ),
+                ButtonStyle::Destructive => (
+                    [0.42, 0.18, 0.22, 0.84 + hover * 0.08],
+                    [1.0, 1.0, 1.0, 0.14 + hover * 0.08],
+                    theme::TEXT_PRIMARY,
+                ),
+            },
         };
         ctx.push_glass_quad(theme::glass_quad(
             self.rect,
@@ -80,13 +122,26 @@ impl Widget for Button {
         ));
 
         if hover > 0.01 {
-            ctx.push_glass_quad(theme::glass_quad(
-                self.rect,
-                match self.style {
+            let overlay = match self.color_mode {
+                ColorMode::Light => match self.style {
+                    ButtonStyle::Primary => [
+                        theme::PRIMARY_BLUE[0],
+                        theme::PRIMARY_BLUE[1],
+                        theme::PRIMARY_BLUE[2],
+                        0.06 + hover * 0.06,
+                    ],
+                    ButtonStyle::Secondary => [1.0, 1.0, 1.0, 0.04 + hover * 0.06],
+                    ButtonStyle::Destructive => theme::destructive(0.06 + hover * 0.08),
+                },
+                ColorMode::Dark => match self.style {
                     ButtonStyle::Primary => theme::accent(0.08 + hover * 0.08),
                     ButtonStyle::Secondary => [1.0, 1.0, 1.0, 0.04 + hover * 0.05],
                     ButtonStyle::Destructive => theme::destructive(0.06 + hover * 0.08),
                 },
+            };
+            ctx.push_glass_quad(theme::glass_quad(
+                self.rect,
+                overlay,
                 [0.0, 0.0, 0.0, 0.0],
                 theme::CONTROL_RADIUS,
             ));

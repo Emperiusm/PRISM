@@ -7,7 +7,7 @@ use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::text_input::TextInput;
 use crate::ui::widgets::{
-    EventResponse, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------
@@ -29,13 +29,20 @@ pub struct ServerForm {
 impl ServerForm {
     pub fn new() -> Self {
         Self {
-            name_input: TextInput::new("Server name"),
-            address_input: TextInput::new("host:port"),
-            noise_key_input: TextInput::new("Noise public key (optional)"),
-            profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0),
-            save_button: Button::new("Save", UiAction::SaveServer).with_style(ButtonStyle::Primary),
+            name_input: TextInput::new("Server name")
+                .with_color_mode(ColorMode::Light),
+            address_input: TextInput::new("host:port")
+                .with_color_mode(ColorMode::Light),
+            noise_key_input: TextInput::new("Noise public key (optional)")
+                .with_color_mode(ColorMode::Light),
+            profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0)
+                .with_color_mode(ColorMode::Light),
+            save_button: Button::new("Save", UiAction::SaveServer)
+                .with_style(ButtonStyle::Primary)
+                .with_color_mode(ColorMode::Light),
             cancel_button: Button::new("Cancel", UiAction::CancelModal)
-                .with_style(ButtonStyle::Secondary),
+                .with_style(ButtonStyle::Secondary)
+                .with_color_mode(ColorMode::Light),
             editing_id: None,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             visible: false,
@@ -158,7 +165,7 @@ impl Widget for ServerForm {
         }
 
         // Glass panel background
-        ctx.push_glass_quad(theme::floating_surface(self.rect));
+        ctx.push_glass_quad(theme::launcher_modal_surface(self.rect));
 
         // Title
         let title = if self.editing_id.is_some() {
@@ -171,7 +178,7 @@ impl Widget for ServerForm {
             y: self.rect.y + 16.0,
             text: title.to_string(),
             font_size: 16.0,
-            color: theme::TEXT_PRIMARY,
+            color: theme::LT_TEXT_PRIMARY,
             monospace: false,
         });
 

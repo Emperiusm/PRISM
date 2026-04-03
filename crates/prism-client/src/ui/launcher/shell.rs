@@ -233,7 +233,7 @@ impl LauncherShell {
             y: title_y,
             text: self.active_tab.title().to_string(),
             font_size: theme::FONT_DISPLAY,
-            color: theme::TEXT_PRIMARY,
+            color: theme::LT_TEXT_PRIMARY,
             monospace: false,
         });
         ctx.push_text_run(TextRun {
@@ -241,7 +241,7 @@ impl LauncherShell {
             y: title_y + 40.0,
             text: self.active_tab.subtitle().to_string(),
             font_size: theme::FONT_BODY,
-            color: theme::TEXT_SECONDARY,
+            color: theme::LT_TEXT_SECONDARY,
             monospace: false,
         });
 
@@ -254,13 +254,13 @@ impl LauncherShell {
                 chip_w,
                 28.0,
             );
-            ctx.push_glass_quad(theme::status_chip(status_rect, theme::ChipTone::Accent));
+            ctx.push_glass_quad(theme::launcher_status_chip(status_rect, theme::ChipTone::Accent));
             ctx.push_text_run(TextRun {
                 x: status_rect.x + 14.0,
                 y: status_rect.y + 6.0,
                 text: chip_text.to_string(),
                 font_size: 12.0,
-                color: theme::TEXT_PRIMARY,
+                color: theme::launcher_chip_text_color(theme::ChipTone::Accent),
                 monospace: false,
             });
         }
@@ -276,10 +276,10 @@ impl LauncherShell {
                     y: section_y,
                     text: "Recent Connections".to_string(),
                     font_size: 13.0,
-                    color: theme::TEXT_SECONDARY,
+                    color: theme::LT_TEXT_SECONDARY,
                     monospace: false,
                 });
-                ctx.push_glass_quad(theme::separator(Rect::new(
+                ctx.push_glass_quad(theme::launcher_separator(Rect::new(
                     self.content_rect.x,
                     section_y + 20.0,
                     self.content_rect.w,
@@ -330,13 +330,13 @@ impl LauncherShell {
                 }
                 ActiveModal::ConfirmDelete { name, .. } => {
                     let panel = self.modal_panel_rect();
-                    ctx.push_glass_quad(theme::modal_surface(panel));
+                    ctx.push_glass_quad(theme::launcher_modal_surface(panel));
                     ctx.push_text_run(TextRun {
                         x: panel.x + 20.0,
                         y: panel.y + 24.0,
                         text: "Delete connection".to_string(),
                         font_size: theme::FONT_HEADLINE,
-                        color: theme::TEXT_PRIMARY,
+                        color: theme::LT_TEXT_PRIMARY,
                         monospace: false,
                     });
                     ctx.push_text_run(TextRun {
@@ -344,14 +344,14 @@ impl LauncherShell {
                         y: panel.y + 58.0,
                         text: format!("Are you sure you want to remove \"{name}\"?"),
                         font_size: theme::FONT_BODY,
-                        color: theme::TEXT_SECONDARY,
+                        color: theme::LT_TEXT_SECONDARY,
                         monospace: false,
                     });
                     let (cancel_rect, confirm_rect) = Self::delete_modal_buttons(panel);
                     ctx.push_glass_quad(theme::glass_quad(
                         cancel_rect,
-                        [1.0, 1.0, 1.0, 0.06],
-                        [1.0, 1.0, 1.0, 0.12],
+                        [1.0, 1.0, 1.0, 0.70],
+                        [0.0, 0.0, 0.0, 0.08],
                         theme::CHIP_RADIUS,
                     ));
                     ctx.push_glass_quad(theme::glass_quad(
@@ -368,7 +368,7 @@ impl LauncherShell {
                         y: cancel_rect.y + 9.0,
                         text: cancel_label.to_string(),
                         font_size: 12.0,
-                        color: theme::TEXT_SECONDARY,
+                        color: theme::LT_TEXT_SECONDARY,
                         monospace: false,
                     });
                     ctx.push_text_run(TextRun {
@@ -377,7 +377,7 @@ impl LauncherShell {
                         y: confirm_rect.y + 9.0,
                         text: delete_label.to_string(),
                         font_size: 12.0,
-                        color: theme::TEXT_PRIMARY,
+                        color: [1.0, 1.0, 1.0, 1.0],
                         monospace: false,
                     });
                 }

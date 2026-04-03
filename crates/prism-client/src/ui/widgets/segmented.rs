@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Segmented control widget for mutually exclusive linear options.
 
-use super::{EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use super::{ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
 use crate::ui::theme;
 
 pub struct SegmentedControl {
@@ -9,6 +9,7 @@ pub struct SegmentedControl {
     selected_index: usize,
     hovered_index: Option<usize>,
     rect: Rect,
+    color_mode: ColorMode,
 }
 
 impl SegmentedControl {
@@ -18,7 +19,17 @@ impl SegmentedControl {
             selected_index,
             hovered_index: None,
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
+            color_mode: ColorMode::Dark,
         }
+    }
+
+    pub fn with_color_mode(mut self, mode: ColorMode) -> Self {
+        self.color_mode = mode;
+        self
+    }
+
+    pub fn set_color_mode(&mut self, mode: ColorMode) {
+        self.color_mode = mode;
     }
 
     pub fn selected_index(&self) -> usize {
@@ -45,12 +56,39 @@ impl Widget for SegmentedControl {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
+        let (base_tint, base_border, active_tint, active_border, active_text, inactive_text, hover_tint) =
+            match self.color_mode {
+                ColorMode::Light => (
+                    theme::SEGMENTED_CONTAINER_LIGHT,
+                    [1.0, 1.0, 1.0, 0.80],
+                    theme::SEGMENTED_ACTIVE_LIGHT,
+                    [
+                        theme::PRIMARY_BLUE[0],
+                        theme::PRIMARY_BLUE[1],
+                        theme::PRIMARY_BLUE[2],
+                        0.80,
+                    ],
+                    [1.0, 1.0, 1.0, 1.0],
+                    theme::LT_TEXT_MUTED,
+                    [1.0, 1.0, 1.0, 0.30],
+                ),
+                ColorMode::Dark => (
+                    [1.0, 1.0, 1.0, 0.04],
+                    [1.0, 1.0, 1.0, 0.1],
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.9],
+                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
+                    [1.0, 1.0, 1.0, 1.0],
+                    theme::TEXT_SECONDARY,
+                    [1.0, 1.0, 1.0, 0.08],
+                ),
+            };
+
         // Base track
         ctx.push_glass_quad(theme::glass_quad(
             self.rect,
-            [1.0, 1.0, 1.0, 0.04],
-            [1.0, 1.0, 1.0, 0.1],
-            theme::CARD_RADIUS, // Assuming CARD_RADIUS makes a nice pill or rounded rect
+            base_tint,
+            base_border,
+            theme::CARD_RADIUS,
         ));
 
         for (idx, label) in self.options.iter().enumerate() {
@@ -61,23 +99,23 @@ impl Widget for SegmentedControl {
             if selected {
                 ctx.push_glass_quad(theme::glass_quad(
                     r,
-                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.9],
-                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
+                    active_tint,
+                    active_border,
                     theme::CARD_RADIUS,
                 ));
             } else if hovered {
                 ctx.push_glass_quad(theme::glass_quad(
                     r,
-                    [1.0, 1.0, 1.0, 0.08],
+                    hover_tint,
                     [1.0, 1.0, 1.0, 0.0],
                     theme::CARD_RADIUS,
                 ));
             }
 
             let text_color = if selected {
-                [1.0, 1.0, 1.0, 1.0]
+                active_text
             } else {
-                theme::TEXT_SECONDARY
+                inactive_text
             };
 
             let tw = theme::text_width(label, 12.0);
