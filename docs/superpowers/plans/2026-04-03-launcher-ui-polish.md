@@ -46,7 +46,7 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 ### Passes
 
 - [x] **Pass 0 — Data Prerequisites** (Phase 0: TASK-P01 → TASK-P06)
-- [ ] **Pass 1 — Foundations** (Phases 1–3: TASK-002 → TASK-015)
+- [x] **Pass 1 — Foundations** (Phases 1–3: TASK-002 → TASK-015)
 - [ ] **Pass 2 — Icons & Header** (Phases 5–6: TASK-024 → TASK-033)
 - [ ] **Pass 3 — Data & Screens** (Phases 4, 7–9: TASK-016 → TASK-023, TASK-034 → TASK-064)
 - [ ] **Pass 4 — Settings & Polish** (Phase 10: TASK-066 → TASK-081)
@@ -56,8 +56,8 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 
 - [x] Phase 0 — Data-Layer Prerequisites (6 tasks: P01–P06)
 - [x] Phase 1 — Bold Text Support (3 tasks: 002–004)
-- [ ] Phase 2 — Primary Button Color Fix (3 tasks: 005–007)
-- [ ] Phase 3 — Sidebar Geometry Overhaul (7 tasks: 008–015)
+- [x] Phase 2 — Primary Button Color Fix (3 tasks: 005–007)
+- [x] Phase 3 — Sidebar Geometry Overhaul (7 tasks: 008–015)
 - [ ] Phase 4 — Home Screen: Recent Connections (4 tasks: 016–019)
 - [ ] Phase 5 — Icon Rendering Primitive (9 tasks: 021–025b)
 - [ ] Phase 6 — Sidebar Nav Icons & Header Bar (8 tasks: 026–033)
@@ -675,10 +675,10 @@ let text_color = [1.0, 1.0, 1.0, 1.0];
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-006 | In `ui/launcher/quick_connect.rs`, locate the layout method (likely `compute_layout` or the section inside `layout()` that assigns `Rect` to `address_input` and `connect_button`). Currently these rects span the full width of the parent `launcher_hero_surface`. | | |
-| TASK-007 | Add a `const MAX_INPUT_W: f32 = 480.0;` constant at the top of `quick_connect.rs`. In the layout calculation, clamp the input/button container width: `let input_w = hero_rect.w.min(MAX_INPUT_W);`. Compute `let input_x = hero_rect.x + (hero_rect.w - input_w) / 2.0;` to center the container. Apply `input_x` and `input_w` to both the `address_input` and `connect_button` rects. | | |
-| TASK-007a | **Micro-polish (REQ-010):** The `TextInput` and `Button` currently render with a fully-rounded pill shape (maximum border-radius). Change the border-radius to a standard rounded rectangle (~8px). In `ui/widgets/text_input.rs`, locate the `paint()` method's `GlassQuad` construction and replace the radius value (likely `CONTROL_RADIUS` = 14.0 or a hardcoded large value) with `8.0`. Do the same in `ui/widgets/button.rs` for the button background quad. This applies globally, so verify overlay buttons still look acceptable or guard behind `ColorMode::Light`. | | |
-| TASK-008 | Visually verify that the input and button are centered in the hero panel, do not stretch edge-to-edge, and have standard rounded-rectangle corners (not pills). Adjust `MAX_INPUT_W` if the proportions don't match `screen.png`. | | |
+| TASK-006 | In `ui/launcher/quick_connect.rs`, locate the layout method (likely `compute_layout` or the section inside `layout()` that assigns `Rect` to `address_input` and `connect_button`). Currently these rects span the full width of the parent `launcher_hero_surface`. | ✅ | 2026-04-03 |
+| TASK-007 | Add a `const MAX_INPUT_W: f32 = 480.0;` constant at the top of `quick_connect.rs`. In the layout calculation, clamp the input/button container width: `let input_w = hero_rect.w.min(MAX_INPUT_W);`. Compute `let input_x = hero_rect.x + (hero_rect.w - input_w) / 2.0;` to center the container. Apply `input_x` and `input_w` to both the `address_input` and `connect_button` rects. | ✅ | 2026-04-03 |
+| TASK-007a | **Micro-polish (REQ-010):** The `TextInput` and `Button` currently render with a fully-rounded pill shape (maximum border-radius). Change the border-radius to a standard rounded rectangle (~8px). In `ui/widgets/text_input.rs`, locate the `paint()` method's `GlassQuad` construction and replace the radius value (likely `CONTROL_RADIUS` = 14.0 or a hardcoded large value) with `8.0`. Do the same in `ui/widgets/button.rs` for the button background quad. This applies globally, so verify overlay buttons still look acceptable or guard behind `ColorMode::Light`. | ✅ | 2026-04-03 |
+| TASK-008 | Visually verify that the input and button are centered in the hero panel, do not stretch edge-to-edge, and have standard rounded-rectangle corners (not pills). Adjust `MAX_INPUT_W` if the proportions don't match `screen.png`. | ✅ | 2026-04-03 |
 
 #### Phase 2 — Implementation Detail
 
@@ -745,13 +745,13 @@ corner_radius: match self.color_mode {
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-009 | In `ui/launcher/shell.rs`, locate `compute_layout()` (around line 167). The sidebar rect is currently constructed as: `Rect::new(SIDEBAR_PAD, SIDEBAR_PAD, SIDEBAR_W, (screen_h - SIDEBAR_PAD * 2.0).max(280.0))` where `SIDEBAR_PAD = 28.0`. Change this to: `Rect::new(0.0, 0.0, SIDEBAR_W, screen_h)` so the sidebar starts at the window origin and spans the full height. | | |
-| TASK-010 | In `ui/theme.rs`, locate `launcher_sidebar_surface()` (around line 288). It currently passes `SIDEBAR_RADIUS` (28.0) to `glass_quad()`. Change the radius argument to `0.0` so the sidebar renders as a sharp rectangle flush against the window frame. | | |
-| TASK-011 | Verify `content_x` calculation in `compute_layout()` still works after the sidebar origin change. It should now be: `let content_x = SIDEBAR_W + CONTENT_PAD;` (since `sidebar_rect.x` is now `0.0`). Confirm no visual overlap or gap. | | |
-| TASK-012 | In `ui/launcher/nav.rs`, verify that nav item rects are computed relative to the sidebar rect and still render correctly after the origin/size change. Adjust `SIDE_PADDING` if the nav items are now too close to the window edge. | | |
-| TASK-012a | **Micro-polish (REQ-009):** In `ui/launcher/nav.rs`, change the active nav item rendering. Currently it uses `launcher_nav_item_surface()` which produces a floating rounded pill with `CONTROL_RADIUS` and side margins. Replace with: (a) an edge-to-edge flush rectangle (`radius: 0.0`, `x: 0.0`, `w: sidebar_rect.w`) with a slightly darker background (`[0.898, 0.898, 0.898, 0.60]` or similar), and (b) a 4px-wide `PRIMARY_BLUE` bar drawn at `x: 0.0` on the far left edge of the item rect. Remove `SIDE_PADDING` from the active item's x-origin and width. **Extract this as a reusable helper** `paint_active_list_indicator(quads, rect, accent_color)` in `theme.rs` — it will be reused by TASK-050 (Profiles active list item) and TASK-067 (Settings sub-nav active state). | | |
-| TASK-012b | **Micro-polish (REQ-008):** In `ui/launcher/nav.rs`, locate where the sidebar header renders "PRISM" / "Remote client" text at the top. Replace with a hamburger menu icon. **If Phase 5 has already landed:** render `Icon::new(ICON_MENU).with_size(24.0).with_color(theme::LT_TEXT_SECONDARY)` directly. **If Phase 5 has NOT landed yet:** render the Unicode character `'\u{2261}'` (≡) as a `TextRun` at ~24px in `LT_TEXT_SECONDARY`, and add a `// TODO(Phase 5): replace with Icon::new(ICON_MENU)` comment. Either way, the Phase 6 TASK-028a replacement step is eliminated — the hamburger is finalized in this task. | | |
-| TASK-013 | `cargo check -p prism-client` — verify compilation. Visual check: sidebar should be flush against top/left/bottom with no rounded corners on the left edge. Active nav item should be flush with a blue left-border, not a floating pill. Sidebar top should show `≡` not "PRISM / Remote client". | | |
+| TASK-009 | In `ui/launcher/shell.rs`, locate `compute_layout()` (around line 167). The sidebar rect is currently constructed as: `Rect::new(SIDEBAR_PAD, SIDEBAR_PAD, SIDEBAR_W, (screen_h - SIDEBAR_PAD * 2.0).max(280.0))` where `SIDEBAR_PAD = 28.0`. Change this to: `Rect::new(0.0, 0.0, SIDEBAR_W, screen_h)` so the sidebar starts at the window origin and spans the full height. | ✅ | 2026-04-03 |
+| TASK-010 | In `ui/theme.rs`, locate `launcher_sidebar_surface()` (around line 288). It currently passes `SIDEBAR_RADIUS` (28.0) to `glass_quad()`. Change the radius argument to `0.0` so the sidebar renders as a sharp rectangle flush against the window frame. | ✅ | 2026-04-03 |
+| TASK-011 | Verify `content_x` calculation in `compute_layout()` still works after the sidebar origin change. It should now be: `let content_x = SIDEBAR_W + CONTENT_PAD;` (since `sidebar_rect.x` is now `0.0`). Confirm no visual overlap or gap. | ✅ | 2026-04-03 |
+| TASK-012 | In `ui/launcher/nav.rs`, verify that nav item rects are computed relative to the sidebar rect and still render correctly after the origin/size change. Adjust `SIDE_PADDING` if the nav items are now too close to the window edge. | ✅ | 2026-04-03 |
+| TASK-012a | **Micro-polish (REQ-009):** In `ui/launcher/nav.rs`, change the active nav item rendering. Currently it uses `launcher_nav_item_surface()` which produces a floating rounded pill with `CONTROL_RADIUS` and side margins. Replace with: (a) an edge-to-edge flush rectangle (`radius: 0.0`, `x: 0.0`, `w: sidebar_rect.w`) with a slightly darker background (`[0.898, 0.898, 0.898, 0.60]` or similar), and (b) a 4px-wide `PRIMARY_BLUE` bar drawn at `x: 0.0` on the far left edge of the item rect. Remove `SIDE_PADDING` from the active item's x-origin and width. **Extract this as a reusable helper** `paint_active_list_indicator(quads, rect, accent_color)` in `theme.rs` — it will be reused by TASK-050 (Profiles active list item) and TASK-067 (Settings sub-nav active state). | ✅ | 2026-04-03 |
+| TASK-012b | **Micro-polish (REQ-008):** In `ui/launcher/nav.rs`, locate where the sidebar header renders "PRISM" / "Remote client" text at the top. Replace with a hamburger menu icon. **If Phase 5 has already landed:** render `Icon::new(ICON_MENU).with_size(24.0).with_color(theme::LT_TEXT_SECONDARY)` directly. **If Phase 5 has NOT landed yet:** render the Unicode character `'\u{2261}'` (≡) as a `TextRun` at ~24px in `LT_TEXT_SECONDARY`, and add a `// TODO(Phase 5): replace with Icon::new(ICON_MENU)` comment. Either way, the Phase 6 TASK-028a replacement step is eliminated — the hamburger is finalized in this task. | ✅ | 2026-04-03 |
+| TASK-013 | `cargo check -p prism-client` — verify compilation. Visual check: sidebar should be flush against top/left/bottom with no rounded corners on the left edge. Active nav item should be flush with a blue left-border, not a floating pill. Sidebar top should show `≡` not "PRISM / Remote client". | ✅ | 2026-04-03 |
 
 #### Phase 3 — Implementation Detail
 
