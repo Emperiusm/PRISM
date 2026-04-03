@@ -415,6 +415,13 @@ pub fn launcher_separator(rect: Rect) -> GlassQuad {
 }
 
 /// Subtle in-panel divider — used inside white glass containers.
+///
+/// Reconciliation: `DESIGN.md` says "Forbid Dividers", but the approved Stitch
+/// `screen.png` targets clearly show subtle dividers in Settings rows and Home
+/// Recent Connections rows.  Canonical rule: `launcher_inner_separator()` is
+/// permitted inside card/list containers where design screenshots show them.
+/// Between free-standing cards on the gradient background, use 12px vertical
+/// spacing only (no separator).
 pub fn launcher_inner_separator(rect: Rect) -> GlassQuad {
     glass_quad(
         rect,

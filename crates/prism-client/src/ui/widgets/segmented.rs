@@ -69,7 +69,7 @@ impl Widget for SegmentedControl {
         ) = match self.color_mode {
             ColorMode::Light => (
                 theme::SEGMENTED_CONTAINER_LIGHT,
-                [1.0, 1.0, 1.0, 0.80],
+                [1.0, 1.0, 1.0, 1.0],
                 theme::SEGMENTED_ACTIVE_LIGHT,
                 [
                     theme::PRIMARY_BLUE[0],
@@ -93,11 +93,15 @@ impl Widget for SegmentedControl {
         };
 
         // Base track
+        let container_radius = match self.color_mode {
+            ColorMode::Light => 12.0,
+            ColorMode::Dark => theme::CARD_RADIUS,
+        };
         ctx.push_glass_quad(theme::glass_quad(
             self.rect,
             base_tint,
             base_border,
-            theme::CARD_RADIUS,
+            container_radius,
         ));
 
         for (idx, label) in self.options.iter().enumerate() {
@@ -106,18 +110,22 @@ impl Widget for SegmentedControl {
             let hovered = Some(idx) == self.hovered_index;
 
             if selected {
+                let seg_radius = match self.color_mode {
+                    ColorMode::Light => 10.0,
+                    ColorMode::Dark => theme::CARD_RADIUS,
+                };
                 ctx.push_glass_quad(theme::glass_quad(
                     r,
                     active_tint,
                     active_border,
-                    theme::CARD_RADIUS,
+                    seg_radius,
                 ));
             } else if hovered {
                 ctx.push_glass_quad(theme::glass_quad(
                     r,
                     hover_tint,
                     [1.0, 1.0, 1.0, 0.0],
-                    theme::CARD_RADIUS,
+                    container_radius,
                 ));
             }
 

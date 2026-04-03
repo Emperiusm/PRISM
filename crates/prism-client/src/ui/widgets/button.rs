@@ -13,6 +13,7 @@ pub enum ButtonStyle {
     Primary,
     Secondary,
     Destructive,
+    Text, // No background, no border — text only
 }
 
 pub struct Button {
@@ -23,6 +24,7 @@ pub struct Button {
     rect: Rect,
     hover_anim: Animation,
     hovered: bool,
+    radius_override: Option<f32>,
 }
 
 impl Button {
@@ -35,6 +37,7 @@ impl Button {
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             hover_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             hovered: false,
+            radius_override: None,
         }
     }
 
@@ -45,6 +48,11 @@ impl Button {
 
     pub fn with_color_mode(mut self, mode: ColorMode) -> Self {
         self.color_mode = mode;
+        self
+    }
+
+    pub fn with_radius(mut self, radius: f32) -> Self {
+        self.radius_override = Some(radius);
         self
     }
 
@@ -61,9 +69,32 @@ impl Widget for Button {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
+        // Text-only style — no background, just a label
+        if self.style == ButtonStyle::Text {
+            let text_color = if self.hovered {
+                theme::LT_TEXT_PRIMARY
+            } else {
+                theme::LT_TEXT_SECONDARY
+            };
+            let font_size = 13.0;
+            let text_x =
+                self.rect.x + (self.rect.w - theme::text_width(&self.label, font_size)) * 0.5;
+            let text_y = self.rect.y + (self.rect.h - font_size) * 0.5 - 1.0;
+            ctx.push_text_run(TextRun {
+                x: text_x,
+                y: text_y,
+                text: self.label.clone(),
+                font_size,
+                color: text_color,
+                ..Default::default()
+            });
+            return;
+        }
+
         let hover = self.hover_anim.value();
         let (tint, border, text_color) = match self.color_mode {
             ColorMode::Light => match self.style {
+                // ALT-005: flat PRIMARY_BLUE per approved mockups — not radial gradient per DESIGN.md
                 ButtonStyle::Primary => (
                     [
                         theme::PRIMARY_BLUE[0],
@@ -94,6 +125,7 @@ impl Widget for Button {
                     [1.0, 1.0, 1.0, 0.14 + hover * 0.08],
                     [1.0, 1.0, 1.0, 1.0],
                 ),
+                ButtonStyle::Text => unreachable!(),
             },
             ColorMode::Dark => match self.style {
                 ButtonStyle::Primary => (
@@ -116,12 +148,13 @@ impl Widget for Button {
                     [1.0, 1.0, 1.0, 0.14 + hover * 0.08],
                     theme::TEXT_PRIMARY,
                 ),
+                ButtonStyle::Text => unreachable!(),
             },
         };
-        let radius = match self.color_mode {
+        let radius = self.radius_override.unwrap_or(match self.color_mode {
             ColorMode::Light => 8.0,
             ColorMode::Dark => theme::CONTROL_RADIUS,
-        };
+        });
         ctx.push_glass_quad(theme::glass_quad(
             self.rect,
             tint,
@@ -140,11 +173,13 @@ impl Widget for Button {
                     ],
                     ButtonStyle::Secondary => [1.0, 1.0, 1.0, 0.04 + hover * 0.06],
                     ButtonStyle::Destructive => theme::destructive(0.06 + hover * 0.08),
+                    ButtonStyle::Text => unreachable!(),
                 },
                 ColorMode::Dark => match self.style {
                     ButtonStyle::Primary => theme::accent(0.08 + hover * 0.08),
                     ButtonStyle::Secondary => [1.0, 1.0, 1.0, 0.04 + hover * 0.05],
                     ButtonStyle::Destructive => theme::destructive(0.06 + hover * 0.08),
+                    ButtonStyle::Text => unreachable!(),
                 },
             };
             ctx.push_glass_quad(theme::glass_quad(

@@ -63,7 +63,7 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 - [x] Phase 6 — Sidebar Nav Icons & Header Bar (8 tasks: 026–033)
 - [x] Phase 7 — Saved Connections: Filter Bar & Sort (4 tasks: 035–038)
 - [x] Phase 8 — Saved Connections: Card Grid, Add Card, & FAB (10 tasks: 039–047a)
-- [ ] Phase 9 — Profiles Editor Polish (17 tasks: 048–064)
+- [x] Phase 9 — Profiles Editor Polish (17 tasks: 048–064)
 - [ ] Phase 10 — Settings Panel Polish (12 tasks: 066–077)
 - [ ] Phase 11 — Cross-Screen Verification (10 tasks: 078–086a)
 
