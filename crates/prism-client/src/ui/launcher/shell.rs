@@ -629,8 +629,7 @@ impl Widget for LauncherShell {
                 if let UiEvent::Scroll { dy, .. } = event
                     && self.home_max_scroll > 0.0
                 {
-                    self.home_scroll_y =
-                        (self.home_scroll_y - dy).clamp(0.0, self.home_max_scroll);
+                    self.home_scroll_y = (self.home_scroll_y - dy).clamp(0.0, self.home_max_scroll);
                     self.layout_active_tab();
                     return EventResponse::Consumed;
                 }
