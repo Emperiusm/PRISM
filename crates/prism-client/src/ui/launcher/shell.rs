@@ -36,6 +36,8 @@ pub struct LauncherShell {
     sidebar_rect: Rect,
     content_rect: Rect,
     home_recent_y: f32,
+    home_scroll_y: f32,
+    home_max_scroll: f32,
     ui_state: UiState,
 }
 
@@ -63,6 +65,8 @@ impl LauncherShell {
             sidebar_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             content_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             home_recent_y: 0.0,
+            home_scroll_y: 0.0,
+            home_max_scroll: 0.0,
             ui_state: UiState::Launcher,
         };
         shell.configure_widgets();
@@ -207,15 +211,20 @@ impl LauncherShell {
 
                 let section_y = quick_y + quick_size.h + 38.0;
                 self.home_recent_y = section_y;
-                let list_y = section_y + 34.0;
+                let list_y = section_y + 34.0 - self.home_scroll_y;
                 let list_h = (body.y + body.h - list_y).max(0.0);
 
-                self.recent_list.layout(Rect::new(
+                let list_size = self.recent_list.layout(Rect::new(
                     body.x,
                     list_y,
                     body.w,
                     list_h,
                 ));
+
+                // TASK-064: Compute scroll bounds for Home
+                let total_h = quick_size.h + 38.0 + 34.0 + list_size.h + 40.0;
+                let visible_h = body.h;
+                self.home_max_scroll = (total_h - visible_h).max(0.0);
             }
             LauncherTab::SavedConnections => {
                 self.card_grid.layout(body);
@@ -510,7 +519,20 @@ impl Widget for LauncherShell {
                 if !matches!(quick_resp, EventResponse::Ignored) {
                     return quick_resp;
                 }
-                self.recent_list.handle_event(event)
+                let list_resp = self.recent_list.handle_event(event);
+                if !matches!(list_resp, EventResponse::Ignored) {
+                    return list_resp;
+                }
+                // TASK-064: Scroll for Home content
+                if let UiEvent::Scroll { dy, .. } = event {
+                    if self.home_max_scroll > 0.0 {
+                        self.home_scroll_y =
+                            (self.home_scroll_y - dy).clamp(0.0, self.home_max_scroll);
+                        self.layout_active_tab();
+                        return EventResponse::Consumed;
+                    }
+                }
+                EventResponse::Ignored
             }
             LauncherTab::SavedConnections => self.card_grid.handle_event(event),
             LauncherTab::Profiles => self.profiles_panel.handle_event(event),

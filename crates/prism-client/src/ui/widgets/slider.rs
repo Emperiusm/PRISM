@@ -50,6 +50,10 @@ impl Slider {
         self.value
     }
 
+    pub fn rect(&self) -> Rect {
+        self.rect
+    }
+
     pub fn set_value(&mut self, v: f32) {
         self.value = v.clamp(self.min, self.max);
     }
