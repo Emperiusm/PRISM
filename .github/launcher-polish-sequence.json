@@ -1,14 +1,14 @@
 [
-  { "label": "phase-0",  "title": "Launcher Polish — Phase 0: Data-Layer Prerequisites",         "pass": 0 },
-  { "label": "phase-1",  "title": "Launcher Polish — Phase 1: Bold Text Support",                "pass": 1 },
-  { "label": "phase-2",  "title": "Launcher Polish — Phase 2: Primary Button Color Fix",         "pass": 1 },
-  { "label": "phase-3",  "title": "Launcher Polish — Phase 3: Sidebar Geometry Overhaul",        "pass": 1 },
-  { "label": "phase-4",  "title": "Launcher Polish — Phase 4: Home Screen Recent Connections",   "pass": 3 },
-  { "label": "phase-5",  "title": "Launcher Polish — Phase 5: Icon Rendering Primitive",         "pass": 2 },
-  { "label": "phase-6",  "title": "Launcher Polish — Phase 6: Sidebar Nav Icons & Header Bar",   "pass": 2 },
-  { "label": "phase-7",  "title": "Launcher Polish — Phase 7: Filter Bar & Card Grid",           "pass": 3 },
-  { "label": "phase-8",  "title": "Launcher Polish — Phase 8: FAB & Card Polish",                "pass": 3 },
-  { "label": "phase-9",  "title": "Launcher Polish — Phase 9: Profiles Editor Polish",           "pass": 3 },
-  { "label": "phase-10", "title": "Launcher Polish — Phase 10: Settings Panel Polish",           "pass": 4 },
-  { "label": "phase-11", "title": "Launcher Polish — Phase 11: Cross-Screen Verification",       "pass": 5 }
+  { "label": "phase-0",  "title": "Launcher Polish — Phase 0: Data-Layer Prerequisites",         "pass": 0, "issue": 4 },
+  { "label": "phase-1",  "title": "Launcher Polish — Phase 1: Bold Text Support",                "pass": 1, "issue": 5 },
+  { "label": "phase-2",  "title": "Launcher Polish — Phase 2: Primary Button Color Fix",         "pass": 1, "issue": 6 },
+  { "label": "phase-3",  "title": "Launcher Polish — Phase 3: Sidebar Geometry Overhaul",        "pass": 1, "issue": 7 },
+  { "label": "phase-4",  "title": "Launcher Polish — Phase 4: Home Screen Recent Connections",   "pass": 3, "issue": 8 },
+  { "label": "phase-5",  "title": "Launcher Polish — Phase 5: Icon Rendering Primitive",         "pass": 2, "issue": 9 },
+  { "label": "phase-6",  "title": "Launcher Polish — Phase 6: Sidebar Nav Icons & Header Bar",   "pass": 2, "issue": 10 },
+  { "label": "phase-7",  "title": "Launcher Polish — Phase 7: Filter Bar & Card Grid",           "pass": 3, "issue": 11 },
+  { "label": "phase-8",  "title": "Launcher Polish — Phase 8: FAB & Card Polish",                "pass": 3, "issue": 12 },
+  { "label": "phase-9",  "title": "Launcher Polish — Phase 9: Profiles Editor Polish",           "pass": 3, "issue": 13 },
+  { "label": "phase-10", "title": "Launcher Polish — Phase 10: Settings Panel Polish",           "pass": 4, "issue": 14 },
+  { "label": "phase-11", "title": "Launcher Polish — Phase 11: Cross-Screen Verification",       "pass": 5, "issue": 15 }
 ]
