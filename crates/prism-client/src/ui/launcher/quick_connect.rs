@@ -5,8 +5,7 @@ use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::text_input::TextInput;
 use crate::ui::widgets::{
-    ColorMode, EventResponse, KeyCode, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
-    Widget,
+    ColorMode, EventResponse, KeyCode, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
 };
 
 // ---------------------------------------------------------------------------

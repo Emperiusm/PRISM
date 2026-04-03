@@ -301,7 +301,12 @@ impl Widget for CardGrid {
                     ctx.push_glass_quad(theme::glass_quad(
                         *rect,
                         theme::PRIMARY_BLUE,
-                        [theme::PRIMARY_BLUE[0], theme::PRIMARY_BLUE[1], theme::PRIMARY_BLUE[2], 0.80],
+                        [
+                            theme::PRIMARY_BLUE[0],
+                            theme::PRIMARY_BLUE[1],
+                            theme::PRIMARY_BLUE[2],
+                            0.80,
+                        ],
                         pill_radius,
                     ));
                     ctx.push_text_run(TextRun {
@@ -314,10 +319,7 @@ impl Widget for CardGrid {
                     });
                 } else {
                     // Light frosted pill for inactive
-                    ctx.push_glass_quad(theme::launcher_control_surface(
-                        *rect,
-                        false,
-                    ));
+                    ctx.push_glass_quad(theme::launcher_control_surface(*rect, false));
                     if hovered {
                         ctx.push_glass_quad(theme::glass_quad(
                             *rect,
@@ -374,8 +376,18 @@ impl Widget for CardGrid {
                     icon_radius * 2.0,
                     icon_radius * 2.0,
                 ),
-                [theme::PRIMARY_BLUE[0], theme::PRIMARY_BLUE[1], theme::PRIMARY_BLUE[2], 0.08],
-                [theme::PRIMARY_BLUE[0], theme::PRIMARY_BLUE[1], theme::PRIMARY_BLUE[2], 0.15],
+                [
+                    theme::PRIMARY_BLUE[0],
+                    theme::PRIMARY_BLUE[1],
+                    theme::PRIMARY_BLUE[2],
+                    0.08,
+                ],
+                [
+                    theme::PRIMARY_BLUE[0],
+                    theme::PRIMARY_BLUE[1],
+                    theme::PRIMARY_BLUE[2],
+                    0.15,
+                ],
                 icon_radius,
             ));
 

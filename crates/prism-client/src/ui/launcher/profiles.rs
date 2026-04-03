@@ -61,22 +61,16 @@ impl ProfilesPanel {
             bitrate_slider: Slider::new("Bitrate", 5.0, 80.0, 35.0)
                 .with_format(|v| format!("{} Mbps", v.round() as u32))
                 .with_color_mode(ColorMode::Light),
-            fps_dropdown: Dropdown::new(Self::fps_options(), 2)
-                .with_color_mode(ColorMode::Light),
+            fps_dropdown: Dropdown::new(Self::fps_options(), 2).with_color_mode(ColorMode::Light),
             encoder_dropdown: SegmentedControl::new(Self::encoder_options(), 0)
                 .with_color_mode(ColorMode::Light),
-            native_scaling_toggle: Toggle::new(true)
-                .with_color_mode(ColorMode::Light),
+            native_scaling_toggle: Toggle::new(true).with_color_mode(ColorMode::Light),
             audio_mode_dropdown: Dropdown::new(Self::audio_options(), 0)
                 .with_color_mode(ColorMode::Light),
-            av1_toggle: Toggle::new(true)
-                .with_color_mode(ColorMode::Light),
-            exclusive_input_toggle: Toggle::new(false)
-                .with_color_mode(ColorMode::Light),
-            touch_mode_toggle: Toggle::new(false)
-                .with_color_mode(ColorMode::Light),
-            auto_reconnect_toggle: Toggle::new(true)
-                .with_color_mode(ColorMode::Light),
+            av1_toggle: Toggle::new(true).with_color_mode(ColorMode::Light),
+            exclusive_input_toggle: Toggle::new(false).with_color_mode(ColorMode::Light),
+            touch_mode_toggle: Toggle::new(false).with_color_mode(ColorMode::Light),
+            auto_reconnect_toggle: Toggle::new(true).with_color_mode(ColorMode::Light),
             save_button: Button::new("Save", UiAction::SaveServer)
                 .with_style(ButtonStyle::Primary)
                 .with_color_mode(ColorMode::Light),
@@ -436,7 +430,12 @@ impl Widget for ProfilesPanel {
                 ctx.push_glass_quad(theme::glass_quad(
                     Rect::new(row.x, row.y, 4.0, row.h),
                     theme::PRIMARY_BLUE,
-                    [theme::PRIMARY_BLUE[0], theme::PRIMARY_BLUE[1], theme::PRIMARY_BLUE[2], 0.80],
+                    [
+                        theme::PRIMARY_BLUE[0],
+                        theme::PRIMARY_BLUE[1],
+                        theme::PRIMARY_BLUE[2],
+                        0.80,
+                    ],
                     2.0,
                 ));
             }

@@ -390,12 +390,7 @@ pub fn launcher_modal_surface(rect: Rect) -> GlassQuad {
 
 /// Launcher separator — light gray divider (between sections on gradient bg).
 pub fn launcher_separator(rect: Rect) -> GlassQuad {
-    glass_quad(
-        rect,
-        [0.898, 0.898, 0.898, 0.50],
-        [0.0, 0.0, 0.0, 0.0],
-        0.0,
-    )
+    glass_quad(rect, [0.898, 0.898, 0.898, 0.50], [0.0, 0.0, 0.0, 0.0], 0.0)
 }
 
 /// Subtle in-panel divider — used inside white glass containers.
