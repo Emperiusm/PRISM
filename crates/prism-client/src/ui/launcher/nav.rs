@@ -4,8 +4,8 @@
 use super::{LauncherTab, SettingsSection};
 use crate::ui::theme;
 use crate::ui::widgets::icon::{
-    Icon, ICON_DEVICES, ICON_HOME, ICON_KEYBOARD, ICON_MENU, ICON_SETTINGS, ICON_SHIELD,
-    ICON_SPEAKER, ICON_STREAMING, ICON_TUNE,
+    ICON_DEVICES, ICON_HOME, ICON_KEYBOARD, ICON_MENU, ICON_SETTINGS, ICON_SHIELD, ICON_SPEAKER,
+    ICON_STREAMING, ICON_TUNE, Icon,
 };
 use crate::ui::widgets::{
     EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
@@ -81,9 +81,8 @@ impl Widget for LauncherNav {
         // When Settings is active, compute sub-nav items after the primary ones
         self.sub_nav_items.clear();
         if self.active_tab == LauncherTab::Settings {
-            let main_nav_bottom_y = self.rect.y
-                + 94.0
-                + LauncherTab::PRIMARY.len() as f32 * (ITEM_H + ITEM_GAP);
+            let main_nav_bottom_y =
+                self.rect.y + 94.0 + LauncherTab::PRIMARY.len() as f32 * (ITEM_H + ITEM_GAP);
             let sub_header_y = main_nav_bottom_y + 16.0;
             for (i, section) in SettingsSection::ALL.iter().enumerate() {
                 let item_y = sub_header_y + 24.0 + i as f32 * (ITEM_H + 4.0);
@@ -137,11 +136,7 @@ impl Widget for LauncherNav {
                     theme::PRIMARY_BLUE,
                 );
             } else if hovered {
-                ctx.push_glass_quad(theme::launcher_nav_item_surface(
-                    *rect,
-                    false,
-                    true,
-                ));
+                ctx.push_glass_quad(theme::launcher_nav_item_surface(*rect, false, true));
             }
 
             let icon_codepoint = match tab {
@@ -258,7 +253,10 @@ impl Widget for LauncherNav {
         Icon::new(ICON_SETTINGS)
             .with_size(20.0)
             .with_color(settings_icon_color)
-            .at(self.settings_item.x + SIDE_PADDING, self.settings_item.y + 10.0)
+            .at(
+                self.settings_item.x + SIDE_PADDING,
+                self.settings_item.y + 10.0,
+            )
             .paint(ctx);
 
         ctx.push_text_run(TextRun {

@@ -12,7 +12,7 @@ use crate::ui::launcher::recent_list::RecentList;
 use crate::ui::launcher::server_form::ServerForm;
 use crate::ui::launcher::settings::SettingsPanel;
 use crate::ui::theme;
-use crate::ui::widgets::icon::{Icon, ICON_SEARCH};
+use crate::ui::widgets::icon::{ICON_SEARCH, Icon};
 use crate::ui::widgets::{
     EventResponse, GlassQuad, MouseButton, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
     Widget,
@@ -179,12 +179,7 @@ impl LauncherShell {
 
     fn compute_layout(&mut self, screen_w: f32, screen_h: f32) {
         self.screen_rect = Rect::new(0.0, 0.0, screen_w, screen_h);
-        self.sidebar_rect = Rect::new(
-            0.0,
-            0.0,
-            SIDEBAR_W,
-            screen_h,
-        );
+        self.sidebar_rect = Rect::new(0.0, 0.0, SIDEBAR_W, screen_h);
         let content_x = SIDEBAR_W + CONTENT_PAD;
         self.content_rect = Rect::new(
             content_x,
@@ -209,24 +204,18 @@ impl LauncherShell {
             LauncherTab::Home => {
                 let quick_y = body.y;
 
-                let quick_size = self.quick_connect.layout(Rect::new(
-                    body.x,
-                    quick_y,
-                    body.w,
-                    300.0,
-                ));
+                let quick_size = self
+                    .quick_connect
+                    .layout(Rect::new(body.x, quick_y, body.w, 300.0));
 
                 let section_y = quick_y + quick_size.h + 38.0;
                 self.home_recent_y = section_y;
                 let list_y = section_y + 34.0 - self.home_scroll_y;
                 let list_h = (body.y + body.h - list_y).max(0.0);
 
-                let list_size = self.recent_list.layout(Rect::new(
-                    body.x,
-                    list_y,
-                    body.w,
-                    list_h,
-                ));
+                let list_size = self
+                    .recent_list
+                    .layout(Rect::new(body.x, list_y, body.w, list_h));
 
                 // TASK-064: Compute scroll bounds for Home
                 let total_h = quick_size.h + 38.0 + 34.0 + list_size.h + 40.0;
@@ -483,24 +472,24 @@ impl LauncherShell {
 
     /// Apply the current `focused_widget` index to the actual widget focus state.
     fn apply_focus(&mut self) {
-        match self.active_tab {
-            LauncherTab::Home => {
-                let qc_count = self.quick_connect.focusable_count();
-                let idx = self.focused_widget;
-                if let Some(i) = idx {
-                    if i < qc_count {
-                        self.quick_connect.set_focus(Some(i));
-                        self.recent_list.set_focus(None);
-                    } else {
-                        self.quick_connect.set_focus(None);
-                        self.recent_list.set_focus(Some(i - qc_count));
-                    }
+        if self.active_tab == LauncherTab::Home {
+            let qc_count = self.quick_connect.focusable_count();
+            let idx = self.focused_widget;
+            if let Some(i) = idx {
+                if i < qc_count {
+                    self.quick_connect.set_focus(Some(i));
+                    self.recent_list.set_focus(None);
                 } else {
                     self.quick_connect.set_focus(None);
-                    self.recent_list.set_focus(None);
+                    self.recent_list.set_focus(Some(i - qc_count));
                 }
+            } else {
+                self.quick_connect.set_focus(None);
+                self.recent_list.set_focus(None);
             }
-            _ => {}
+        } else {
+            self.quick_connect.set_focus(None);
+            self.recent_list.set_focus(None);
         }
     }
 }
@@ -576,9 +565,8 @@ impl Widget for LauncherShell {
                 KeyCode::Tab => {
                     let max = self.focusable_count();
                     if max > 0 {
-                        self.focused_widget = Some(
-                            self.focused_widget.map_or(0, |i| (i + 1) % max),
-                        );
+                        self.focused_widget =
+                            Some(self.focused_widget.map_or(0, |i| (i + 1) % max));
                         self.apply_focus();
                     }
                     return EventResponse::Consumed;
@@ -638,13 +626,13 @@ impl Widget for LauncherShell {
                     return list_resp;
                 }
                 // TASK-064: Scroll for Home content
-                if let UiEvent::Scroll { dy, .. } = event {
-                    if self.home_max_scroll > 0.0 {
-                        self.home_scroll_y =
-                            (self.home_scroll_y - dy).clamp(0.0, self.home_max_scroll);
-                        self.layout_active_tab();
-                        return EventResponse::Consumed;
-                    }
+                if let UiEvent::Scroll { dy, .. } = event
+                    && self.home_max_scroll > 0.0
+                {
+                    self.home_scroll_y =
+                        (self.home_scroll_y - dy).clamp(0.0, self.home_max_scroll);
+                    self.layout_active_tab();
+                    return EventResponse::Consumed;
                 }
                 EventResponse::Ignored
             }

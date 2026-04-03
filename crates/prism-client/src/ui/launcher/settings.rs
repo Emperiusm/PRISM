@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use crate::config::client_config_prefs::UserPrefs;
 use crate::ui::theme;
 use crate::ui::widgets::dropdown::Dropdown;
-use crate::ui::widgets::icon::{Icon, ICON_MIC, ICON_SPEAKER};
+use crate::ui::widgets::icon::{ICON_MIC, ICON_SPEAKER, Icon};
 use crate::ui::widgets::toggle::Toggle;
 use crate::ui::widgets::{
     ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget,

@@ -8,8 +8,8 @@ use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::icon::{
-    Icon, ICON_ADD, ICON_BALANCE, ICON_CODE, ICON_DIAL, ICON_GAMEPAD, ICON_KEYBOARD, ICON_MONITOR,
-    ICON_SPEED,
+    ICON_ADD, ICON_BALANCE, ICON_CODE, ICON_DIAL, ICON_GAMEPAD, ICON_KEYBOARD, ICON_MONITOR,
+    ICON_SPEED, Icon,
 };
 use crate::ui::widgets::segmented::SegmentedControl;
 use crate::ui::widgets::slider::Slider;
@@ -413,8 +413,7 @@ impl Widget for ProfilesPanel {
 
         // PERFORMANCE SETTINGS (single-column controls)
         let mut y = y_start + 32.0; // room for section header
-        self.bitrate_slider
-            .layout(Rect::new(x, y + 50.0, w, 32.0));
+        self.bitrate_slider.layout(Rect::new(x, y + 50.0, w, 32.0));
         y += 110.0;
         self.encoder_dropdown
             .layout(Rect::new(x, y + 20.0, w, 36.0));
@@ -646,8 +645,7 @@ impl Widget for ProfilesPanel {
             }
 
             if self.dirty {
-                let badge_x =
-                    name_x + tw + 16.0 + if draft.builtin { 74.0 } else { 0.0 };
+                let badge_x = name_x + tw + 16.0 + if draft.builtin { 74.0 } else { 0.0 };
                 let chip = Rect::new(badge_x, editor.y + 24.0, 80.0, 20.0);
                 ctx.push_glass_quad(theme::launcher_status_chip(chip, theme::ChipTone::Warning));
                 ctx.push_text_run(TextRun {
@@ -678,9 +676,7 @@ impl Widget for ProfilesPanel {
 
         // Section helper
         let paint_section_header = |ctx: &mut PaintContext, y: f32, icon: char, title: &str| {
-            ctx.push_glass_quad(theme::launcher_inner_separator(Rect::new(
-                x, y, w, 1.0,
-            )));
+            ctx.push_glass_quad(theme::launcher_inner_separator(Rect::new(x, y, w, 1.0)));
             Icon::new(icon)
                 .with_size(16.0)
                 .with_color(theme::PRIMARY_BLUE)
@@ -706,8 +702,8 @@ impl Widget for ProfilesPanel {
         let bitrate_mbps = self.bitrate_slider.value().round() as u32;
         let value_str = format!("{}", bitrate_mbps);
         ctx.push_text_run(TextRun {
-            x: x,
-            y: y,
+            x,
+            y,
             text: "Bitrate Preference".into(),
             font_size: theme::FONT_CAPTION,
             color: theme::LT_TEXT_MUTED,
@@ -717,7 +713,7 @@ impl Widget for ProfilesPanel {
         let val_w = theme::text_width(&value_str, theme::FONT_DISPLAY);
         ctx.push_text_run(TextRun {
             x: x + w - val_w - 50.0,
-            y: y,
+            y,
             text: value_str,
             font_size: theme::FONT_DISPLAY,
             color: theme::LT_TEXT_PRIMARY,
@@ -756,8 +752,8 @@ impl Widget for ProfilesPanel {
 
         y += 110.0;
         ctx.push_text_run(TextRun {
-            x: x,
-            y: y,
+            x,
+            y,
             text: "Latency vs Quality".into(),
             font_size: theme::FONT_CAPTION,
             color: theme::LT_TEXT_MUTED,

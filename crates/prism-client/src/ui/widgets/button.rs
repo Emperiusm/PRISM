@@ -168,12 +168,7 @@ impl Widget for Button {
             ColorMode::Light => 8.0,
             ColorMode::Dark => theme::CONTROL_RADIUS,
         });
-        ctx.push_glass_quad(theme::glass_quad(
-            self.rect,
-            tint,
-            border,
-            radius,
-        ));
+        ctx.push_glass_quad(theme::glass_quad(self.rect, tint, border, radius));
 
         if hover > 0.01 {
             let overlay = match self.color_mode {

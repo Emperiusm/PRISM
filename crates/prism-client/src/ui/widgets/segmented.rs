@@ -114,12 +114,7 @@ impl Widget for SegmentedControl {
                     ColorMode::Light => 10.0,
                     ColorMode::Dark => theme::CARD_RADIUS,
                 };
-                ctx.push_glass_quad(theme::glass_quad(
-                    r,
-                    active_tint,
-                    active_border,
-                    seg_radius,
-                ));
+                ctx.push_glass_quad(theme::glass_quad(r, active_tint, active_border, seg_radius));
             } else if hovered {
                 ctx.push_glass_quad(theme::glass_quad(
                     r,
