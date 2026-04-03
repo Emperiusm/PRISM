@@ -9,7 +9,9 @@ on:
 
 permissions:
   issues: write
+  pull-requests: write
   contents: read
+  actions: write
 
 jobs:
   chain-next-phase:
@@ -79,17 +81,24 @@ jobs:
             const next = sequence[completedIndex + 1];
             console.log(`Triggering next phase: ${next.label} (issue #${next.issue})`);
 
-            // Trigger Copilot cloud agent via @copilot mention
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+            // Assign Copilot cloud agent via REST API (official method)
+            // Uses copilot-swe-agent[bot] with agent_assignment payload
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
+              owner,
+              repo,
               issue_number: next.issue,
-              body: [
-                `Previous phase merged: ${context.payload.pull_request.html_url}`,
-                '',
-                `@copilot Create a PR for this issue. The base branch is \`main\`. Follow the issue body instructions exactly. The plan is at \`docs/superpowers/plans/2026-04-03-launcher-ui-polish.md\`.`
-              ].join('\n')
+              assignees: ['copilot-swe-agent[bot]'],
+              agent_assignment: {
+                target_repo: `${owner}/${repo}`,
+                base_branch: 'main',
+                custom_instructions: `Follow the issue body instructions exactly. The plan is at docs/superpowers/plans/2026-04-03-launcher-ui-polish.md. Previous phase merged: ${context.payload.pull_request.html_url}`,
+                custom_agent: '',
+                model: ''
+              }
             });
+            console.log(`Assigned copilot-swe-agent to issue #${next.issue}`);
 
   # Safety: notify on 2 consecutive CI failures for the same phase
   notify-stuck:
