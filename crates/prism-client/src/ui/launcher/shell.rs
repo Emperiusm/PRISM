@@ -254,7 +254,10 @@ impl LauncherShell {
                 chip_w,
                 28.0,
             );
-            ctx.push_glass_quad(theme::launcher_status_chip(status_rect, theme::ChipTone::Accent));
+            ctx.push_glass_quad(theme::launcher_status_chip(
+                status_rect,
+                theme::ChipTone::Accent,
+            ));
             ctx.push_text_run(TextRun {
                 x: status_rect.x + 14.0,
                 y: status_rect.y + 6.0,

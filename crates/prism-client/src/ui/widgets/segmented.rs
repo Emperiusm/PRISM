@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Segmented control widget for mutually exclusive linear options.
 
-use super::{ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use super::{
+    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+};
 use crate::ui::theme;
 
 pub struct SegmentedControl {
@@ -56,32 +58,39 @@ impl Widget for SegmentedControl {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        let (base_tint, base_border, active_tint, active_border, active_text, inactive_text, hover_tint) =
-            match self.color_mode {
-                ColorMode::Light => (
-                    theme::SEGMENTED_CONTAINER_LIGHT,
-                    [1.0, 1.0, 1.0, 0.80],
-                    theme::SEGMENTED_ACTIVE_LIGHT,
-                    [
-                        theme::PRIMARY_BLUE[0],
-                        theme::PRIMARY_BLUE[1],
-                        theme::PRIMARY_BLUE[2],
-                        0.80,
-                    ],
-                    [1.0, 1.0, 1.0, 1.0],
-                    theme::LT_TEXT_MUTED,
-                    [1.0, 1.0, 1.0, 0.30],
-                ),
-                ColorMode::Dark => (
-                    [1.0, 1.0, 1.0, 0.04],
-                    [1.0, 1.0, 1.0, 0.1],
-                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.9],
-                    [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
-                    [1.0, 1.0, 1.0, 1.0],
-                    theme::TEXT_SECONDARY,
-                    [1.0, 1.0, 1.0, 0.08],
-                ),
-            };
+        let (
+            base_tint,
+            base_border,
+            active_tint,
+            active_border,
+            active_text,
+            inactive_text,
+            hover_tint,
+        ) = match self.color_mode {
+            ColorMode::Light => (
+                theme::SEGMENTED_CONTAINER_LIGHT,
+                [1.0, 1.0, 1.0, 0.80],
+                theme::SEGMENTED_ACTIVE_LIGHT,
+                [
+                    theme::PRIMARY_BLUE[0],
+                    theme::PRIMARY_BLUE[1],
+                    theme::PRIMARY_BLUE[2],
+                    0.80,
+                ],
+                [1.0, 1.0, 1.0, 1.0],
+                theme::LT_TEXT_MUTED,
+                [1.0, 1.0, 1.0, 0.30],
+            ),
+            ColorMode::Dark => (
+                [1.0, 1.0, 1.0, 0.04],
+                [1.0, 1.0, 1.0, 0.1],
+                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 0.9],
+                [theme::ACCENT[0], theme::ACCENT[1], theme::ACCENT[2], 1.0],
+                [1.0, 1.0, 1.0, 1.0],
+                theme::TEXT_SECONDARY,
+                [1.0, 1.0, 1.0, 0.08],
+            ),
+        };
 
         // Base track
         ctx.push_glass_quad(theme::glass_quad(
@@ -112,11 +121,7 @@ impl Widget for SegmentedControl {
                 ));
             }
 
-            let text_color = if selected {
-                active_text
-            } else {
-                inactive_text
-            };
+            let text_color = if selected { active_text } else { inactive_text };
 
             let tw = theme::text_width(label, 12.0);
             ctx.push_text_run(TextRun {

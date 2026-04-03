@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Horizontal value slider widget.
 
-use super::{ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use super::{
+    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+};
 use crate::ui::theme;
 
 pub struct Slider {
@@ -158,12 +160,7 @@ impl Widget for Slider {
             THUMB_SIZE,
             THUMB_SIZE,
         );
-        ctx.push_glass_quad(theme::glass_quad(
-            thumb_rect,
-            thumb_tint,
-            thumb_border,
-            6.0,
-        ));
+        ctx.push_glass_quad(theme::glass_quad(thumb_rect, thumb_tint, thumb_border, 6.0));
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {

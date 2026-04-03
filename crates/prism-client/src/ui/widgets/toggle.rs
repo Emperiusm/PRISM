@@ -3,7 +3,9 @@
 
 use crate::renderer::animation::{Animation, EaseCurve};
 use crate::ui::theme;
-use crate::ui::widgets::{ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, UiEvent, Widget};
+use crate::ui::widgets::{
+    ColorMode, EventResponse, MouseButton, PaintContext, Rect, Size, UiEvent, Widget,
+};
 
 const TRACK_W: f32 = 44.0;
 const TRACK_H: f32 = 22.0;
@@ -104,8 +106,7 @@ impl Widget for Toggle {
 
                 // Light-mode thumb — always white
                 let t = self.slide_anim.value();
-                let thumb_x =
-                    track.x + THUMB_PAD + t * (TRACK_W - THUMB_SIZE - THUMB_PAD * 2.0);
+                let thumb_x = track.x + THUMB_PAD + t * (TRACK_W - THUMB_SIZE - THUMB_PAD * 2.0);
                 let thumb_y = track.y + (TRACK_H - THUMB_SIZE) * 0.5;
                 let thumb_rect = Rect::new(thumb_x, thumb_y, THUMB_SIZE, THUMB_SIZE);
                 ctx.push_glass_quad(theme::glass_quad(
@@ -119,8 +120,7 @@ impl Widget for Toggle {
                 ctx.push_glass_quad(theme::toggle_track(track, self.on));
 
                 let t = self.slide_anim.value();
-                let thumb_x =
-                    track.x + THUMB_PAD + t * (TRACK_W - THUMB_SIZE - THUMB_PAD * 2.0);
+                let thumb_x = track.x + THUMB_PAD + t * (TRACK_W - THUMB_SIZE - THUMB_PAD * 2.0);
                 let thumb_y = track.y + (TRACK_H - THUMB_SIZE) * 0.5;
                 let thumb_rect = Rect::new(thumb_x, thumb_y, THUMB_SIZE, THUMB_SIZE);
                 ctx.push_glass_quad(theme::toggle_thumb(thumb_rect, self.on));

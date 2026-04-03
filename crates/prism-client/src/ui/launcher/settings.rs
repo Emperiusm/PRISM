@@ -8,7 +8,9 @@ use crate::config::client_config_prefs::UserPrefs;
 use crate::ui::theme;
 use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::toggle::Toggle;
-use crate::ui::widgets::{ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
+use crate::ui::widgets::{
+    ColorMode, EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget,
+};
 
 const ROW_GAP: f32 = 28.0;
 
@@ -47,10 +49,8 @@ impl SettingsPanel {
                 2,
             )
             .with_color_mode(ColorMode::Light),
-            exclusive_keyboard_toggle: Toggle::new(true)
-                .with_color_mode(ColorMode::Light),
-            relative_mouse_toggle: Toggle::new(false)
-                .with_color_mode(ColorMode::Light),
+            exclusive_keyboard_toggle: Toggle::new(true).with_color_mode(ColorMode::Light),
+            relative_mouse_toggle: Toggle::new(false).with_color_mode(ColorMode::Light),
             audio_output_dropdown: Dropdown::new(
                 vec![
                     "System Default".to_string(),
@@ -299,7 +299,10 @@ impl Widget for SettingsPanel {
             "Validation status of this hardware endpoint.",
         );
         let trust_badge = Rect::new(content_x + content_w * 0.35, cy + 12.0, 110.0, 24.0);
-        ctx.push_glass_quad(theme::launcher_status_chip(trust_badge, theme::ChipTone::Success));
+        ctx.push_glass_quad(theme::launcher_status_chip(
+            trust_badge,
+            theme::ChipTone::Success,
+        ));
         ctx.push_text_run(TextRun {
             x: trust_badge.x + 12.0,
             y: trust_badge.y + 5.0,

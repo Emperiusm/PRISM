@@ -29,10 +29,8 @@ pub struct ServerForm {
 impl ServerForm {
     pub fn new() -> Self {
         Self {
-            name_input: TextInput::new("Server name")
-                .with_color_mode(ColorMode::Light),
-            address_input: TextInput::new("host:port")
-                .with_color_mode(ColorMode::Light),
+            name_input: TextInput::new("Server name").with_color_mode(ColorMode::Light),
+            address_input: TextInput::new("host:port").with_color_mode(ColorMode::Light),
             noise_key_input: TextInput::new("Noise public key (optional)")
                 .with_color_mode(ColorMode::Light),
             profile_dropdown: Dropdown::new(vec!["Gaming".into(), "Coding".into()], 0)
