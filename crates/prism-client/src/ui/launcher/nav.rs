@@ -36,9 +36,9 @@ impl LauncherNav {
 
     fn item_rect(&self, index: usize) -> Rect {
         Rect::new(
-            self.rect.x + SIDE_PADDING,
+            self.rect.x,
             self.rect.y + 94.0 + index as f32 * (ITEM_H + ITEM_GAP),
-            self.rect.w - SIDE_PADDING * 2.0,
+            self.rect.w,
             ITEM_H,
         )
     }
@@ -59,9 +59,9 @@ impl Widget for LauncherNav {
             .map(|(index, tab)| (*tab, self.item_rect(index)))
             .collect();
         self.settings_item = Rect::new(
-            self.rect.x + SIDE_PADDING,
+            self.rect.x,
             self.rect.y + self.rect.h - 54.0,
-            self.rect.w - SIDE_PADDING * 2.0,
+            self.rect.w,
             ITEM_H,
         );
         Size {
@@ -73,35 +73,34 @@ impl Widget for LauncherNav {
     fn paint(&self, ctx: &mut PaintContext) {
         ctx.push_glass_quad(theme::launcher_sidebar_surface(self.rect));
 
+        // TODO(Phase 5): replace with Icon::new(ICON_MENU)
         ctx.push_text_run(TextRun {
             x: self.rect.x + 18.0,
-            y: self.rect.y + 22.0,
-            text: "PRISM".into(),
-            font_size: 20.0,
-            color: theme::LT_TEXT_PRIMARY,
-            ..Default::default()
-        });
-        ctx.push_text_run(TextRun {
-            x: self.rect.x + 18.0,
-            y: self.rect.y + 48.0,
-            text: "Remote client".into(),
-            font_size: 11.0,
-            color: theme::LT_TEXT_MUTED,
+            y: self.rect.y + 30.0,
+            text: "\u{2261}".into(), // ≡ hamburger
+            font_size: 24.0,
+            color: theme::LT_TEXT_SECONDARY,
             ..Default::default()
         });
 
         for (tab, rect) in &self.primary_items {
             let hovered = self.hovered_tab == Some(*tab);
-            if *tab == self.active_tab || hovered {
+            if *tab == self.active_tab {
+                theme::paint_active_list_indicator(
+                    &mut ctx.glass_quads,
+                    *rect,
+                    theme::PRIMARY_BLUE,
+                );
+            } else if hovered {
                 ctx.push_glass_quad(theme::launcher_nav_item_surface(
                     *rect,
-                    *tab == self.active_tab,
-                    hovered,
+                    false,
+                    true,
                 ));
             }
 
             ctx.push_text_run(TextRun {
-                x: rect.x + 16.0,
+                x: rect.x + SIDE_PADDING + 16.0,
                 y: rect.y + 11.0,
                 text: tab.label().to_string(),
                 font_size: 13.0,
@@ -115,15 +114,21 @@ impl Widget for LauncherNav {
         }
 
         let hovered = self.hovered_tab == Some(LauncherTab::Settings);
-        if self.active_tab == LauncherTab::Settings || hovered {
+        if self.active_tab == LauncherTab::Settings {
+            theme::paint_active_list_indicator(
+                &mut ctx.glass_quads,
+                self.settings_item,
+                theme::PRIMARY_BLUE,
+            );
+        } else if hovered {
             ctx.push_glass_quad(theme::launcher_nav_item_surface(
                 self.settings_item,
-                self.active_tab == LauncherTab::Settings,
-                hovered,
+                false,
+                true,
             ));
         }
         ctx.push_text_run(TextRun {
-            x: self.settings_item.x + 16.0,
+            x: self.settings_item.x + SIDE_PADDING + 16.0,
             y: self.settings_item.y + 11.0,
             text: "Settings".into(),
             font_size: 13.0,

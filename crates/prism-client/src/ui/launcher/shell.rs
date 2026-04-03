@@ -16,7 +16,6 @@ use crate::ui::widgets::{
 };
 
 const SIDEBAR_W: f32 = 224.0;
-const SIDEBAR_PAD: f32 = 28.0;
 const CONTENT_PAD: f32 = 28.0;
 const HEADER_OFFSET: f32 = 92.0;
 
@@ -166,12 +165,12 @@ impl LauncherShell {
     fn compute_layout(&mut self, screen_w: f32, screen_h: f32) {
         self.screen_rect = Rect::new(0.0, 0.0, screen_w, screen_h);
         self.sidebar_rect = Rect::new(
-            SIDEBAR_PAD,
-            SIDEBAR_PAD,
+            0.0,
+            0.0,
             SIDEBAR_W,
-            (screen_h - SIDEBAR_PAD * 2.0).max(280.0),
+            screen_h,
         );
-        let content_x = self.sidebar_rect.x + self.sidebar_rect.w + CONTENT_PAD;
+        let content_x = SIDEBAR_W + CONTENT_PAD;
         self.content_rect = Rect::new(
             content_x,
             42.0,
