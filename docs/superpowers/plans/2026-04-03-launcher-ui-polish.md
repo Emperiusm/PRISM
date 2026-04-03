@@ -58,7 +58,7 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 - [x] Phase 1 — Bold Text Support (3 tasks: 002–004)
 - [x] Phase 2 — Primary Button Color Fix (3 tasks: 005–007)
 - [x] Phase 3 — Sidebar Geometry Overhaul (7 tasks: 008–015)
-- [ ] Phase 4 — Home Screen: Recent Connections (4 tasks: 016–019)
+- [x] Phase 4 — Home Screen: Recent Connections (4 tasks: 016–019)
 - [x] Phase 5 — Icon Rendering Primitive (9 tasks: 021–025b)
 - [x] Phase 6 — Sidebar Nav Icons & Header Bar (8 tasks: 026–033)
 - [ ] Phase 7 — Saved Connections: Filter Bar & Card Grid (11 tasks: 034–044)
@@ -883,13 +883,13 @@ ctx.text_runs.push(TextRun {
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-014 | In `shell.rs`, the Home tab currently delegates Recent Connections rendering to `card_grid` in `Rows` mode with `visible_limit = Some(3)`. **Refactor this delegation** — instead of reusing the Connections-page card grid, build a dedicated lightweight row list directly in `quick_connect.rs` (or a new `recent_list.rs`). Remove the `Rows`-mode delegation from the Home tab paint path. This avoids coupling the Home screen's simple 3-row list to the full Connections-page grid/filter/scroll infrastructure. The empty state ("No saved desktops match this filter.") insertion point remains in the same location. | | |
-| TASK-015 | Wrap the list area in `theme::launcher_list_surface(list_rect)` — a nearly-opaque white glass container (`rgba(255,255,255,0.85)`). Compute `list_rect` to fill the space below the "Recent Connections" section header within the content area. | | |
-| TASK-016 | Implement a rendering loop over the saved-server data (likely `Vec<SavedServer>` from `crate::config::servers`). For each server, compute a row rect and render using `theme::launcher_row_surface(row_rect, hovered)`. | | |
-| TASK-017 | Each row must render: (a) a numbered index in `LT_TEXT_MUTED`, (b) server name in `LT_TEXT_PRIMARY` bold, (c) a status chip via `theme::launcher_status_chip(chip_rect, tone)` with text color from `theme::launcher_chip_text_color(tone)` — mapping Online→`Success`, Sleeping→`Warning`, Unreachable→`Danger`, (d) last-connected timestamp in `LT_TEXT_MUTED`, (e) a "Reconnect" button using `ButtonStyle::Secondary` + `ColorMode::Light` with a refresh/sync icon (`ICON_SYNC` or `ICON_REFRESH`) rendered to the left of the label text. The icon should use `LT_TEXT_SECONDARY` color at ~14px. Note: the icon won't render until Phase 5 lands the `Icon` widget — initially render the button text-only, then revisit in Phase 6 to inject the icon. | | |
-| TASK-018 | Add `launcher_inner_separator()` between rows inside the list container (permitted per TASK-061 reconciliation rule — dividers are allowed inside card/list containers where the design screenshots show them). | | |
-| TASK-019 | Keep the "No saved desktops match this filter." empty state as a fallback when the server list is empty. | | |
-| TASK-020 | `cargo check -p prism-client` — verify compilation. | | |
+| TASK-014 | In `shell.rs`, the Home tab currently delegates Recent Connections rendering to `card_grid` in `Rows` mode with `visible_limit = Some(3)`. **Refactor this delegation** — instead of reusing the Connections-page card grid, build a dedicated lightweight row list directly in `quick_connect.rs` (or a new `recent_list.rs`). Remove the `Rows`-mode delegation from the Home tab paint path. This avoids coupling the Home screen's simple 3-row list to the full Connections-page grid/filter/scroll infrastructure. The empty state ("No saved desktops match this filter.") insertion point remains in the same location. | ✅ | 2026-04-03 |
+| TASK-015 | Wrap the list area in `theme::launcher_list_surface(list_rect)` — a nearly-opaque white glass container (`rgba(255,255,255,0.85)`). Compute `list_rect` to fill the space below the "Recent Connections" section header within the content area. | ✅ | 2026-04-03 |
+| TASK-016 | Implement a rendering loop over the saved-server data (likely `Vec<SavedServer>` from `crate::config::servers`). For each server, compute a row rect and render using `theme::launcher_row_surface(row_rect, hovered)`. | ✅ | 2026-04-03 |
+| TASK-017 | Each row must render: (a) a numbered index in `LT_TEXT_MUTED`, (b) server name in `LT_TEXT_PRIMARY` bold, (c) a status chip via `theme::launcher_status_chip(chip_rect, tone)` with text color from `theme::launcher_chip_text_color(tone)` — mapping Online→`Success`, Sleeping→`Warning`, Unreachable→`Danger`, (d) last-connected timestamp in `LT_TEXT_MUTED`, (e) a "Reconnect" button using `ButtonStyle::Secondary` + `ColorMode::Light` with a refresh/sync icon (`ICON_SYNC` or `ICON_REFRESH`) rendered to the left of the label text. The icon should use `LT_TEXT_SECONDARY` color at ~14px. Note: the icon won't render until Phase 5 lands the `Icon` widget — initially render the button text-only, then revisit in Phase 6 to inject the icon. | ✅ | 2026-04-03 |
+| TASK-018 | Add `launcher_inner_separator()` between rows inside the list container (permitted per TASK-061 reconciliation rule — dividers are allowed inside card/list containers where the design screenshots show them). | ✅ | 2026-04-03 |
+| TASK-019 | Keep the "No saved desktops match this filter." empty state as a fallback when the server list is empty. | ✅ | 2026-04-03 |
+| TASK-020 | `cargo check -p prism-client` — verify compilation. | ✅ | 2026-04-03 |
 
 #### Phase 4 — Implementation Detail
 
