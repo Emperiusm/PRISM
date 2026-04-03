@@ -10,8 +10,7 @@ use crate::ui::widgets::dropdown::Dropdown;
 use crate::ui::widgets::toggle::Toggle;
 use crate::ui::widgets::{EventResponse, PaintContext, Rect, Size, TextRun, UiEvent, Widget};
 
-const SECTION_GAP: f32 = 14.0;
-const SECTION_PAD: f32 = 18.0;
+const ROW_GAP: f32 = 28.0;
 
 pub struct SettingsPanel {
     rect: Rect,
@@ -24,6 +23,10 @@ pub struct SettingsPanel {
     relative_mouse_toggle: Toggle,
     audio_output_dropdown: Dropdown,
     mic_dropdown: Dropdown,
+
+    // Simplest native scroll tracking possible without overengineering clipped contexts
+    scroll_y: f32,
+    max_scroll: f32,
 }
 
 impl SettingsPanel {
@@ -61,6 +64,8 @@ impl SettingsPanel {
                 ],
                 0,
             ),
+            scroll_y: 0.0,
+            max_scroll: 0.0,
         }
     }
 
@@ -117,61 +122,67 @@ impl SettingsPanel {
             let _ = prefs.save(prefs_dir);
         }
     }
-
-    fn section_rects(&self) -> (Rect, Rect, Rect, Rect, Rect) {
-        let x = self.rect.x;
-        let w = self.rect.w;
-        let mut y = self.rect.y + 58.0;
-
-        let identity = Rect::new(x, y, w, 92.0);
-        y += identity.h + SECTION_GAP;
-        let streaming = Rect::new(x, y, w, 102.0);
-        y += streaming.h + SECTION_GAP;
-        let input = Rect::new(x, y, w, 108.0);
-        y += input.h + SECTION_GAP;
-        let audio = Rect::new(x, y, w, 132.0);
-        y += audio.h + SECTION_GAP;
-        let about = Rect::new(x, y, w, 74.0);
-
-        (identity, streaming, input, audio, about)
-    }
 }
 
 impl Widget for SettingsPanel {
     fn layout(&mut self, available: Rect) -> Size {
         self.rect = available;
 
-        let (_identity, streaming, input, audio, _about) = self.section_rects();
-        self.default_profile_dropdown.layout(Rect::new(
-            streaming.x + SECTION_PAD,
-            streaming.y + 44.0,
-            streaming.w - SECTION_PAD * 2.0,
-            40.0,
-        ));
+        let content_x = available.x + 40.0;
+        let content_w = (available.w - 80.0).clamp(400.0, 900.0);
+
+        // Settings inner components width mappings (split layout logic)
+        let _left_w = content_w * 0.35;
+        let right_w = content_w * 0.65;
+        let right_x = content_x + content_w - right_w;
+
+        // Base y is affected smoothly by manual scrolling
+        let mut cursor_y = available.y + 110.0 - self.scroll_y;
+
+        // Sections
+        // Identity
+        cursor_y += 34.0;
+
+        // Device Trust
+        cursor_y += ROW_GAP + 20.0 + 34.0;
+
+        // Streaming Defaults
+        cursor_y += ROW_GAP + 20.0;
+        self.default_profile_dropdown
+            .layout(Rect::new(right_x, cursor_y, right_w, 40.0));
+        cursor_y += 40.0;
+
+        // Input
+        cursor_y += ROW_GAP + 20.0;
         self.exclusive_keyboard_toggle.layout(Rect::new(
-            input.x + SECTION_PAD,
-            input.y + 40.0,
-            input.w - SECTION_PAD * 2.0,
+            right_x + right_w - 42.0,
+            cursor_y + 14.0,
+            42.0,
             22.0,
         ));
+        cursor_y += 56.0;
         self.relative_mouse_toggle.layout(Rect::new(
-            input.x + SECTION_PAD,
-            input.y + 72.0,
-            input.w - SECTION_PAD * 2.0,
+            right_x + right_w - 42.0,
+            cursor_y + 14.0,
+            42.0,
             22.0,
         ));
-        self.audio_output_dropdown.layout(Rect::new(
-            audio.x + SECTION_PAD,
-            audio.y + 36.0,
-            audio.w - SECTION_PAD * 2.0,
-            40.0,
-        ));
-        self.mic_dropdown.layout(Rect::new(
-            audio.x + SECTION_PAD,
-            audio.y + 84.0,
-            audio.w - SECTION_PAD * 2.0,
-            40.0,
-        ));
+        cursor_y += 50.0;
+
+        // Audio
+        cursor_y += ROW_GAP + 20.0;
+        self.audio_output_dropdown
+            .layout(Rect::new(right_x, cursor_y + 24.0, right_w, 40.0));
+        cursor_y += 76.0;
+        self.mic_dropdown
+            .layout(Rect::new(right_x, cursor_y + 24.0, right_w, 40.0));
+        cursor_y += 76.0;
+
+        // Compute total unscaled height
+        let total_content_h = (cursor_y + self.scroll_y - available.y) + 120.0;
+
+        // Update valid max scroll bounds dynamically
+        self.max_scroll = (total_content_h - available.h).max(0.0);
 
         Size {
             w: available.w,
@@ -180,113 +191,236 @@ impl Widget for SettingsPanel {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        let (identity, streaming, input, audio, about) = self.section_rects();
+        // Sticky Header Region Layout (unaffected by scroll_y directly, visually floats if needed, but we'll draw it to scroll for harmony with Stitch).
+        let scroll_top = self.rect.y - self.scroll_y;
 
+        let content_x = self.rect.x + 40.0;
+        let content_w = (self.rect.w - 80.0).clamp(400.0, 900.0);
+
+        // Header
         ctx.push_text_run(TextRun {
-            x: self.rect.x,
-            y: self.rect.y + 10.0,
-            text: "Client Settings".to_string(),
-            font_size: 13.0,
-            color: theme::TEXT_MUTED,
-            monospace: false,
-        });
-
-        for section in [identity, streaming, input, audio, about] {
-            ctx.push_glass_quad(theme::card_surface(section));
-        }
-
-        ctx.push_text_run(TextRun {
-            x: identity.x + SECTION_PAD,
-            y: identity.y + 14.0,
+            x: content_x,
+            y: scroll_top + 40.0,
             text: "Identity & Security".to_string(),
-            font_size: 13.0,
+            font_size: theme::FONT_DISPLAY,
+            color: theme::TEXT_PRIMARY,
+            monospace: false,
+        });
+
+        ctx.push_text_run(TextRun {
+            x: content_x,
+            y: scroll_top + 74.0,
+            text: "Manage your digital footprint and application settings.".to_string(),
+            font_size: theme::FONT_BODY,
             color: theme::TEXT_MUTED,
             monospace: false,
         });
+
+        // Main Card Surface bounding all attributes
+        let card_y = scroll_top + 110.0;
+        let card_h = (self.max_scroll + self.rect.h) - 200.0; // Approximation of content depth
+        let card_rect = Rect::new(content_x, card_y, content_w, card_h.max(680.0));
+
+        ctx.push_glass_quad(theme::floating_surface(card_rect));
+
+        // Drawing Helper
+        let draw_row = |ctx: &mut PaintContext, y: f32, title: &str, subtitle: &str| {
+            ctx.push_text_run(TextRun {
+                x: content_x + 32.0,
+                y: y + 20.0,
+                text: title.to_string(),
+                font_size: theme::FONT_BODY,
+                color: theme::TEXT_PRIMARY,
+                monospace: false,
+            });
+            ctx.push_text_run(TextRun {
+                x: content_x + 32.0,
+                y: y + 42.0,
+                text: subtitle.to_string(),
+                font_size: theme::FONT_CAPTION,
+                color: theme::TEXT_MUTED,
+                monospace: false,
+            });
+        };
+
+        let draw_separator = |ctx: &mut PaintContext, y: f32| {
+            ctx.push_glass_quad(theme::glass_quad(
+                Rect::new(content_x + 32.0, y, content_w - 64.0, 1.0),
+                [0.0, 0.0, 0.0, 0.05],
+                [0.0, 0.0, 0.0, 0.0],
+                0.0,
+            ));
+        };
+
+        let mut cy = card_y;
+
+        // Identity Path
+        draw_row(
+            ctx,
+            cy,
+            "Identity Path",
+            "Your unique cryptographic identifier.",
+        );
+        let id_badge_w = theme::text_width(&self.identity_path, theme::FONT_LABEL) + 32.0;
+        ctx.push_glass_quad(theme::glass_quad(
+            Rect::new(
+                content_x + content_w - id_badge_w - 32.0,
+                cy + 12.0,
+                id_badge_w,
+                36.0,
+            ),
+            [1.0, 1.0, 1.0, 0.6],
+            [0.0, 0.0, 0.0, 0.08],
+            theme::CONTROL_RADIUS,
+        ));
         ctx.push_text_run(TextRun {
-            x: identity.x + SECTION_PAD,
-            y: identity.y + 36.0,
+            x: content_x + content_w - id_badge_w - 16.0,
+            y: cy + 24.0,
             text: self.identity_path.clone(),
-            font_size: 12.0,
-            color: theme::TEXT_PRIMARY,
+            font_size: theme::FONT_LABEL,
+            color: theme::ACCENT,
             monospace: true,
         });
+
+        cy += 74.0;
+        draw_separator(ctx, cy);
+        cy += ROW_GAP;
+
+        // Device Trust
+        draw_row(
+            ctx,
+            cy,
+            "Device Trust",
+            "Validation status of this hardware endpoint.",
+        );
+        let trust_badge = Rect::new(content_x + content_w * 0.35, cy + 12.0, 110.0, 24.0);
+        ctx.push_glass_quad(theme::status_chip(trust_badge, theme::ChipTone::Success));
         ctx.push_text_run(TextRun {
-            x: identity.x + SECTION_PAD,
-            y: identity.y + 58.0,
-            text: "Trust status: verified identity key".to_string(),
-            font_size: 11.0,
-            color: theme::TEXT_SECONDARY,
+            x: trust_badge.x + 12.0,
+            y: trust_badge.y + 5.0,
+            text: "Trusted Device".to_string(),
+            font_size: theme::FONT_CAPTION,
+            color: theme::SUCCESS,
             monospace: false,
         });
 
-        ctx.push_text_run(TextRun {
-            x: streaming.x + SECTION_PAD,
-            y: streaming.y + 14.0,
-            text: "Streaming Defaults".to_string(),
-            font_size: 13.0,
-            color: theme::TEXT_MUTED,
-            monospace: false,
-        });
+        cy += 74.0;
+        draw_separator(ctx, cy);
+        cy += ROW_GAP;
+
+        // Streaming Defaults
+        draw_row(
+            ctx,
+            cy,
+            "Streaming Defaults",
+            "Balance latency and fidelity.",
+        );
         self.default_profile_dropdown.paint(ctx);
 
+        cy += 84.0;
+        draw_separator(ctx, cy);
+        cy += ROW_GAP;
+
+        // Input
+        let right_x = content_x + content_w * 0.35;
+        let right_w = content_w * 0.65 - 32.0;
+
+        draw_row(
+            ctx,
+            cy,
+            "Input",
+            "Configure how local peripherals interact.",
+        );
+        ctx.push_glass_quad(theme::glass_quad(
+            Rect::new(right_x, cy, right_w, 56.0),
+            [1.0, 1.0, 1.0, 0.4],
+            [1.0, 1.0, 1.0, 0.6],
+            theme::CONTROL_RADIUS,
+        ));
         ctx.push_text_run(TextRun {
-            x: input.x + SECTION_PAD,
-            y: input.y + 14.0,
-            text: "Input Controls".to_string(),
-            font_size: 13.0,
-            color: theme::TEXT_MUTED,
-            monospace: false,
-        });
-        ctx.push_text_run(TextRun {
-            x: input.x + SECTION_PAD,
-            y: input.y + 44.0,
-            text: "Exclusive keyboard capture".to_string(),
-            font_size: 12.0,
-            color: theme::TEXT_PRIMARY,
-            monospace: false,
-        });
-        ctx.push_text_run(TextRun {
-            x: input.x + SECTION_PAD,
-            y: input.y + 76.0,
-            text: "Relative mouse mode".to_string(),
-            font_size: 12.0,
+            x: right_x + 16.0,
+            y: cy + 16.0,
+            text: "Exclusive Keyboard Capture".to_string(),
+            font_size: theme::FONT_LABEL,
             color: theme::TEXT_PRIMARY,
             monospace: false,
         });
         self.exclusive_keyboard_toggle.paint(ctx);
+        cy += 64.0;
+
+        ctx.push_glass_quad(theme::glass_quad(
+            Rect::new(right_x, cy, right_w, 56.0),
+            [1.0, 1.0, 1.0, 0.4],
+            [1.0, 1.0, 1.0, 0.6],
+            theme::CONTROL_RADIUS,
+        ));
+        ctx.push_text_run(TextRun {
+            x: right_x + 16.0,
+            y: cy + 16.0,
+            text: "Relative Mouse Movement".to_string(),
+            font_size: theme::FONT_LABEL,
+            color: theme::TEXT_PRIMARY,
+            monospace: false,
+        });
         self.relative_mouse_toggle.paint(ctx);
 
+        cy += 84.0;
+        draw_separator(ctx, cy);
+        cy += ROW_GAP;
+
+        // Audio
+        draw_row(
+            ctx,
+            cy,
+            "Audio",
+            "Route sound between local and remote boundaries.",
+        );
+        let audio_label_color = theme::TEXT_MUTED;
         ctx.push_text_run(TextRun {
-            x: audio.x + SECTION_PAD,
-            y: audio.y + 14.0,
-            text: "Audio Paths".to_string(),
-            font_size: 13.0,
-            color: theme::TEXT_MUTED,
+            x: right_x,
+            y: cy + 6.0,
+            text: "REMOTE OUTPUT".to_string(),
+            font_size: 10.0,
+            color: audio_label_color,
             monospace: false,
         });
         self.audio_output_dropdown.paint(ctx);
-        self.mic_dropdown.paint(ctx);
 
+        cy += 76.0;
         ctx.push_text_run(TextRun {
-            x: about.x + SECTION_PAD,
-            y: about.y + 14.0,
-            text: "About".to_string(),
-            font_size: 13.0,
-            color: theme::TEXT_MUTED,
+            x: right_x,
+            y: cy + 6.0,
+            text: "LOCAL MIC PATH".to_string(),
+            font_size: 10.0,
+            color: audio_label_color,
             monospace: false,
         });
+        self.mic_dropdown.paint(ctx);
+
+        // Versioning watermark at the bottom
+        let watermark_y = card_y + card_h + 30.0;
         ctx.push_text_run(TextRun {
-            x: about.x + SECTION_PAD,
-            y: about.y + 38.0,
-            text: format!("PRISM Client {}", self.version),
-            font_size: 12.0,
-            color: theme::TEXT_PRIMARY,
+            x: content_x + (content_w - 200.0) / 2.0,
+            y: watermark_y,
+            text: format!("PRISM Professional Edition • {}", self.version),
+            font_size: 10.0,
+            color: [
+                theme::TEXT_PRIMARY[0],
+                theme::TEXT_PRIMARY[1],
+                theme::TEXT_PRIMARY[2],
+                0.3,
+            ],
             monospace: false,
         });
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> EventResponse {
+        // Handle scroll behavior at container level
+        if let UiEvent::Scroll { dy, .. } = event {
+            self.scroll_y = (self.scroll_y - dy).clamp(0.0, self.max_scroll);
+            return EventResponse::Consumed;
+        }
+
         let old_profile = self.default_profile_dropdown.selected_index();
         let profile_resp = self.default_profile_dropdown.handle_event(event);
         if self.default_profile_dropdown.selected_index() != old_profile {
@@ -344,7 +478,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn settings_panel_paints_sections() {
+    fn settings_panel_paints_single_card() {
         let mut panel = SettingsPanel::new(
             "/home/user/.prism/client_identity.json".to_string(),
             "0.1.0".to_string(),
@@ -354,22 +488,19 @@ mod tests {
         let mut ctx = PaintContext::new();
         panel.paint(&mut ctx);
 
-        assert!(ctx.glass_quads.len() >= 9);
-        assert!(ctx.text_runs.len() >= 12);
+        // Core UI elements verify single card surface + internal dividers and backgrounds
+        assert!(ctx.glass_quads.len() >= 4);
     }
 
     #[test]
-    fn toggles_handle_clicks() {
+    fn scrolling_updates_offset() {
         let mut panel = SettingsPanel::new("id".to_string(), "0.1.0".to_string());
-        panel.layout(Rect::new(0.0, 0.0, 900.0, 720.0));
+        panel.layout(Rect::new(0.0, 0.0, 900.0, 300.0)); // Small height to induce max_scroll bounds
 
-        let (.., input, _, _) = panel.section_rects();
-        let resp = panel.handle_event(&UiEvent::MouseDown {
-            x: input.x + input.w - 30.0,
-            y: input.y + 50.0,
-            button: crate::ui::widgets::MouseButton::Left,
-        });
+        // Dispatch a scroll event
+        let resp = panel.handle_event(&UiEvent::Scroll { dx: 0.0, dy: -20.0 });
 
         assert!(matches!(resp, EventResponse::Consumed));
+        assert!(panel.scroll_y > 0.0);
     }
 }

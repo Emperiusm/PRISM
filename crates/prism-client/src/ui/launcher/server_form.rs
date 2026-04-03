@@ -116,33 +116,33 @@ impl Widget for ServerForm {
             return Size { w: 0.0, h: 0.0 };
         }
 
-        let panel_w = 300.0;
-        let panel_h = 280.0;
+        let panel_w = 340.0;
+        let panel_h = 320.0;
         self.rect = Rect::new(available.x, available.y, panel_w, panel_h);
 
-        let x = available.x + 12.0;
-        let w = panel_w - 24.0;
+        let x = available.x + 20.0;
+        let w = panel_w - 40.0;
 
-        // Name input at y+50
+        // Name input at y+60
         self.name_input
-            .layout(Rect::new(x, available.y + 50.0, w, 36.0));
-        // Address at y+95
+            .layout(Rect::new(x, available.y + 60.0, w, 36.0));
+        // Address at y+110
         self.address_input
-            .layout(Rect::new(x, available.y + 95.0, w, 36.0));
-        // Noise key at y+140
+            .layout(Rect::new(x, available.y + 110.0, w, 36.0));
+        // Noise key at y+160
         self.noise_key_input
-            .layout(Rect::new(x, available.y + 140.0, w, 36.0));
-        // Profile dropdown at y+185
+            .layout(Rect::new(x, available.y + 160.0, w, 36.0));
+        // Profile dropdown at y+210
         self.profile_dropdown
-            .layout(Rect::new(x, available.y + 185.0, w, 32.0));
-        // Save button at y+230
+            .layout(Rect::new(x, available.y + 210.0, w, 32.0));
+        // Save button at y+260
         self.save_button
-            .layout(Rect::new(x, available.y + 230.0, (w / 2.0) - 4.0, 36.0));
+            .layout(Rect::new(x, available.y + 260.0, (w / 2.0) - 6.0, 36.0));
         // Cancel beside save
         self.cancel_button.layout(Rect::new(
-            x + (w / 2.0) + 4.0,
-            available.y + 230.0,
-            (w / 2.0) - 4.0,
+            x + (w / 2.0) + 6.0,
+            available.y + 260.0,
+            (w / 2.0) - 6.0,
             36.0,
         ));
 
@@ -263,7 +263,7 @@ mod tests {
         form.paint(&mut ctx);
 
         assert!(
-            ctx.glass_quads.len() > 0,
+            !ctx.glass_quads.is_empty(),
             "expected glass quads when form is visible"
         );
     }

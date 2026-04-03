@@ -58,9 +58,11 @@ mod tests {
     #[test]
     fn save_and_load() {
         let dir = TempDir::new().expect("tempdir");
-        let mut prefs = UserPrefs::default();
-        prefs.default_profile = "Gaming".to_string();
-        prefs.exclusive_keyboard = false;
+        let prefs = UserPrefs {
+            default_profile: "Gaming".to_string(),
+            exclusive_keyboard: false,
+            ..UserPrefs::default()
+        };
         prefs.save(dir.path()).expect("save prefs");
 
         let loaded = UserPrefs::load(dir.path());

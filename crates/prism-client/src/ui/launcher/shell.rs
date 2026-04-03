@@ -4,7 +4,7 @@
 use super::{ActiveModal, FormMode, LauncherTab};
 use crate::config::servers::SavedServer;
 use crate::ui::UiState;
-use crate::ui::launcher::card_grid::CardGrid;
+use crate::ui::launcher::card_grid::{CardGrid, GridMode};
 use crate::ui::launcher::nav::LauncherNav;
 use crate::ui::launcher::profiles::ProfilesPanel;
 use crate::ui::launcher::quick_connect::QuickConnect;
@@ -32,6 +32,7 @@ pub struct LauncherShell {
     screen_rect: Rect,
     sidebar_rect: Rect,
     content_rect: Rect,
+    home_recent_y: f32,
     ui_state: UiState,
 }
 
@@ -56,6 +57,7 @@ impl LauncherShell {
             screen_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             sidebar_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
             content_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
+            home_recent_y: 0.0,
             ui_state: UiState::Launcher,
         };
         shell.configure_widgets();
@@ -142,11 +144,13 @@ impl LauncherShell {
     fn configure_widgets(&mut self) {
         match self.active_tab {
             LauncherTab::Home => {
+                self.card_grid.set_layout_mode(GridMode::Rows);
                 self.card_grid.set_visible_limit(Some(3));
                 self.card_grid.set_show_add_card(false);
                 self.card_grid.set_show_filters(false);
             }
             LauncherTab::SavedConnections => {
+                self.card_grid.set_layout_mode(GridMode::Grid);
                 self.card_grid.set_visible_limit(None);
                 self.card_grid.set_show_add_card(true);
                 self.card_grid.set_show_filters(true);
@@ -190,15 +194,18 @@ impl LauncherShell {
         match self.active_tab {
             LauncherTab::Home => {
                 let quick_y = self.content_rect.y + HEADER_OFFSET;
-                let section_y = quick_y + 132.0;
-                let card_y = section_y + 34.0;
 
-                self.quick_connect.layout(Rect::new(
+                let quick_size = self.quick_connect.layout(Rect::new(
                     self.content_rect.x,
                     quick_y,
                     self.content_rect.w,
-                    94.0,
+                    300.0,
                 ));
+
+                let section_y = quick_y + quick_size.h + 38.0;
+                self.home_recent_y = section_y;
+                let card_y = section_y + 34.0;
+
                 self.card_grid.layout(Rect::new(
                     self.content_rect.x,
                     card_y,
@@ -262,14 +269,14 @@ impl LauncherShell {
     fn paint_active_tab(&self, ctx: &mut PaintContext) {
         match self.active_tab {
             LauncherTab::Home => {
-                let section_y = self.content_rect.y + HEADER_OFFSET + 132.0;
+                let section_y = self.home_recent_y;
                 self.quick_connect.paint(ctx);
                 ctx.push_text_run(TextRun {
                     x: self.content_rect.x,
                     y: section_y,
-                    text: "Recent connections".to_string(),
-                    font_size: 12.0,
-                    color: theme::TEXT_MUTED,
+                    text: "Recent Connections".to_string(),
+                    font_size: 13.0,
+                    color: theme::TEXT_SECONDARY,
                     monospace: false,
                 });
                 ctx.push_glass_quad(theme::separator(Rect::new(

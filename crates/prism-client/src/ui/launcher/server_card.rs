@@ -14,6 +14,12 @@ use crate::ui::widgets::{
 const WEEK_SECS: u64 = 7 * 24 * 60 * 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CardLayoutMode {
+    Card,
+    Row,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CardFilter {
     All,
     Recent,
@@ -55,6 +61,14 @@ impl CardStatus {
             CardStatus::New => theme::ACCENT,
         }
     }
+
+    fn chip_tone(self) -> theme::ChipTone {
+        match self {
+            CardStatus::Recent => theme::ChipTone::Success,
+            CardStatus::Dormant => theme::ChipTone::Warning,
+            CardStatus::New => theme::ChipTone::Accent,
+        }
+    }
 }
 
 pub struct ServerCard {
@@ -70,6 +84,8 @@ pub struct ServerCard {
     delete_button: Button,
     hover_anim: Animation,
     hovered: bool,
+    layout_mode: CardLayoutMode,
+    index: Option<usize>,
     rect: Rect,
 }
 
@@ -116,8 +132,24 @@ impl ServerCard {
                 .with_style(ButtonStyle::Destructive),
             hover_anim: Animation::new(EaseCurve::EaseOut, 150.0),
             hovered: false,
+            layout_mode: CardLayoutMode::Card,
+            index: None,
             rect: Rect::new(0.0, 0.0, Self::WIDTH, Self::HEIGHT),
         }
+    }
+
+    pub fn with_index(mut self, index: usize) -> Self {
+        self.index = Some(index);
+        self
+    }
+
+    pub fn with_layout_mode(mut self, mode: CardLayoutMode) -> Self {
+        self.layout_mode = mode;
+        self
+    }
+
+    pub fn set_layout_mode(&mut self, mode: CardLayoutMode) {
+        self.layout_mode = mode;
     }
 
     pub fn matches_filter(&self, filter: CardFilter) -> bool {
@@ -152,10 +184,11 @@ impl ServerCard {
     }
 
     fn profile_chip_rect(&self) -> Rect {
+        let status_w = theme::text_width(self.status().label(), 10.0) + 26.0;
         let label = self.last_profile.to_uppercase();
         let w = theme::text_width(&label, 10.0) + 26.0;
         Rect::new(
-            self.rect.x + self.rect.w - 18.0 - w,
+            self.rect.x + 18.0 + status_w + 6.0,
             self.rect.y + 16.0,
             w,
             20.0,
@@ -163,7 +196,11 @@ impl ServerCard {
     }
 
     fn buttons_y(&self) -> f32 {
-        self.rect.y + self.rect.h - 54.0
+        if self.layout_mode == CardLayoutMode::Row {
+            self.rect.y + 12.0
+        } else {
+            self.rect.y + self.rect.h - 52.0
+        }
     }
 
     fn relative_last_connected(&self) -> String {
@@ -191,23 +228,44 @@ impl Widget for ServerCard {
     fn layout(&mut self, available: Rect) -> Size {
         const ACTION_GAP: f32 = 8.0;
         const SECONDARY_W: f32 = 62.0;
-        self.rect = Rect::new(available.x, available.y, Self::WIDTH, Self::HEIGHT);
-        let button_y = self.buttons_y();
-        let delete_x = self.rect.x + self.rect.w - 18.0 - SECONDARY_W;
-        let edit_x = delete_x - ACTION_GAP - SECONDARY_W;
-        let connect_x = self.rect.x + 18.0;
-        let connect_w = (edit_x - ACTION_GAP - connect_x).max(80.0);
 
-        self.connect_button
-            .layout(Rect::new(connect_x, button_y, connect_w, 40.0));
-        self.edit_button
-            .layout(Rect::new(edit_x, button_y, SECONDARY_W, 40.0));
-        self.delete_button
-            .layout(Rect::new(delete_x, button_y, SECONDARY_W, 40.0));
-        Size {
-            w: Self::WIDTH,
-            h: Self::HEIGHT,
+        let h = match self.layout_mode {
+            CardLayoutMode::Card => Self::HEIGHT,
+            CardLayoutMode::Row => 64.0,
+        };
+        let w = match self.layout_mode {
+            CardLayoutMode::Card => Self::WIDTH,
+            CardLayoutMode::Row => available.w,
+        };
+
+        self.rect = Rect::new(available.x, available.y, w, h);
+        let button_y = self.buttons_y();
+
+        if self.layout_mode == CardLayoutMode::Row {
+            let delete_x = self.rect.x + self.rect.w - 18.0 - SECONDARY_W;
+            let edit_x = delete_x - ACTION_GAP - SECONDARY_W;
+            let connect_x = edit_x - ACTION_GAP - 90.0;
+            self.connect_button
+                .layout(Rect::new(connect_x, button_y, 90.0, 40.0));
+            self.edit_button
+                .layout(Rect::new(edit_x, button_y, SECONDARY_W, 40.0));
+            self.delete_button
+                .layout(Rect::new(delete_x, button_y, SECONDARY_W, 40.0));
+        } else {
+            let sec_w = 48.0;
+            let delete_x = self.rect.x + self.rect.w - 18.0 - sec_w;
+            let edit_x = delete_x - ACTION_GAP - sec_w;
+            let connect_x = self.rect.x + 18.0;
+            let connect_w = (edit_x - ACTION_GAP - connect_x).max(80.0);
+            self.connect_button
+                .layout(Rect::new(connect_x, button_y, connect_w, 36.0));
+            self.edit_button
+                .layout(Rect::new(edit_x, button_y, sec_w, 36.0));
+            self.delete_button
+                .layout(Rect::new(delete_x, button_y, sec_w, 36.0));
         }
+
+        Size { w, h }
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
@@ -222,23 +280,38 @@ impl Widget for ServerCard {
             1.0,
         ];
 
-        ctx.push_glass_quad(theme::card_surface(r));
-        if hover > 0.01 {
-            ctx.push_glass_quad(theme::glass_quad(
-                r,
-                [accent[0], accent[1], accent[2], 0.04 + hover * 0.08],
-                [accent[0], accent[1], accent[2], 0.08 + hover * 0.10],
-                theme::CARD_RADIUS,
-            ));
+        if self.layout_mode == CardLayoutMode::Row {
+            ctx.push_glass_quad(theme::list_row_surface(r, hover > 0.01));
+        } else {
+            ctx.push_glass_quad(theme::card_surface(r));
+            if hover > 0.01 {
+                ctx.push_glass_quad(theme::glass_quad(
+                    r,
+                    [accent[0], accent[1], accent[2], 0.04 + hover * 0.08],
+                    [accent[0], accent[1], accent[2], 0.08 + hover * 0.10],
+                    theme::CARD_RADIUS,
+                ));
+            }
         }
 
-        let status_rect = self.status_chip_rect();
-        ctx.push_glass_quad(theme::glass_quad(
-            status_rect,
-            [status_tone[0], status_tone[1], status_tone[2], 0.18],
-            [status_tone[0], status_tone[1], status_tone[2], 0.22],
-            theme::CHIP_RADIUS,
-        ));
+        let status_rect = if self.layout_mode == CardLayoutMode::Row {
+            let label = status.label();
+            let w = theme::text_width(label, 10.0) + 26.0;
+            Rect::new(r.x + 220.0, r.y + 22.0, w, 20.0)
+        } else {
+            self.status_chip_rect()
+        };
+
+        if self.layout_mode == CardLayoutMode::Row {
+            ctx.push_glass_quad(theme::status_chip(status_rect, status.chip_tone()));
+        } else {
+            ctx.push_glass_quad(theme::glass_quad(
+                status_rect,
+                [status_tone[0], status_tone[1], status_tone[2], 0.18],
+                [status_tone[0], status_tone[1], status_tone[2], 0.22],
+                theme::CHIP_RADIUS,
+            ));
+        }
         ctx.push_text_run(TextRun {
             x: status_rect.x + 12.0,
             y: status_rect.y + 4.0,
@@ -248,58 +321,104 @@ impl Widget for ServerCard {
             monospace: false,
         });
 
-        let profile_rect = self.profile_chip_rect();
-        let profile_label = self.last_profile.to_uppercase();
-        ctx.push_glass_quad(theme::glass_quad(
-            profile_rect,
-            [1.0, 1.0, 1.0, 0.08],
-            [1.0, 1.0, 1.0, 0.10],
-            theme::CHIP_RADIUS,
-        ));
-        ctx.push_text_run(TextRun {
-            x: profile_rect.x + 12.0,
-            y: profile_rect.y + 4.0,
-            text: profile_label,
-            font_size: 10.0,
-            color: theme::TEXT_SECONDARY,
-            monospace: false,
-        });
+        if self.layout_mode == CardLayoutMode::Card {
+            let profile_rect = self.profile_chip_rect();
+            let profile_label = self.last_profile.to_uppercase();
+            ctx.push_glass_quad(theme::glass_quad(
+                profile_rect,
+                [1.0, 1.0, 1.0, 0.08],
+                [1.0, 1.0, 1.0, 0.10],
+                theme::CHIP_RADIUS,
+            ));
+            ctx.push_text_run(TextRun {
+                x: profile_rect.x + 12.0,
+                y: profile_rect.y + 4.0,
+                text: profile_label,
+                font_size: 10.0,
+                color: theme::TEXT_SECONDARY,
+                monospace: false,
+            });
 
-        ctx.push_text_run(TextRun {
-            x: r.x + 18.0,
-            y: r.y + 52.0,
-            text: self.display_name.clone(),
-            font_size: 16.0,
-            color: theme::TEXT_PRIMARY,
-            monospace: false,
-        });
+            ctx.push_text_run(TextRun {
+                x: r.x + 18.0,
+                y: r.y + 60.0,
+                text: self.display_name.clone(),
+                font_size: 16.0,
+                color: theme::TEXT_PRIMARY,
+                monospace: false,
+            });
 
-        ctx.push_text_run(TextRun {
-            x: r.x + 18.0,
-            y: r.y + 76.0,
-            text: self.address.clone(),
-            font_size: 11.0,
-            color: theme::TEXT_MUTED,
-            monospace: false,
-        });
+            ctx.push_text_run(TextRun {
+                x: r.x + 18.0,
+                y: r.y + 80.0,
+                text: self.address.clone(),
+                font_size: 11.0,
+                color: theme::TEXT_MUTED,
+                monospace: false,
+            });
 
-        ctx.push_text_run(TextRun {
-            x: r.x + 18.0,
-            y: r.y + 110.0,
-            text: self.relative_last_connected(),
-            font_size: 11.0,
-            color: theme::TEXT_SECONDARY,
-            monospace: false,
-        });
+            ctx.push_text_run(TextRun {
+                x: r.x + 18.0,
+                y: r.y + 116.0,
+                text: self.relative_last_connected(),
+                font_size: 11.0,
+                color: theme::TEXT_SECONDARY,
+                monospace: false,
+            });
 
-        ctx.push_text_run(TextRun {
-            x: r.x + 18.0,
-            y: r.y + 132.0,
-            text: self.last_info.clone(),
-            font_size: 11.0,
-            color: theme::TEXT_TERTIARY,
-            monospace: false,
-        });
+            ctx.push_text_run(TextRun {
+                x: r.x + 18.0,
+                y: r.y + 134.0,
+                text: self.last_info.clone(),
+                font_size: 11.0,
+                color: theme::TEXT_TERTIARY,
+                monospace: false,
+            });
+        } else {
+            // Row text placement
+            ctx.push_glass_quad(theme::glass_quad(
+                Rect::new(r.x + 18.0, r.y + 16.0, 32.0, 32.0),
+                [accent[0], accent[1], accent[2], 0.1],
+                [0.0, 0.0, 0.0, 0.0],
+                8.0,
+            ));
+            let index_text = format!("{:02}", self.index.unwrap_or(0));
+            let idx_w = theme::text_width(&index_text, 14.0);
+            ctx.push_text_run(TextRun {
+                x: r.x + 18.0 + (32.0 - idx_w) * 0.5,
+                y: r.y + 26.0,
+                text: index_text,
+                font_size: 14.0,
+                color: accent,
+                monospace: true,
+            });
+            ctx.push_text_run(TextRun {
+                x: r.x + 64.0,
+                y: r.y + 16.0,
+                text: self.display_name.clone(),
+                font_size: 14.0,
+                color: theme::TEXT_PRIMARY,
+                monospace: false,
+            });
+            ctx.push_text_run(TextRun {
+                x: r.x + 64.0,
+                y: r.y + 36.0,
+                text: self.address.clone(),
+                font_size: 11.0,
+                color: theme::TEXT_MUTED,
+                monospace: false,
+            });
+
+            let status_end = status_rect.x + status_rect.w;
+            ctx.push_text_run(TextRun {
+                x: status_end + 32.0,
+                y: r.y + 24.0,
+                text: self.relative_last_connected(),
+                font_size: 12.0,
+                color: theme::TEXT_SECONDARY,
+                monospace: false,
+            });
+        }
 
         self.connect_button.paint(ctx);
         self.edit_button.paint(ctx);
