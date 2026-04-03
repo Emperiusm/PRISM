@@ -177,7 +177,7 @@ impl Widget for ServerForm {
             text: title.to_string(),
             font_size: 16.0,
             color: theme::LT_TEXT_PRIMARY,
-            monospace: false,
+            ..Default::default()
         });
 
         self.name_input.paint(ctx);

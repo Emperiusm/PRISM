@@ -137,7 +137,7 @@ impl CardGrid {
             .cards
             .iter()
             .enumerate()
-            .filter_map(|(index, card)| card.matches_filter(self.active_filter).then_some(index))
+            .filter_map(|(index, card)| card.matches_filter(&self.active_filter).then_some(index))
             .collect();
     }
 
@@ -155,7 +155,7 @@ impl CardGrid {
             CardFilter::Dormant,
             CardFilter::New,
         ] {
-            let label = filter.label(self.cards.len());
+            let label = filter.label();
             let w = theme::text_width(&label, 11.0) + 28.0;
             let rect = Rect::new(x, y, w, FILTER_H);
             self.filter_chip_rects.push((filter, rect));
@@ -292,8 +292,8 @@ impl Widget for CardGrid {
     fn paint(&self, ctx: &mut PaintContext) {
         if self.show_filters {
             for (filter, rect) in &self.filter_chip_rects {
-                let active = *filter == self.active_filter;
-                let hovered = self.hovered_filter == Some(*filter);
+                let active = filter == &self.active_filter;
+                let hovered = self.hovered_filter.as_ref() == Some(filter);
 
                 let pill_radius = 16.0;
                 if active {
@@ -312,10 +312,10 @@ impl Widget for CardGrid {
                     ctx.push_text_run(TextRun {
                         x: rect.x + 14.0,
                         y: rect.y + 10.0,
-                        text: filter.label(self.cards.len()),
+                        text: filter.label(),
                         font_size: 11.0,
                         color: [1.0, 1.0, 1.0, 1.0],
-                        monospace: false,
+                        ..Default::default()
                     });
                 } else {
                     // Light frosted pill for inactive
@@ -331,10 +331,10 @@ impl Widget for CardGrid {
                     ctx.push_text_run(TextRun {
                         x: rect.x + 14.0,
                         y: rect.y + 10.0,
-                        text: filter.label(self.cards.len()),
+                        text: filter.label(),
                         font_size: 11.0,
                         color: theme::LT_TEXT_SECONDARY,
-                        monospace: false,
+                        ..Default::default()
                     });
                 }
             }
@@ -352,7 +352,7 @@ impl Widget for CardGrid {
                 text: "No saved desktops match this filter.".to_string(),
                 font_size: 12.0,
                 color: theme::LT_TEXT_MUTED,
-                monospace: false,
+                ..Default::default()
             });
         }
 
@@ -398,7 +398,7 @@ impl Widget for CardGrid {
                 text: plus.to_string(),
                 font_size: 28.0,
                 color: theme::PRIMARY_BLUE,
-                monospace: false,
+                ..Default::default()
             });
 
             let title = "Add New Connection";
@@ -408,7 +408,7 @@ impl Widget for CardGrid {
                 text: title.to_string(),
                 font_size: 14.0,
                 color: theme::LT_TEXT_PRIMARY,
-                monospace: false,
+                ..Default::default()
             });
 
             let body = "Manual IP or Network Discovery";
@@ -418,7 +418,7 @@ impl Widget for CardGrid {
                 text: body.to_string(),
                 font_size: 11.0,
                 color: theme::LT_TEXT_MUTED,
-                monospace: false,
+                ..Default::default()
             });
         }
     }
@@ -429,7 +429,7 @@ impl Widget for CardGrid {
                 self.hovered_filter = self
                     .filter_chip_rects
                     .iter()
-                    .find_map(|(filter, rect)| rect.contains(*x, *y).then_some(*filter));
+                    .find_map(|(filter, rect)| rect.contains(*x, *y).then_some(filter.clone()));
             }
             UiEvent::MouseDown {
                 x,
@@ -442,7 +442,7 @@ impl Widget for CardGrid {
                     .find(|(_, rect)| rect.contains(*x, *y))
                 {
                     if self.active_filter != *filter {
-                        self.active_filter = *filter;
+                        self.active_filter = filter.clone();
                         self.recompute_layout();
                     }
                     return EventResponse::Consumed;

@@ -45,7 +45,7 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 
 ### Passes
 
-- [ ] **Pass 0 — Data Prerequisites** (Phase 0: TASK-P01 → TASK-P06)
+- [x] **Pass 0 — Data Prerequisites** (Phase 0: TASK-P01 → TASK-P06)
 - [ ] **Pass 1 — Foundations** (Phases 1–3: TASK-002 → TASK-015)
 - [ ] **Pass 2 — Icons & Header** (Phases 5–6: TASK-024 → TASK-033)
 - [ ] **Pass 3 — Data & Screens** (Phases 4, 7–9: TASK-016 → TASK-023, TASK-034 → TASK-064)
@@ -54,7 +54,7 @@ Check off each phase/pass as it is completed. Refer to **Section 10 — Recommen
 
 ### Phases
 
-- [ ] Phase 0 — Data-Layer Prerequisites (6 tasks: P01–P06)
+- [x] Phase 0 — Data-Layer Prerequisites (6 tasks: P01–P06)
 - [ ] Phase 1 — Bold Text Support (3 tasks: 002–004)
 - [ ] Phase 2 — Primary Button Color Fix (3 tasks: 005–007)
 - [ ] Phase 3 — Sidebar Geometry Overhaul (7 tasks: 008–015)
@@ -405,13 +405,13 @@ mode is handled exclusively by the overlay and is NOT modified by this plan.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-P01 | **`ServerStatus` enum:** In `crates/prism-client/src/config/servers.rs`, add `pub enum ServerStatus { Online, Sleeping, Unreachable }`. The design uses status to drive chip color (Success/Warning/Danger), contextual button labels, and unreachable-card dimming. | | |
-| TASK-P02 | **Heuristic status derivation:** Add `pub fn derived_status(&self) -> ServerStatus` to `SavedServer`. Logic: if `last_connected` is `None` → `Unreachable`; if age < 6 hours → `Online`; if age < 7 days → `Sleeping`; else → `Unreachable`. This is a temporary heuristic until real-time discovery/ping is implemented. Document the intent to replace with a runtime probe in a follow-up plan. | | |
-| TASK-P03 | **Schema extensions:** Add optional fields to `SavedServer`: `pub os_label: Option<String>` (e.g. "WINDOWS 11 PRO"), `pub tags: Vec<String>` (e.g. ["WORK"]), `pub wol_supported: bool` (default `false`), `pub last_latency_ms: Option<u32>`. These fields are `Option`/defaulted so existing serialized data remains compatible. Update `serde` derives and `ServerStore` snapshot logic. | | |
-| TASK-P04 | **Filter alignment:** In `ui/launcher/server_card.rs`, update `CardFilter` to support tag-based filters in addition to time-based ones. Add variants: `Tag(String)`. Update `label()` to return the tag name. The filter bar (Phase 7) can render both built-in and tag-derived pills. The current `All`/`Recent`/`Dormant`/`New` filters remain; tag pills are appended dynamically from the union of all servers' `tags`. | | |
-| TASK-P05 | **`TextRun` extensibility (merged from Phase 1 TASK-001):** In `ui/widgets/mod.rs`, add `bold: bool` and `icon: bool` fields to `TextRun` (both default `false`). Implement `Default` manually (not `#[derive(Default)]` — `font_size` must default to `14.0`, not `0.0`). Migrate ALL existing `TextRun { ... }` construction sites to use `..Default::default()` syntax. This makes `TextRun` forward-compatible — Phase 1 (bold rendering) and Phase 5 (icon rendering) consume these fields without re-editing the struct or its `Default` impl. | | |
-| TASK-P05a | **`GlassQuad` `Default` impl:** In `ui/widgets/mod.rs`, implement `Default` for `GlassQuad` with zeroed fields: `rect: Rect::ZERO`, `blur_rect: Rect::ZERO`, `tint: [0.0; 4]`, `border_color: [0.0; 4]`, `corner_radius: 0.0`, `noise_intensity: 0.0`. This enables `GlassQuad { rect, tint, corner_radius, ..Default::default() }` shorthand throughout all phases. | | |
-| TASK-P06 | `cargo check -p prism-client` — verify compilation. All existing `TextRun` and `GlassQuad` construction sites compile with the new `Default` impls. | | |
+| TASK-P01 | **`ServerStatus` enum:** In `crates/prism-client/src/config/servers.rs`, add `pub enum ServerStatus { Online, Sleeping, Unreachable }`. The design uses status to drive chip color (Success/Warning/Danger), contextual button labels, and unreachable-card dimming. | ✅ | 2026-04-03 |
+| TASK-P02 | **Heuristic status derivation:** Add `pub fn derived_status(&self) -> ServerStatus` to `SavedServer`. Logic: if `last_connected` is `None` → `Unreachable`; if age < 6 hours → `Online`; if age < 7 days → `Sleeping`; else → `Unreachable`. This is a temporary heuristic until real-time discovery/ping is implemented. Document the intent to replace with a runtime probe in a follow-up plan. | ✅ | 2026-04-03 |
+| TASK-P03 | **Schema extensions:** Add optional fields to `SavedServer`: `pub os_label: Option<String>` (e.g. "WINDOWS 11 PRO"), `pub tags: Vec<String>` (e.g. ["WORK"]), `pub wol_supported: bool` (default `false`), `pub last_latency_ms: Option<u32>`. These fields are `Option`/defaulted so existing serialized data remains compatible. Update `serde` derives and `ServerStore` snapshot logic. | ✅ | 2026-04-03 |
+| TASK-P04 | **Filter alignment:** In `ui/launcher/server_card.rs`, update `CardFilter` to support tag-based filters in addition to time-based ones. Add variants: `Tag(String)`. Update `label()` to return the tag name. The filter bar (Phase 7) can render both built-in and tag-derived pills. The current `All`/`Recent`/`Dormant`/`New` filters remain; tag pills are appended dynamically from the union of all servers' `tags`. | ✅ | 2026-04-03 |
+| TASK-P05 | **`TextRun` extensibility (merged from Phase 1 TASK-001):** In `ui/widgets/mod.rs`, add `bold: bool` and `icon: bool` fields to `TextRun` (both default `false`). Implement `Default` manually (not `#[derive(Default)]` — `font_size` must default to `14.0`, not `0.0`). Migrate ALL existing `TextRun { ... }` construction sites to use `..Default::default()` syntax. This makes `TextRun` forward-compatible — Phase 1 (bold rendering) and Phase 5 (icon rendering) consume these fields without re-editing the struct or its `Default` impl. | ✅ | 2026-04-03 |
+| TASK-P05a | **`GlassQuad` `Default` impl:** In `ui/widgets/mod.rs`, implement `Default` for `GlassQuad` with zeroed fields: `rect: Rect::ZERO`, `blur_rect: Rect::ZERO`, `tint: [0.0; 4]`, `border_color: [0.0; 4]`, `corner_radius: 0.0`, `noise_intensity: 0.0`. This enables `GlassQuad { rect, tint, corner_radius, ..Default::default() }` shorthand throughout all phases. | ✅ | 2026-04-03 |
+| TASK-P06 | `cargo check -p prism-client` — verify compilation. All existing `TextRun` and `GlassQuad` construction sites compile with the new `Default` impls. | ✅ | 2026-04-03 |
 
 #### Phase 0 — Implementation Detail
 

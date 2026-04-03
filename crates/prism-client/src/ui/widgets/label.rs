@@ -59,6 +59,7 @@ impl Widget for Label {
             font_size: self.font_size,
             color: self.color,
             monospace: self.monospace,
+            ..Default::default()
         });
     }
 

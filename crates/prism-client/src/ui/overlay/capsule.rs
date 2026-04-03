@@ -192,7 +192,7 @@ impl Widget for OverlayCapsule {
             text: "DECODE".into(),
             font_size: 10.0,
             color: txt_c,
-            monospace: false,
+            ..Default::default()
         });
         bl_x += 46.0;
         ctx.push_text_run(TextRun {
@@ -202,6 +202,7 @@ impl Widget for OverlayCapsule {
             font_size: 11.0,
             color: theme::ACCENT,
             monospace: true,
+            ..Default::default()
         });
         bl_x += 50.0;
 
@@ -211,7 +212,7 @@ impl Widget for OverlayCapsule {
             text: "RES".into(),
             font_size: 10.0,
             color: txt_c,
-            monospace: false,
+            ..Default::default()
         });
         bl_x += 24.0;
         ctx.push_text_run(TextRun {
@@ -224,6 +225,7 @@ impl Widget for OverlayCapsule {
             font_size: 11.0,
             color: theme::ACCENT,
             monospace: true,
+            ..Default::default()
         });
         bl_x += 80.0;
 
@@ -233,7 +235,7 @@ impl Widget for OverlayCapsule {
             text: "ACTIVE SESSION".into(),
             font_size: 10.0,
             color: theme::SUCCESS,
-            monospace: false,
+            ..Default::default()
         });
 
         // Paint Disconnect Button (Bottom Corner)
@@ -249,7 +251,7 @@ impl Widget for OverlayCapsule {
             text: "DISCONNECT".into(),
             font_size: 8.0,
             color: [1.0, 1.0, 1.0, 1.0],
-            monospace: false,
+            ..Default::default()
         });
     }
 
