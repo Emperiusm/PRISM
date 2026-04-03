@@ -24,6 +24,7 @@ use crate::ui::launcher::card_grid::CardGrid;
 use crate::ui::launcher::nav::LauncherNav;
 use crate::ui::launcher::profiles::ProfilesPanel;
 use crate::ui::launcher::quick_connect::QuickConnect;
+use crate::ui::launcher::recent_list::RecentList;
 use crate::ui::launcher::server_form::ServerForm;
 use crate::ui::launcher::settings::SettingsPanel;
 use crate::ui::launcher::shell::LauncherShell;
@@ -117,6 +118,7 @@ impl PrismApp {
         let launcher_shell = LauncherShell::new(
             LauncherNav::new(),
             QuickConnect::new(),
+            RecentList::new(),
             card_grid,
             profiles_panel,
             settings_panel,

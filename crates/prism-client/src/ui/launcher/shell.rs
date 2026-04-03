@@ -8,6 +8,7 @@ use crate::ui::launcher::card_grid::{CardGrid, GridMode};
 use crate::ui::launcher::nav::LauncherNav;
 use crate::ui::launcher::profiles::ProfilesPanel;
 use crate::ui::launcher::quick_connect::QuickConnect;
+use crate::ui::launcher::recent_list::RecentList;
 use crate::ui::launcher::server_form::ServerForm;
 use crate::ui::launcher::settings::SettingsPanel;
 use crate::ui::theme;
@@ -24,6 +25,7 @@ const HEADER_H: f32 = 48.0;
 pub struct LauncherShell {
     nav: LauncherNav,
     quick_connect: QuickConnect,
+    recent_list: RecentList,
     card_grid: CardGrid,
     profiles_panel: ProfilesPanel,
     settings_panel: SettingsPanel,
@@ -41,6 +43,7 @@ impl LauncherShell {
     pub fn new(
         nav: LauncherNav,
         quick_connect: QuickConnect,
+        recent_list: RecentList,
         card_grid: CardGrid,
         profiles_panel: ProfilesPanel,
         settings_panel: SettingsPanel,
@@ -49,6 +52,7 @@ impl LauncherShell {
         let mut shell = Self {
             nav,
             quick_connect,
+            recent_list,
             card_grid,
             profiles_panel,
             settings_panel,
@@ -87,6 +91,7 @@ impl LauncherShell {
     }
 
     pub fn set_servers(&mut self, servers: &[SavedServer]) {
+        self.recent_list.set_servers(servers);
         self.card_grid.set_servers(servers);
         if self.screen_rect.w > 0.0 && self.screen_rect.h > 0.0 {
             self.layout(self.screen_rect);
@@ -145,10 +150,7 @@ impl LauncherShell {
     fn configure_widgets(&mut self) {
         match self.active_tab {
             LauncherTab::Home => {
-                self.card_grid.set_layout_mode(GridMode::Rows);
-                self.card_grid.set_visible_limit(Some(3));
-                self.card_grid.set_show_add_card(false);
-                self.card_grid.set_show_filters(false);
+                // Home uses RecentList, not CardGrid
             }
             LauncherTab::SavedConnections => {
                 self.card_grid.set_layout_mode(GridMode::Grid);
@@ -205,13 +207,14 @@ impl LauncherShell {
 
                 let section_y = quick_y + quick_size.h + 38.0;
                 self.home_recent_y = section_y;
-                let card_y = section_y + 34.0;
+                let list_y = section_y + 34.0;
+                let list_h = (body.y + body.h - list_y).max(0.0);
 
-                self.card_grid.layout(Rect::new(
+                self.recent_list.layout(Rect::new(
                     body.x,
-                    card_y,
+                    list_y,
                     body.w,
-                    (body.y + body.h - card_y).max(0.0),
+                    list_h,
                 ));
             }
             LauncherTab::SavedConnections => {
@@ -328,7 +331,7 @@ impl LauncherShell {
                     body.w,
                     1.0,
                 )));
-                self.card_grid.paint(ctx);
+                self.recent_list.paint(ctx);
             }
             LauncherTab::SavedConnections => {
                 self.card_grid.paint(ctx);
@@ -507,7 +510,7 @@ impl Widget for LauncherShell {
                 if !matches!(quick_resp, EventResponse::Ignored) {
                     return quick_resp;
                 }
-                self.card_grid.handle_event(event)
+                self.recent_list.handle_event(event)
             }
             LauncherTab::SavedConnections => self.card_grid.handle_event(event),
             LauncherTab::Profiles => self.profiles_panel.handle_event(event),
@@ -518,6 +521,7 @@ impl Widget for LauncherShell {
     fn animate(&mut self, dt_ms: f32) {
         self.nav.animate(dt_ms);
         self.quick_connect.animate(dt_ms);
+        self.recent_list.animate(dt_ms);
         self.card_grid.animate(dt_ms);
         self.profiles_panel.animate(dt_ms);
         self.settings_panel.animate(dt_ms);

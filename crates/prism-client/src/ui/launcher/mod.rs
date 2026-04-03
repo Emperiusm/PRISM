@@ -5,6 +5,7 @@ pub mod card_grid;
 pub mod nav;
 pub mod profiles;
 pub mod quick_connect;
+pub mod recent_list;
 pub mod server_card;
 pub mod server_form;
 pub mod settings;
