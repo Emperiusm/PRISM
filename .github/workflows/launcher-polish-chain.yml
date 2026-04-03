@@ -1,0 +1,153 @@
+name: "Launcher Polish — Phase Chain"
+
+# Triggers when a launcher-polish PR merges to main.
+# Looks up the next phase and assigns it to Copilot Coding Agent.
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  chain-next-phase:
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'launcher-polish')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine completed phase and assign next
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const sequence = JSON.parse(
+              fs.readFileSync('.github/launcher-polish-sequence.json', 'utf8')
+            );
+
+            // Find which phase label was on the merged PR
+            const prLabels = context.payload.pull_request.labels.map(l => l.name);
+            const phaseLabel = prLabels.find(l => l.startsWith('phase-'));
+            if (!phaseLabel) {
+              console.log('No phase-* label found on PR, skipping.');
+              return;
+            }
+
+            const completedIndex = sequence.findIndex(p => p.label === phaseLabel);
+            if (completedIndex === -1) {
+              console.log(`Phase ${phaseLabel} not in sequence, skipping.`);
+              return;
+            }
+
+            // Mark completed phase issue as closed
+            const completed = sequence[completedIndex];
+            if (completed.issue) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: completed.issue,
+                state: 'closed',
+                state_reason: 'completed'
+              });
+              console.log(`Closed issue #${completed.issue} (${phaseLabel}).`);
+            }
+
+            // Check if there's a next phase
+            if (completedIndex + 1 >= sequence.length) {
+              console.log('All phases complete!');
+
+              // Close the tracking issue if it exists
+              const trackingIssue = sequence.find(p => p.label === 'tracking');
+              if (trackingIssue?.issue) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: trackingIssue.issue,
+                  state: 'closed',
+                  state_reason: 'completed'
+                });
+              }
+              return;
+            }
+
+            const next = sequence[completedIndex + 1];
+            console.log(`Assigning next phase: ${next.label} (issue #${next.issue})`);
+
+            // Assign Copilot to the next issue
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: next.issue,
+              assignees: ['copilot']
+            });
+
+            // Add a comment to surface context
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: next.issue,
+              body: `🔗 Previous phase merged: ${context.payload.pull_request.html_url}\n\nCopilot, you may begin this phase now. The plan is at \`docs/superpowers/plans/2026-04-03-launcher-ui-polish.md\`.`
+            });
+
+  # Safety: notify on 2 consecutive CI failures for the same phase
+  notify-stuck:
+    if: >-
+      github.event.pull_request.merged == false &&
+      contains(github.event.pull_request.labels.*.name, 'launcher-polish')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check for repeated failures
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prLabels = context.payload.pull_request.labels.map(l => l.name);
+            const phaseLabel = prLabels.find(l => l.startsWith('phase-'));
+            if (!phaseLabel) return;
+
+            // Count closed (unmerged) PRs with this phase label
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              per_page: 10
+            });
+
+            const failedAttempts = prs.filter(pr =>
+              !pr.merged_at &&
+              pr.labels.some(l => l.name === phaseLabel) &&
+              pr.labels.some(l => l.name === 'launcher-polish')
+            ).length;
+
+            if (failedAttempts >= 2) {
+              // Find the issue for this phase
+              const fs = require('fs');
+              const sequence = JSON.parse(
+                fs.readFileSync('.github/launcher-polish-sequence.json', 'utf8')
+              );
+              const phase = sequence.find(p => p.label === phaseLabel);
+
+              if (phase?.issue) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: phase.issue,
+                  body: `⚠️ **Chain halted**: ${failedAttempts} failed attempts for ${phaseLabel}. Manual intervention needed.\n\ncc @Emperiusm`
+                });
+
+                // Remove copilot assignment to stop retries
+                await github.rest.issues.removeAssignees({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: phase.issue,
+                  assignees: ['copilot']
+                });
+              }
+            }
