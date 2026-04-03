@@ -71,7 +71,9 @@ impl Widget for TextInput {
     fn paint(&self, ctx: &mut PaintContext) {
         match self.color_mode {
             ColorMode::Light => {
-                ctx.push_glass_quad(theme::launcher_control_surface(self.rect, self.focused));
+                let mut quad = theme::launcher_control_surface(self.rect, self.focused);
+                quad.corner_radius = 8.0;
+                ctx.push_glass_quad(quad);
             }
             ColorMode::Dark => {
                 ctx.push_glass_quad(theme::control_surface(self.rect, self.focused));
