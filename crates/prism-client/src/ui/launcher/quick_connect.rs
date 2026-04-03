@@ -5,7 +5,8 @@ use crate::ui::theme;
 use crate::ui::widgets::button::{Button, ButtonStyle};
 use crate::ui::widgets::text_input::TextInput;
 use crate::ui::widgets::{
-    EventResponse, KeyCode, PaintContext, Rect, Size, TextRun, UiAction, UiEvent, Widget,
+    ColorMode, EventResponse, KeyCode, PaintContext, Rect, Size, TextRun, UiAction, UiEvent,
+    Widget,
 };
 
 // ---------------------------------------------------------------------------
@@ -21,7 +22,8 @@ pub struct QuickConnect {
 impl QuickConnect {
     pub fn new() -> Self {
         Self {
-            address_input: TextInput::new("Enter a host or IP address"),
+            address_input: TextInput::new("Enter a host or IP address")
+                .with_color_mode(ColorMode::Light),
             connect_button: Button::new(
                 "Connect",
                 UiAction::Connect {
@@ -29,7 +31,8 @@ impl QuickConnect {
                     noise_key: None,
                 },
             )
-            .with_style(ButtonStyle::Primary),
+            .with_style(ButtonStyle::Primary)
+            .with_color_mode(ColorMode::Light),
             rect: Rect::new(0.0, 0.0, 0.0, 0.0),
         }
     }
@@ -65,7 +68,7 @@ impl Widget for QuickConnect {
     }
 
     fn paint(&self, ctx: &mut PaintContext) {
-        ctx.push_glass_quad(theme::hero_surface(self.rect));
+        ctx.push_glass_quad(theme::launcher_hero_surface(self.rect));
 
         // Match Stitch visual intent with FONT_HERO heading centered
         let title = "Quick Connect";
@@ -75,7 +78,7 @@ impl Widget for QuickConnect {
             y: self.rect.y + 40.0,
             text: title.into(),
             font_size: theme::FONT_HERO,
-            color: theme::TEXT_PRIMARY,
+            color: theme::LT_TEXT_PRIMARY,
             monospace: false,
         });
 
@@ -86,7 +89,7 @@ impl Widget for QuickConnect {
             y: self.rect.y + 80.0,
             text: subtitle.into(),
             font_size: theme::FONT_BODY,
-            color: theme::TEXT_MUTED,
+            color: theme::LT_TEXT_MUTED,
             monospace: false,
         });
 

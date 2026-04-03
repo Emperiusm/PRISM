@@ -16,6 +16,19 @@ pub mod toggle;
 use crate::ui::launcher::LauncherTab;
 
 // ---------------------------------------------------------------------------
+// Color mode
+// ---------------------------------------------------------------------------
+
+/// Controls whether a widget renders with dark-glass (overlay) or
+/// light-Mica (launcher) colors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorMode {
+    #[default]
+    Dark,
+    Light,
+}
+
+// ---------------------------------------------------------------------------
 // Geometry
 // ---------------------------------------------------------------------------
 
