@@ -3,7 +3,7 @@
 
 use glyphon::{
     Attrs, Buffer, Cache, Color, Family, FontSystem, Metrics, Resolution, Shaping, SwashCache,
-    TextArea, TextAtlas, TextBounds, TextRenderer as GlyphonTextRenderer, Viewport,
+    TextArea, TextAtlas, TextBounds, TextRenderer as GlyphonTextRenderer, Viewport, Weight,
 };
 
 use crate::ui::widgets::PaintContext;
@@ -91,10 +91,12 @@ impl TextPipeline {
                 Family::SansSerif
             };
 
+            let weight = if run.bold { Weight::BOLD } else { Weight::NORMAL };
+
             buf.set_text(
                 &mut self.font_system,
                 &run.text,
-                Attrs::new().family(family),
+                Attrs::new().family(family).weight(weight),
                 Shaping::Advanced,
             );
 

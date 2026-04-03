@@ -280,6 +280,7 @@ impl LauncherShell {
                     text: "Recent Connections".to_string(),
                     font_size: 13.0,
                     color: theme::LT_TEXT_SECONDARY,
+                    bold: true,
                     ..Default::default()
                 });
                 ctx.push_glass_quad(theme::launcher_separator(Rect::new(
